@@ -1,0 +1,10 @@
+[metadata]
+name = "hello"
+version = "1.0.0"
+architecture = "AMD64"
+description = "test package"
+
+dependencies = [
+    "glibc",
+    "libarchive"
+]
