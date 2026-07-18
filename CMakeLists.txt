@@ -12,6 +12,7 @@ add_executable(${PROJECT_NAME}
         meow/src/package/load.cpp
         meow/src/repository/repository.cpp
         meow/src/repository/version.cpp
+        meow/src/repository/resolver.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
