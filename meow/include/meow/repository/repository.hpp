@@ -7,9 +7,14 @@
 #include <meow/types/types.hpp>
 
 namespace meow::repository {
+    struct RepositoryVersion {
+        types::PackageVersion version;
+        std::filesystem::path archive;
+    };
+
     struct RepositoryPackage {
         types::PackageName name;
-        std::vector<std::filesystem::path> versions;
+        std::vector<RepositoryVersion> versions;
     };
 
     struct Repository {
@@ -20,7 +25,7 @@ namespace meow::repository {
     Repository loadRepository(const std::filesystem::path& root);
     const RepositoryPackage* findPackage(const Repository& repo, const types::PackageName& name);
     std::vector<types::PackageName> listPackages(const Repository& repo);
-    std::vector<std::filesystem::path> listVersions(const RepositoryPackage& package);
+    std::vector<types::PackageVersion> listVersions(const RepositoryPackage& package);
 }
 
 #endif //MEOWOS_REPOSITORY_H
