@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.2)
+cmake_minimum_required(VERSION 3.20)
 
 project(meowOS)
 
@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(${PROJECT_NAME}
         meow/src/main.cpp
+        meow/src/archive/archive.cpp
         meow/src/cli/command_parser.cpp
         meow/src/package/parser.cpp
 )
@@ -17,7 +18,15 @@ target_include_directories(${PROJECT_NAME}
 
 find_package(SQLite3 REQUIRED)
 find_package(LibArchive REQUIRED)
-find_package(tomlplusplus REQUIRED)
+find_package(tomlplusplus QUIET)
+if(NOT tomlplusplus_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(tomlplusplus
+        GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+        GIT_TAG v3.4.0
+    )
+    FetchContent_MakeAvailable(tomlplusplus)
+endif()
 
 target_link_libraries(${PROJECT_NAME}
         PRIVATE
