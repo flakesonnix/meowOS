@@ -2,6 +2,7 @@
 #define MEOWOS_ARCHIVE_H
 
 #include <filesystem>
+#include <meow/types/types.hpp>
 
 namespace meow::archive {
     struct Archive {
@@ -9,6 +10,8 @@ namespace meow::archive {
     };
 
     Archive openArchive(const std::filesystem::path& path);
+    types::FileList listFiles(const Archive& archive);
+    std::string readFile(const Archive& archive, const std::filesystem::path& filename);
 }
 
 #endif //MEOWOS_ARCHIVE_H
