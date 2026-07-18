@@ -4,6 +4,7 @@
 
 #ifndef MEOWOS_PACKAGE_H
 #define MEOWOS_PACKAGE_H
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,14 @@ namespace meow::package {
         meow::types::Description description;
         meow::types::Dependencies dependencies;
     };
+
+    struct PackageFile {
+        std::filesystem::path archivePath;
+        PackageMetadata metadata;
+        types::FileList files;
+    };
+
+    PackageFile loadPackage(const std::filesystem::path& path);
 }
 
 #endif //MEOWOS_PACKAGE_H

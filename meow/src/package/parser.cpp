@@ -7,8 +7,8 @@
 #include <meow/package/package.hpp>
 
 namespace meow::package {
-    PackageMetadata ParsePackageManifest(const std::string& path) {
-        toml::table tbl = toml::parse_file(path);
+    PackageMetadata parsePackageManifest(const std::string& tomlContent) {
+        toml::table tbl = toml::parse(tomlContent);
 
 
 

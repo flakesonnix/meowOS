@@ -3,7 +3,9 @@
 //
 
 
+#include <fstream>
 #include <iostream>
+#include <sstream>
 
 #include "meow/package/parser.hpp"
 
@@ -26,7 +28,10 @@ std::ostream& operator<<(std::ostream& os, const meow::package::PackageMetadata&
 }
 
 int main() {
-    const auto test = meow::package::ParsePackageManifest("./examples/hello.toml");
+    std::ifstream file("./examples/hello.toml");
+    std::stringstream buf;
+    buf << file.rdbuf();
+    const auto test = meow::package::parsePackageManifest(buf.str());
 
     std::cout <<test << std::endl;
 

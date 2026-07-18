@@ -9,6 +9,8 @@ add_executable(${PROJECT_NAME}
         meow/src/archive/archive.cpp
         meow/src/cli/command_parser.cpp
         meow/src/package/parser.cpp
+        meow/src/package/load.cpp
+        meow/src/repository/repository.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

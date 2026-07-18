@@ -5,7 +5,7 @@
 #include <meow/package/package.hpp>
 
 namespace meow::package {
-   PackageMetadata ParsePackageManifest(const std::string& path);
+   PackageMetadata parsePackageManifest(const std::string& tomlContent);
 }
 
 #endif //MEOWOS_PARSER_H
