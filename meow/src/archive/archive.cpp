@@ -130,4 +130,29 @@ namespace meow::archive {
         }
         return extracted;
     }
+
+    void extractFile(const Archive& archive, const std::filesystem::path& file, const std::filesystem::path& destination) {
+        ArchiveHandle ah{archive.path};
+
+        struct archive_entry* entry;
+        while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
+            const char* name = archive_entry_pathname(entry);
+            if (!name) continue;
+
+            if (file == std::filesystem::path(name)) {
+                auto fullPath = destination / name;
+                archive_entry_set_pathname(entry, fullPath.c_str());
+
+                int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
+                if (r != ARCHIVE_OK) {
+                    throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + file.string() + ": " + archive_error_string(ah.ptr));
+                }
+                return;
+            }
+
+            skipData(ah.ptr);
+        }
+
+        throw error::MeowError(error::ErrorCode::FileNotFound, "file not found in archive: " + file.string());
+    }
 }

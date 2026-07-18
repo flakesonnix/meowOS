@@ -25,6 +25,7 @@ void closeDatabase(Database& db);
 void initializeDatabase(Database& db);
 
     void registerPackage(Database& db, const package::PackageFile& package, const std::vector<std::filesystem::path>& installedFiles);
+    void updateFileHash(Database& db, const std::filesystem::path& path);
 bool isInstalled(Database& db, const types::PackageName& name);
 std::vector<types::PackageName> listInstalled(Database& db);
 std::optional<types::PackageVersion> installedVersion(Database& db, const types::PackageName& name);

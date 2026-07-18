@@ -23,6 +23,7 @@ add_executable(${PROJECT_NAME}
         meow/src/upgrade/upgrade.cpp
         meow/src/lock/lockfile.cpp
         meow/src/verify/verifier.cpp
+        meow/src/repair/repair.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

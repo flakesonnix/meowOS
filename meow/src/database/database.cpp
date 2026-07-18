@@ -234,6 +234,33 @@ namespace meow::database {
         return entries;
     }
 
+    void updateFileHash(Database& db, const std::filesystem::path& path) {
+        auto* handle = h(db);
+
+        std::string hash;
+        int64_t fileSize = 0;
+        if (std::filesystem::exists(path) && std::filesystem::is_regular_file(path)) {
+            hash = download::computeFileHash(path);
+            fileSize = static_cast<int64_t>(std::filesystem::file_size(path));
+        }
+
+        const char* sql = "UPDATE files SET sha256 = ?, size = ? WHERE path = ?;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+
+        sqlite3_bind_text(stmt, 1, hash.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt, 2, fileSize);
+        sqlite3_bind_text(stmt, 3, path.c_str(), -1, SQLITE_TRANSIENT);
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            sqlite3_finalize(stmt);
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        sqlite3_finalize(stmt);
+    }
+
     void removePackageRecord(Database& db, const types::PackageName& name) {
         auto* handle = h(db);
 
