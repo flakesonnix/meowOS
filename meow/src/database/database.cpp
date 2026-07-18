@@ -151,4 +151,43 @@ namespace meow::database {
         sqlite3_finalize(stmt);
         return result;
     }
+
+    std::vector<std::filesystem::path> listPackageFiles(Database& db, const types::PackageName& name) {
+        const char* sql =
+            "SELECT f.path FROM files f "
+            "JOIN packages p ON f.package_id = p.id "
+            "WHERE p.name = ?;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(h(db), sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(h(db)));
+        }
+
+        sqlite3_bind_text(stmt, 1, name.value.c_str(), -1, SQLITE_TRANSIENT);
+
+        std::vector<std::filesystem::path> paths;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            auto text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (text) paths.emplace_back(text);
+        }
+        sqlite3_finalize(stmt);
+        return paths;
+    }
+
+    void removePackageRecord(Database& db, const types::PackageName& name) {
+        auto* handle = h(db);
+
+        const char* delPkg = "DELETE FROM packages WHERE name = ?;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, delPkg, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+
+        sqlite3_bind_text(stmt, 1, name.value.c_str(), -1, SQLITE_TRANSIENT);
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            sqlite3_finalize(stmt);
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        sqlite3_finalize(stmt);
+    }
 }

@@ -21,6 +21,8 @@ namespace meow::database {
     bool isInstalled(Database& db, const types::PackageName& name);
     std::vector<types::PackageName> listInstalled(Database& db);
     std::optional<types::PackageVersion> installedVersion(Database& db, const types::PackageName& name);
+    std::vector<std::filesystem::path> listPackageFiles(Database& db, const types::PackageName& name);
+    void removePackageRecord(Database& db, const types::PackageName& name);
 }
 
 #endif //MEOWOS_DATABASE_H
