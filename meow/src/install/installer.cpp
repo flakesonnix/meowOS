@@ -6,8 +6,8 @@
 namespace meow::install {
     void installPackage(const package::PackageFile& package, const std::filesystem::path& root, database::Database& db) {
         archive::Archive archive{package.archivePath};
-        archive::extractAll(archive, root);
-        database::registerPackage(db, package);
+        auto files = archive::extractAll(archive, root);
+        database::registerPackage(db, package, files.value);
     }
 
     void installPackages(const std::vector<package::PackageFile>& packages, const std::filesystem::path& root, database::Database& db) {
@@ -19,7 +19,10 @@ namespace meow::install {
                 archive::Archive archive{pkg.archivePath};
                 auto files = archive::extractAll(archive, root);
                 transaction::recordExtractedFiles(tx, files);
-                tx.packages.push_back(pkg);
+                transaction::Transaction::PackageEntry entry;
+                entry.pkg = pkg;
+                entry.installedFiles = files.value;
+                tx.packages.push_back(std::move(entry));
             }
 
             transaction::commitTransaction(tx, db);

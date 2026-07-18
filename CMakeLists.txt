@@ -22,6 +22,7 @@ add_executable(${PROJECT_NAME}
         meow/src/remove/remove.cpp
         meow/src/upgrade/upgrade.cpp
         meow/src/lock/lockfile.cpp
+        meow/src/verify/verifier.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

@@ -10,7 +10,12 @@
 
 namespace meow::transaction {
     struct Transaction {
-        std::vector<package::PackageFile> packages;
+        struct PackageEntry {
+            package::PackageFile pkg;
+            std::vector<std::filesystem::path> installedFiles;
+        };
+
+        std::vector<PackageEntry> packages;
         std::vector<std::filesystem::path> createdFiles;
         bool committed = false;
     };

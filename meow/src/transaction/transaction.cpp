@@ -13,8 +13,8 @@ namespace meow::transaction {
     }
 
     void commitTransaction(Transaction& tx, database::Database& db) {
-        for (const auto& pkg : tx.packages) {
-            database::registerPackage(db, pkg);
+        for (const auto& entry : tx.packages) {
+            database::registerPackage(db, entry.pkg, entry.installedFiles);
         }
         tx.committed = true;
     }

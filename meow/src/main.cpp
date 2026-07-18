@@ -12,6 +12,7 @@
 #include <meow/remove/remove.hpp>
 #include <meow/upgrade/upgrade.hpp>
 #include <meow/lock/lockfile.hpp>
+#include <meow/verify/verifier.hpp>
 
 namespace {
     const auto lockfilePath = std::filesystem::path("meow.lock");
@@ -116,7 +117,8 @@ int main(int argc, char** argv) {
               << "  install [--locked] <package>\n"
               << "  upgrade <package>\n"
               << "  remove <package>\n"
-              << "  installed\n";
+              << "  installed\n"
+              << "  verify\n";
         return 1;
     }
 
@@ -214,6 +216,15 @@ int main(int argc, char** argv) {
                 return 1;
             }
             meow::remove::removePackage(meow::types::PackageName{argv[2]}, db);
+        } else if (cmd == "verify") {
+            std::cout << "Checking installed packages...\n\n";
+            auto vr = meow::verify::verifyAll(db);
+            size_t errors = vr.missing.size() + vr.modified.size();
+            if (errors == 0) {
+                std::cout << "\nAll files intact\n";
+            } else {
+                std::cout << "\n" << errors << " error" << (errors == 1 ? "" : "s") << " found\n";
+            }
         } else if (cmd == "installed") {
             cmdInstalled(db);
         } else {

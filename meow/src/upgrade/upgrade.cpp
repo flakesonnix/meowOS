@@ -60,18 +60,21 @@ namespace meow::upgrade {
             std::cout << "Upgrading " << name.value << "\n\n"
                       << "  " << installedVer->value << " -> " << latest->value << "\n\n";
 
-            std::cout << "  installing " << latest->value << "\n";
-            archive::Archive archive{latestPkg.archivePath};
-            auto newFiles = archive::extractAll(archive, root);
-            transaction::recordExtractedFiles(tx, newFiles);
-
             std::cout << "  removing old files\n";
             std::error_code ec;
             for (const auto& f : oldFiles) {
                 std::filesystem::remove(f, ec);
             }
 
-            tx.packages.push_back(std::move(latestPkg));
+            std::cout << "  installing " << latest->value << "\n";
+            archive::Archive archive{latestPkg.archivePath};
+            auto newFiles = archive::extractAll(archive, root);
+            transaction::recordExtractedFiles(tx, newFiles);
+
+            transaction::Transaction::PackageEntry entry;
+            entry.pkg = std::move(latestPkg);
+            entry.installedFiles = newFiles.value;
+            tx.packages.push_back(std::move(entry));
             transaction::commitTransaction(tx, db);
             std::cout << "\nUpgrade complete\n";
         } catch (...) {
