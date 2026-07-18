@@ -9,6 +9,7 @@
 #include <meow/install/installer.hpp>
 #include <meow/dependency/resolver.hpp>
 #include <meow/remove/remove.hpp>
+#include <meow/upgrade/upgrade.hpp>
 
 namespace {
     auto openDb() {
@@ -82,6 +83,7 @@ int main(int argc, char** argv) {
               << "  list\n"
               << "  search <query>\n"
               << "  install <package>\n"
+              << "  upgrade <package>\n"
               << "  remove <package>\n"
               << "  installed\n";
         return 1;
@@ -126,6 +128,12 @@ int main(int argc, char** argv) {
             std::cout << "\nInstalling...\n";
             meow::install::installPackages(toInstall, "/tmp/meow-install", db);
             std::cout << "\ndone\n";
+        } else if (cmd == "upgrade") {
+            if (argc < 3) {
+                std::cerr << "usage: meow upgrade <package>\n";
+                return 1;
+            }
+            meow::upgrade::upgradePackage(repo, db, meow::types::PackageName{argv[2]}, "/tmp/meow-install");
         } else if (cmd == "remove") {
             if (argc < 3) {
                 std::cerr << "usage: meow remove <package>\n";
