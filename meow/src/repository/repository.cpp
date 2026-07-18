@@ -14,18 +14,32 @@ namespace meow::repository {
         for (const auto& pkgDir : std::filesystem::directory_iterator(root)) {
             if (!pkgDir.is_directory()) continue;
 
-            types::PackageName name{pkgDir.path().filename().string()};
-
             RepositoryPackage pkg;
-            pkg.name = name;
+            pkg.name = types::PackageName{pkgDir.path().filename().string()};
 
             auto versionsDir = pkgDir.path() / "versions";
             if (std::filesystem::is_directory(versionsDir)) {
                 for (const auto& verDir : std::filesystem::directory_iterator(versionsDir)) {
                     if (!verDir.is_directory()) continue;
-                    pkg.versions.push_back(verDir.path().filename());
+
+                    RepositoryVersion rv;
+                    rv.version = types::PackageVersion{verDir.path().filename().string()};
+
+                    for (const auto& file : std::filesystem::directory_iterator(verDir.path())) {
+                        if (file.is_regular_file()) {
+                            rv.archive = file.path();
+                            break;
+                        }
+                    }
+
+                    if (!rv.archive.empty()) {
+                        pkg.versions.push_back(std::move(rv));
+                    }
                 }
-                std::sort(pkg.versions.begin(), pkg.versions.end());
+                std::sort(pkg.versions.begin(), pkg.versions.end(),
+                    [](const RepositoryVersion& a, const RepositoryVersion& b) {
+                        return a.version.value < b.version.value;
+                    });
             }
 
             repo.packages.push_back(std::move(pkg));
@@ -52,7 +66,12 @@ namespace meow::repository {
         return names;
     }
 
-    std::vector<std::filesystem::path> listVersions(const RepositoryPackage& package) {
-        return package.versions;
+    std::vector<types::PackageVersion> listVersions(const RepositoryPackage& package) {
+        std::vector<types::PackageVersion> versions;
+        versions.reserve(package.versions.size());
+        for (const auto& v : package.versions) {
+            versions.push_back(v.version);
+        }
+        return versions;
     }
 }
