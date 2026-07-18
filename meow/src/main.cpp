@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string_view>
+#include <vector>
 
 #include <meow/error/error.hpp>
 #include <meow/database/database.hpp>
@@ -10,11 +11,14 @@
 #include <meow/dependency/resolver.hpp>
 #include <meow/remove/remove.hpp>
 #include <meow/upgrade/upgrade.hpp>
+#include <meow/lock/lockfile.hpp>
 
 namespace {
+    const auto lockfilePath = std::filesystem::path("meow.lock");
+    const auto installRoot = std::filesystem::path("/tmp/meow-install");
+
     auto openDb() {
-        auto db = meow::database::openDatabase("");
-        return db;
+        return meow::database::openDatabase("");
     }
 
     void cmdInfo(const meow::repository::Repository& repo, std::string_view name) {
@@ -74,6 +78,33 @@ namespace {
             std::cout << "\n";
         }
     }
+
+    void cmdSaveLockfile(
+        const std::vector<meow::package::PackageFile>& packages,
+        const meow::repository::Repository& repo
+    ) {
+        meow::lock::Lockfile lock;
+        lock.repositoryHash = "dev";
+
+        for (const auto& pkg : packages) {
+            const auto* repoPkg = meow::repository::findPackage(repo, pkg.metadata.name);
+            if (!repoPkg) continue;
+
+            for (const auto& rv : repoPkg->versions) {
+                if (rv.version.value == pkg.metadata.version.value) {
+                    meow::lock::LockedPackage lp;
+                    lp.name = pkg.metadata.name;
+                    lp.version = pkg.metadata.version;
+                    lp.artifact = rv.artifact;
+                    lock.packages.push_back(std::move(lp));
+                    break;
+                }
+            }
+        }
+
+        meow::lock::saveLockfile(lock, lockfilePath);
+        std::cout << "  created meow.lock\n";
+    }
 }
 
 int main(int argc, char** argv) {
@@ -82,7 +113,7 @@ int main(int argc, char** argv) {
               << "  info   <package>\n"
               << "  list\n"
               << "  search <query>\n"
-              << "  install <package>\n"
+              << "  install [--locked] <package>\n"
               << "  upgrade <package>\n"
               << "  remove <package>\n"
               << "  installed\n";
@@ -111,29 +142,72 @@ int main(int argc, char** argv) {
             cmdSearch(repo, argv[2]);
         } else if (cmd == "install") {
             if (argc < 3) {
-                std::cerr << "usage: meow install <package>\n";
+                std::cerr << "usage: meow install [--locked] <package>\n";
                 return 1;
             }
-            auto meta = meow::repository::resolvePackage(repo, meow::types::PackageName{argv[2]}).metadata;
-            auto tree = meow::dependency::resolveDependencies(repo, meta, db);
 
-            std::cout << "Resolving dependencies...\n\n";
+            bool locked = false;
+            std::string pkgName;
+
+            if (argv[2] == std::string_view("--locked")) {
+                if (argc < 4) {
+                    std::cerr << "usage: meow install --locked <package>\n";
+                    return 1;
+                }
+                locked = true;
+                pkgName = argv[3];
+            } else {
+                pkgName = argv[2];
+            }
+
+            meow::package::PackageMetadata meta;
             std::vector<meow::package::PackageFile> toInstall;
-            for (const auto& name : tree.packages) {
-                auto pkg = meow::repository::resolvePackage(repo, name);
-                std::cout << "  " << name.value << " " << pkg.metadata.version.value << "\n";
-                toInstall.push_back(std::move(pkg));
+            meow::lock::Lockfile lock;
+
+            if (locked) {
+                std::cout << "Using lockfile\n\n";
+                lock = meow::lock::loadLockfile(lockfilePath);
+
+                const auto* lockedPkg = meow::lock::findLockedPackage(lock, meow::types::PackageName{pkgName});
+                if (!lockedPkg) {
+                    std::cerr << "package not found in lockfile: " << pkgName << "\n";
+                    return 1;
+                }
+                meta = meow::repository::resolveLockedPackage(lock, meow::types::PackageName{pkgName}).metadata;
+                auto tree = meow::dependency::resolveDependencies(repo, meta, db, &lock);
+
+                std::cout << "Resolving dependencies from lockfile...\n\n";
+                for (const auto& name : tree.packages) {
+                    auto pkg = meow::repository::resolveLockedPackage(lock, name);
+                    std::cout << "  " << name.value << " " << pkg.metadata.version.value << "\n";
+                    toInstall.push_back(std::move(pkg));
+                }
+            } else {
+                meta = meow::repository::resolvePackage(repo, meow::types::PackageName{pkgName}).metadata;
+                auto tree = meow::dependency::resolveDependencies(repo, meta, db);
+
+                std::cout << "Resolving dependencies...\n\n";
+                for (const auto& name : tree.packages) {
+                    auto pkg = meow::repository::resolvePackage(repo, name);
+                    std::cout << "  " << name.value << " " << pkg.metadata.version.value << "\n";
+                    toInstall.push_back(std::move(pkg));
+                }
             }
 
             std::cout << "\nInstalling...\n";
-            meow::install::installPackages(toInstall, "/tmp/meow-install", db);
+            meow::install::installPackages(toInstall, installRoot, db);
+
+            if (!locked) {
+                cmdSaveLockfile(toInstall, repo);
+            }
+
             std::cout << "\ndone\n";
         } else if (cmd == "upgrade") {
             if (argc < 3) {
                 std::cerr << "usage: meow upgrade <package>\n";
                 return 1;
             }
-            meow::upgrade::upgradePackage(repo, db, meow::types::PackageName{argv[2]}, "/tmp/meow-install");
+            meow::upgrade::upgradePackage(repo, db, meow::types::PackageName{argv[2]}, installRoot);
         } else if (cmd == "remove") {
             if (argc < 3) {
                 std::cerr << "usage: meow remove <package>\n";

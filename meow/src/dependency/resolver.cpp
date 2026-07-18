@@ -10,7 +10,8 @@ namespace meow::dependency {
             const types::PackageName& name,
             database::Database& db,
             DependencyTree& tree,
-            std::set<std::string>& visited
+            std::set<std::string>& visited,
+            const lock::Lockfile* lock
         ) {
             if (visited.find(name.value) != visited.end()) {
                 throw error::MeowError(error::ErrorCode::DependencyCycleDetected, "cycle detected: " + name.value);
@@ -21,9 +22,15 @@ namespace meow::dependency {
                 return;
             }
 
-            auto pkg = repository::resolvePackage(repo, name);
+            package::PackageFile pkg;
+            if (lock) {
+                pkg = repository::resolveLockedPackage(*lock, name);
+            } else {
+                pkg = repository::resolvePackage(repo, name);
+            }
+
             for (const auto& dep : pkg.metadata.dependencies.value) {
-                resolveDependency(repo, dep, db, tree, visited);
+                resolveDependency(repo, dep, db, tree, visited, lock);
             }
 
             tree.packages.push_back(name);
@@ -33,15 +40,16 @@ namespace meow::dependency {
     DependencyTree resolveDependencies(
         const repository::Repository& repo,
         const package::PackageMetadata& package,
-        database::Database& db
+        database::Database& db,
+        const lock::Lockfile* lock
     ) {
         DependencyTree tree;
         std::set<std::string> visited;
 
-        resolveDependency(repo, package.name, db, tree, visited);
+        resolveDependency(repo, package.name, db, tree, visited, lock);
 
         for (const auto& dep : package.dependencies.value) {
-            resolveDependency(repo, dep, db, tree, visited);
+            resolveDependency(repo, dep, db, tree, visited, lock);
         }
 
         return tree;

@@ -21,6 +21,7 @@ add_executable(${PROJECT_NAME}
         meow/src/transaction/transaction.cpp
         meow/src/remove/remove.cpp
         meow/src/upgrade/upgrade.cpp
+        meow/src/lock/lockfile.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

@@ -64,4 +64,17 @@ namespace meow::repository {
 
         throw error::MeowError(error::ErrorCode::VersionNotFound, "version not found: " + version.value + " for package: " + name.value);
     }
+
+    package::PackageFile resolveLockedPackage(const lock::Lockfile& lock, const types::PackageName& name) {
+        const auto* locked = lock::findLockedPackage(lock, name);
+        if (!locked) {
+            throw error::MeowError(
+                error::ErrorCode::PackageNotFound,
+                "package not found in lockfile: " + name.value
+            );
+        }
+
+        auto archive = downloadArtifact(locked->artifact);
+        return package::loadPackage(archive);
+    }
 }
