@@ -26,7 +26,7 @@ std::ostream& operator<<(std::ostream& os, const meow::package::PackageMetadata&
 }
 
 int main() {
-    auto test = meow::package::ParsePackageManifest("./examples/hello.toml");
+    const auto test = meow::package::ParsePackageManifest("./examples/hello.toml");
 
     std::cout <<test << std::endl;
 

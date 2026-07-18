@@ -1,18 +1,14 @@
-//
-// Created by lucy on 17.07.26.
-//
-
 #ifndef MEOWOS_ARCHIVE_H
 #define MEOWOS_ARCHIVE_H
-#include <filesystem>
 
+#include <filesystem>
 
 namespace meow::archive {
     struct Archive {
-        std::filesystem::path path1;
+        std::filesystem::path path;
     };
 
-    Archive OpenArchive(const std::filesystem::path &path) {};
+    Archive openArchive(const std::filesystem::path& path);
 }
 
 #endif //MEOWOS_ARCHIVE_H
