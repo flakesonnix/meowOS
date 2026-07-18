@@ -1,39 +1,87 @@
-//
-// Created by lucy on 17.07.26.
-//
-
-
-#include <fstream>
 #include <iostream>
-#include <sstream>
+#include <string_view>
 
-#include "meow/package/parser.hpp"
+#include <meow/repository/repository.hpp>
+#include <meow/repository/version.hpp>
+#include <meow/repository/resolver.hpp>
 
-std::ostream& operator<<(std::ostream& os, const meow::package::PackageMetadata& meta) {
-    os << "--- Package Metadata ---\n"
-       << "Name:         " << meta.name.value << "\n"
-       << "Version:      " << meta.version.value << "\n"
-       << "Architecture: " << (meta.CpuArch == meow::types::CpuArch::AMD64 ? "AMD64" : "AARCH64") << "\n"
-       << "Description:  " << meta.description.value << "\n"
-       << "Dependencies: ";
+namespace {
+    void cmdInfo(const meow::repository::Repository& repo, std::string_view name) {
+        auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{std::string(name)});
 
-    if (meta.dependencies.value.empty()) {
-        os << "none";
-    } else {
-        for (const auto& dep : meta.dependencies.value) {
-            os << "\n  - " << dep.value;
+        std::cout << "Package      " << pkg.metadata.name.value << "\n"
+                  << "Version      " << pkg.metadata.version.value << "\n"
+                  << "Architecture " << (pkg.metadata.CpuArch == meow::types::CpuArch::AMD64 ? "amd64" : "aarch64") << "\n"
+                  << "\n"
+                  << "Description\n"
+                  << "------------\n"
+                  << pkg.metadata.description.value << "\n"
+                  << "\n"
+                  << "Dependencies\n"
+                  << "------------\n";
+
+        if (pkg.metadata.dependencies.value.empty()) {
+            std::cout << "(none)\n";
+        } else {
+            for (const auto& dep : pkg.metadata.dependencies.value) {
+                std::cout << "  " << dep.value << "\n";
+            }
+        }
+
+        std::cout << "\n"
+                  << "Files\n"
+                  << "-----\n";
+        for (const auto& f : pkg.files.value) {
+            std::cout << "  " << f.string() << "\n";
         }
     }
-    return os;
+
+    void cmdList(const meow::repository::Repository& repo) {
+        for (const auto& name : meow::repository::listPackages(repo)) {
+            std::cout << name.value << "\n";
+        }
+    }
+
+    void cmdSearch(const meow::repository::Repository& repo, std::string_view query) {
+        for (const auto& name : meow::repository::listPackages(repo)) {
+            if (name.value.find(query) != std::string::npos) {
+                std::cout << name.value << "\n";
+            }
+        }
+    }
 }
 
-int main() {
-    std::ifstream file("./examples/hello.toml");
-    std::stringstream buf;
-    buf << file.rdbuf();
-    const auto test = meow::package::parsePackageManifest(buf.str());
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        std::cerr << "usage: meow <command> [args]\n"
+                  << "  info   <package>\n"
+                  << "  list\n"
+                  << "  search <query>\n";
+        return 1;
+    }
 
-    std::cout <<test << std::endl;
+    auto repo = meow::repository::loadRepository("./repo");
+
+    std::string_view cmd = argv[1];
+
+    if (cmd == "info") {
+        if (argc < 3) {
+            std::cerr << "usage: meow info <package>\n";
+            return 1;
+        }
+        cmdInfo(repo, argv[2]);
+    } else if (cmd == "list") {
+        cmdList(repo);
+    } else if (cmd == "search") {
+        if (argc < 3) {
+            std::cerr << "usage: meow search <query>\n";
+            return 1;
+        }
+        cmdSearch(repo, argv[2]);
+    } else {
+        std::cerr << "unknown command: " << cmd << "\n";
+        return 1;
+    }
 
     return 0;
 }
