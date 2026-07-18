@@ -1,5 +1,6 @@
 #include <meow/repository/repository.hpp>
 #include <meow/error/error.hpp>
+#include <meow/log/logger.hpp>
 #include <toml++/toml.hpp>
 #include <algorithm>
 
@@ -12,8 +13,61 @@ namespace meow::repository {
         Repository repo;
         repo.root = root;
 
+        auto indexPath = root / "index.toml";
+        if (std::filesystem::exists(indexPath)) {
+            try {
+                repo.index = loadIndex(indexPath);
+                log::log(log::LogLevel::Debug, "loaded repository index");
+            } catch (...) {
+                log::log(log::LogLevel::Warning, "failed to load repository index, falling back to directory scan");
+            }
+        }
+
         for (const auto& pkgDir : std::filesystem::directory_iterator(root)) {
             if (!pkgDir.is_directory()) continue;
+            if (pkgDir.path().filename() == "packages") {
+                for (const auto& subDir : std::filesystem::directory_iterator(pkgDir.path())) {
+                    if (!subDir.is_directory()) continue;
+
+                    RepositoryPackage pkg;
+                    pkg.name = types::PackageName{subDir.path().filename().string()};
+
+                    auto versionsDir = subDir.path() / "versions";
+                    if (std::filesystem::is_directory(versionsDir)) {
+                        for (const auto& entry : std::filesystem::directory_iterator(versionsDir)) {
+                            if (!entry.is_regular_file()) continue;
+                            if (entry.path().extension() != ".toml") continue;
+
+                            auto tbl = toml::parse_file(entry.path().string());
+                            RepositoryVersion rv;
+                            rv.version = types::PackageVersion{entry.path().stem().string()};
+
+                            if (auto* art = tbl["artifact"].as_table()) {
+                                rv.artifact.filename = (*art)["filename"].value_or("");
+                                rv.artifact.url = (*art)["url"].value_or("");
+                                rv.artifact.sha256 = (*art)["sha256"].value_or("");
+                            }
+
+                            pkg.versions.push_back(std::move(rv));
+                        }
+                    }
+
+                    if (repo.index) {
+                        const auto* entry = findIndexEntry(*repo.index, pkg.name);
+                        if (entry) {
+                            pkg.description = entry->description;
+                        }
+                    }
+
+                    std::sort(pkg.versions.begin(), pkg.versions.end(),
+                        [](const RepositoryVersion& a, const RepositoryVersion& b) {
+                            return a.version.value < b.version.value;
+                        });
+
+                    repo.packages.push_back(std::move(pkg));
+                }
+                continue;
+            }
 
             RepositoryPackage pkg;
             pkg.name = types::PackageName{pkgDir.path().filename().string()};
@@ -25,7 +79,6 @@ namespace meow::repository {
                     if (entry.path().extension() != ".toml") continue;
 
                     auto tbl = toml::parse_file(entry.path().string());
-
                     RepositoryVersion rv;
                     rv.version = types::PackageVersion{entry.path().stem().string()};
 
@@ -37,11 +90,19 @@ namespace meow::repository {
 
                     pkg.versions.push_back(std::move(rv));
                 }
-                std::sort(pkg.versions.begin(), pkg.versions.end(),
-                    [](const RepositoryVersion& a, const RepositoryVersion& b) {
-                        return a.version.value < b.version.value;
-                    });
             }
+
+            if (repo.index) {
+                const auto* entry = findIndexEntry(*repo.index, pkg.name);
+                if (entry) {
+                    pkg.description = entry->description;
+                }
+            }
+
+            std::sort(pkg.versions.begin(), pkg.versions.end(),
+                [](const RepositoryVersion& a, const RepositoryVersion& b) {
+                    return a.version.value < b.version.value;
+                });
 
             repo.packages.push_back(std::move(pkg));
         }

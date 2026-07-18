@@ -2,9 +2,11 @@
 #define MEOWOS_REPOSITORY_H
 
 #include <filesystem>
+#include <optional>
 #include <vector>
 
 #include <meow/types/types.hpp>
+#include <meow/repository/index.hpp>
 
 namespace meow::repository {
     struct RepositoryVersion {
@@ -14,11 +16,13 @@ namespace meow::repository {
 
     struct RepositoryPackage {
         types::PackageName name;
+        std::optional<types::Description> description;
         std::vector<RepositoryVersion> versions;
     };
 
     struct Repository {
         std::filesystem::path root;
+        std::optional<RepositoryIndex> index;
         std::vector<RepositoryPackage> packages;
     };
 
