@@ -18,6 +18,8 @@ namespace meow::error {
             case ErrorCode::DatabaseMigrationFailed: codeStr = "DatabaseMigrationFailed"; break;
             case ErrorCode::DependencyNotFound:     codeStr = "DependencyNotFound";     break;
             case ErrorCode::DependencyCycleDetected: codeStr = "DependencyCycleDetected"; break;
+            case ErrorCode::TransactionFailed:       codeStr = "TransactionFailed";       break;
+            case ErrorCode::RollbackFailed:          codeStr = "RollbackFailed";          break;
             case ErrorCode::Internal:                codeStr = "Internal";                break;
         }
         return "error: " + std::string(e.what()) + "\ncode: " + codeStr;

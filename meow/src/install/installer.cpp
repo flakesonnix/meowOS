@@ -1,5 +1,6 @@
 #include <meow/install/installer.hpp>
 #include <meow/archive/archive.hpp>
+#include <meow/transaction/transaction.hpp>
 #include <iostream>
 
 namespace meow::install {
@@ -10,9 +11,23 @@ namespace meow::install {
     }
 
     void installPackages(const std::vector<package::PackageFile>& packages, const std::filesystem::path& root, database::Database& db) {
-        for (const auto& pkg : packages) {
-            std::cout << "  installing " << pkg.metadata.name.value << " " << pkg.metadata.version.value << "\n";
-            installPackage(pkg, root, db);
+        auto tx = transaction::beginTransaction();
+
+        try {
+            for (const auto& pkg : packages) {
+                std::cout << "  installing " << pkg.metadata.name.value << " " << pkg.metadata.version.value << "\n";
+                archive::Archive archive{pkg.archivePath};
+                auto files = archive::extractAll(archive, root);
+                transaction::recordExtractedFiles(tx, files);
+                tx.packages.push_back(pkg);
+            }
+
+            transaction::commitTransaction(tx, db);
+            std::cout << "  transaction committed\n";
+        } catch (...) {
+            std::cerr << "  transaction failed, rolling back...\n";
+            transaction::rollbackTransaction(tx);
+            throw;
         }
     }
 }

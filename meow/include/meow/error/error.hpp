@@ -20,6 +20,8 @@ namespace meow::error {
         DatabaseMigrationFailed,
         DependencyNotFound,
         DependencyCycleDetected,
+        TransactionFailed,
+        RollbackFailed,
         Internal
     };
 

@@ -18,6 +18,7 @@ add_executable(${PROJECT_NAME}
         meow/src/error/printer.cpp
         meow/src/database/database.cpp
         meow/src/dependency/resolver.cpp
+        meow/src/transaction/transaction.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
