@@ -4,6 +4,7 @@
 #include <meow/repository/repository.hpp>
 #include <meow/repository/version.hpp>
 #include <meow/repository/resolver.hpp>
+#include <meow/install/installer.hpp>
 
 namespace {
     void cmdInfo(const meow::repository::Repository& repo, std::string_view name) {
@@ -53,10 +54,11 @@ namespace {
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "usage: meow <command> [args]\n"
-                  << "  info   <package>\n"
-                  << "  list\n"
-                  << "  search <query>\n";
+    std::cerr << "usage: meow <command> [args]\n"
+              << "  info   <package>\n"
+              << "  list\n"
+              << "  search <query>\n"
+              << "  install <package>\n";
         return 1;
     }
 
@@ -78,6 +80,14 @@ int main(int argc, char** argv) {
             return 1;
         }
         cmdSearch(repo, argv[2]);
+    } else if (cmd == "install") {
+        if (argc < 3) {
+            std::cerr << "usage: meow install <package>\n";
+            return 1;
+        }
+        auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{argv[2]});
+        meow::install::installPackage(pkg, "/tmp/meow-install");
+        std::cout << "installed " << argv[2] << " to /tmp/meow-install\n";
     } else {
         std::cerr << "unknown command: " << cmd << "\n";
         return 1;

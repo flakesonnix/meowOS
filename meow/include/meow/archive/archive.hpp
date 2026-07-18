@@ -12,6 +12,7 @@ namespace meow::archive {
     Archive openArchive(const std::filesystem::path& path);
     types::FileList listFiles(const Archive& archive);
     std::string readFile(const Archive& archive, const std::filesystem::path& filename);
+    void extractAll(const Archive& archive, const std::filesystem::path& destination);
 }
 
 #endif //MEOWOS_ARCHIVE_H

@@ -109,4 +109,22 @@ namespace meow::archive {
 
         throw std::runtime_error("file not found in archive: " + filename.string());
     }
+
+    void extractAll(const Archive& archive, const std::filesystem::path& destination) {
+        ArchiveHandle ah{archive.path};
+
+        struct archive_entry* entry;
+        while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
+            const char* name = archive_entry_pathname(entry);
+            if (!name) continue;
+
+            auto fullPath = destination / name;
+            archive_entry_set_pathname(entry, fullPath.c_str());
+
+            int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
+            if (r != ARCHIVE_OK) {
+                throw std::runtime_error("error extracting " + std::string(name) + ": " + archive_error_string(ah.ptr));
+            }
+        }
+    }
 }
