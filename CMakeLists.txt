@@ -15,6 +15,7 @@ add_executable(${PROJECT_NAME}
         meow/src/repository/resolver.cpp
         meow/src/install/installer.cpp
         meow/src/download/downloader.cpp
+        meow/src/error/printer.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

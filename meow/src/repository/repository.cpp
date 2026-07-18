@@ -1,12 +1,12 @@
 #include <meow/repository/repository.hpp>
+#include <meow/error/error.hpp>
 #include <toml++/toml.hpp>
 #include <algorithm>
-#include <stdexcept>
 
 namespace meow::repository {
     Repository loadRepository(const std::filesystem::path& root) {
         if (!std::filesystem::is_directory(root)) {
-            throw std::runtime_error("repository not found: " + root.string());
+            throw error::MeowError(error::ErrorCode::RepositoryNotFound, "repository not found: " + root.string());
         }
 
         Repository repo;

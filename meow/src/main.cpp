@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string_view>
 
+#include <meow/error/error.hpp>
 #include <meow/repository/repository.hpp>
 #include <meow/repository/version.hpp>
 #include <meow/repository/resolver.hpp>
@@ -62,34 +63,39 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto repo = meow::repository::loadRepository("./repo");
+    try {
+        auto repo = meow::repository::loadRepository("./repo");
 
-    std::string_view cmd = argv[1];
+        std::string_view cmd = argv[1];
 
-    if (cmd == "info") {
-        if (argc < 3) {
-            std::cerr << "usage: meow info <package>\n";
+        if (cmd == "info") {
+            if (argc < 3) {
+                std::cerr << "usage: meow info <package>\n";
+                return 1;
+            }
+            cmdInfo(repo, argv[2]);
+        } else if (cmd == "list") {
+            cmdList(repo);
+        } else if (cmd == "search") {
+            if (argc < 3) {
+                std::cerr << "usage: meow search <query>\n";
+                return 1;
+            }
+            cmdSearch(repo, argv[2]);
+        } else if (cmd == "install") {
+            if (argc < 3) {
+                std::cerr << "usage: meow install <package>\n";
+                return 1;
+            }
+            auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{argv[2]});
+            meow::install::installPackage(pkg, "/tmp/meow-install");
+            std::cout << "installed " << argv[2] << " to /tmp/meow-install\n";
+        } else {
+            std::cerr << "unknown command: " << cmd << "\n";
             return 1;
         }
-        cmdInfo(repo, argv[2]);
-    } else if (cmd == "list") {
-        cmdList(repo);
-    } else if (cmd == "search") {
-        if (argc < 3) {
-            std::cerr << "usage: meow search <query>\n";
-            return 1;
-        }
-        cmdSearch(repo, argv[2]);
-    } else if (cmd == "install") {
-        if (argc < 3) {
-            std::cerr << "usage: meow install <package>\n";
-            return 1;
-        }
-        auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{argv[2]});
-        meow::install::installPackage(pkg, "/tmp/meow-install");
-        std::cout << "installed " << argv[2] << " to /tmp/meow-install\n";
-    } else {
-        std::cerr << "unknown command: " << cmd << "\n";
+    } catch (const meow::error::MeowError& e) {
+        std::cerr << meow::error::formatError(e) << "\n";
         return 1;
     }
 

@@ -27,6 +27,8 @@ namespace meow::error {
         explicit MeowError(ErrorCode code, const char* message)
             : std::runtime_error(message), code(code) {}
     };
+
+    std::string formatError(const MeowError& e);
 }
 
 #endif //MEOWOS_ERROR_H

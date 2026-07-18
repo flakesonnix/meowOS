@@ -1,8 +1,8 @@
 #include <meow/archive/archive.hpp>
+#include <meow/error/error.hpp>
 #include <archive.h>
 #include <archive_entry.h>
 #include <array>
-#include <stdexcept>
 
 namespace meow::archive {
     namespace {
@@ -14,7 +14,7 @@ namespace meow::archive {
             explicit ArchiveHandle(const std::filesystem::path& path) {
                 ptr = archive_read_new();
                 if (!ptr) {
-                    throw std::runtime_error("archive_read_new failed");
+                    throw error::MeowError(error::ErrorCode::ArchiveOpenFailed, "archive_read_new failed");
                 }
                 archive_read_support_format_all(ptr);
                 archive_read_support_filter_all(ptr);
@@ -23,7 +23,7 @@ namespace meow::archive {
                     std::string err = archive_error_string(ptr);
                     archive_read_free(ptr);
                     ptr = nullptr;
-                    throw std::runtime_error("cannot open archive: " + err);
+                    throw error::MeowError(error::ErrorCode::ArchiveOpenFailed, "cannot open archive: " + err);
                 }
             }
 
@@ -56,14 +56,14 @@ namespace meow::archive {
 
         void skipData(struct archive* a) {
             if (archive_read_data_skip(a) != ARCHIVE_OK) {
-                throw std::runtime_error("error skipping archive data");
+                throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error skipping archive data");
             }
         }
     }
 
     Archive openArchive(const std::filesystem::path& path) {
         if (!std::filesystem::exists(path)) {
-            throw std::runtime_error("archive not found: " + path.string());
+            throw error::MeowError(error::ErrorCode::FileNotFound, "archive not found: " + path.string());
         }
 
         ArchiveHandle _{path};
@@ -100,14 +100,14 @@ namespace meow::archive {
                     content.append(buf.data(), static_cast<std::size_t>(n));
                 }
                 if (n < 0) {
-                    throw std::runtime_error("error reading " + filename.string());
+                    throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error reading " + filename.string());
                 }
                 return content;
             }
             skipData(ah.ptr);
         }
 
-        throw std::runtime_error("file not found in archive: " + filename.string());
+        throw error::MeowError(error::ErrorCode::FileNotFound, "file not found in archive: " + filename.string());
     }
 
     void extractAll(const Archive& archive, const std::filesystem::path& destination) {
@@ -123,7 +123,7 @@ namespace meow::archive {
 
             int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
             if (r != ARCHIVE_OK) {
-                throw std::runtime_error("error extracting " + std::string(name) + ": " + archive_error_string(ah.ptr));
+                throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + std::string(name) + ": " + archive_error_string(ah.ptr));
             }
         }
     }

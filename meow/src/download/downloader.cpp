@@ -1,10 +1,7 @@
 #include <meow/download/downloader.hpp>
+#include <meow/error/error.hpp>
 #include <array>
 #include <cstdio>
-#include <fstream>
-#include <sstream>
-#include <stdexcept>
-#include <vector>
 
 namespace meow::download {
     std::filesystem::path downloadFile(const std::string& url, const std::filesystem::path& destination) {
@@ -18,12 +15,12 @@ namespace meow::download {
             std::string cmd = "curl -fsSL \"" + url + "\" -o \"" + destination.string() + "\"";
             int rc = std::system(cmd.c_str());
             if (rc != 0) {
-                throw std::runtime_error("download failed: " + url);
+                throw error::MeowError(error::ErrorCode::DownloadFailed, "download failed: " + url);
             }
             return destination;
         }
 
-        throw std::runtime_error("unsupported URL scheme: " + url);
+        throw error::MeowError(error::ErrorCode::DownloadFailed, "unsupported URL scheme: " + url);
     }
 
     bool verifyChecksum(const std::filesystem::path& file, const std::string& sha256) {

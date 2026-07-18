@@ -1,14 +1,14 @@
 #include <meow/repository/resolver.hpp>
 #include <meow/repository/version.hpp>
 #include <meow/download/downloader.hpp>
+#include <meow/error/error.hpp>
 #include <cstdlib>
-#include <stdexcept>
 
 namespace meow::repository {
     namespace {
         std::filesystem::path cacheDir() {
             const char* home = std::getenv("HOME");
-            if (!home) throw std::runtime_error("HOME not set");
+            if (!home) throw error::MeowError(error::ErrorCode::Internal, "HOME not set");
             auto dir = std::filesystem::path(home) / ".cache" / "meow";
             std::filesystem::create_directories(dir);
             return dir;
@@ -28,7 +28,7 @@ namespace meow::repository {
 
             if (!download::verifyChecksum(dest, artifact.sha256)) {
                 std::filesystem::remove(dest);
-                throw std::runtime_error("checksum mismatch for " + artifact.filename);
+                throw error::MeowError(error::ErrorCode::ChecksumMismatch, "checksum mismatch for " + artifact.filename);
             }
 
             return dest;
@@ -38,12 +38,12 @@ namespace meow::repository {
     package::PackageFile resolvePackage(const Repository& repo, const types::PackageName& name) {
         const auto* pkg = findPackage(repo, name);
         if (!pkg) {
-            throw std::runtime_error("package not found in repository: " + name.value);
+            throw error::MeowError(error::ErrorCode::PackageNotFound, "package not found: " + name.value);
         }
 
         const auto* ver = latestVersion(*pkg);
         if (!ver) {
-            throw std::runtime_error("no versions available for package: " + name.value);
+            throw error::MeowError(error::ErrorCode::VersionNotFound, "no versions available for package: " + name.value);
         }
 
         return resolvePackage(repo, name, *ver);
@@ -52,7 +52,7 @@ namespace meow::repository {
     package::PackageFile resolvePackage(const Repository& repo, const types::PackageName& name, const types::PackageVersion& version) {
         const auto* pkg = findPackage(repo, name);
         if (!pkg) {
-            throw std::runtime_error("package not found in repository: " + name.value);
+            throw error::MeowError(error::ErrorCode::PackageNotFound, "package not found: " + name.value);
         }
 
         for (const auto& rv : pkg->versions) {
@@ -62,6 +62,6 @@ namespace meow::repository {
             }
         }
 
-        throw std::runtime_error("version not found: " + version.value + " for package: " + name.value);
+        throw error::MeowError(error::ErrorCode::VersionNotFound, "version not found: " + version.value + " for package: " + name.value);
     }
 }
