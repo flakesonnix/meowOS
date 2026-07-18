@@ -4,7 +4,4 @@ version = "1.0.0"
 architecture = "AMD64"
 description = "GNU Hello - a friendly greeting program"
 
-dependencies = [
-    "glibc",
-    "libarchive"
-]
+dependencies = []

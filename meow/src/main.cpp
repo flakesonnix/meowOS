@@ -7,6 +7,7 @@
 #include <meow/repository/version.hpp>
 #include <meow/repository/resolver.hpp>
 #include <meow/install/installer.hpp>
+#include <meow/dependency/resolver.hpp>
 
 namespace {
     auto openDb() {
@@ -109,9 +110,20 @@ int main(int argc, char** argv) {
                 std::cerr << "usage: meow install <package>\n";
                 return 1;
             }
-            auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{argv[2]});
-            meow::install::installPackage(pkg, "/tmp/meow-install", db);
-            std::cout << "installed " << argv[2] << " to /tmp/meow-install\n";
+            auto meta = meow::repository::resolvePackage(repo, meow::types::PackageName{argv[2]}).metadata;
+            auto tree = meow::dependency::resolveDependencies(repo, meta, db);
+
+            std::cout << "Resolving dependencies...\n\n";
+            std::vector<meow::package::PackageFile> toInstall;
+            for (const auto& name : tree.packages) {
+                auto pkg = meow::repository::resolvePackage(repo, name);
+                std::cout << "  " << name.value << " " << pkg.metadata.version.value << "\n";
+                toInstall.push_back(std::move(pkg));
+            }
+
+            std::cout << "\nInstalling...\n";
+            meow::install::installPackages(toInstall, "/tmp/meow-install", db);
+            std::cout << "\ndone\n";
         } else if (cmd == "installed") {
             cmdInstalled(db);
         } else {
