@@ -9,7 +9,7 @@
 namespace meow::repository {
     struct RepositoryVersion {
         types::PackageVersion version;
-        std::filesystem::path archive;
+        types::PackageArtifact artifact;
     };
 
     struct RepositoryPackage {

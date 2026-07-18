@@ -1,4 +1,5 @@
 #include <meow/repository/repository.hpp>
+#include <toml++/toml.hpp>
 #include <algorithm>
 #include <stdexcept>
 
@@ -19,22 +20,22 @@ namespace meow::repository {
 
             auto versionsDir = pkgDir.path() / "versions";
             if (std::filesystem::is_directory(versionsDir)) {
-                for (const auto& verDir : std::filesystem::directory_iterator(versionsDir)) {
-                    if (!verDir.is_directory()) continue;
+                for (const auto& entry : std::filesystem::directory_iterator(versionsDir)) {
+                    if (!entry.is_regular_file()) continue;
+                    if (entry.path().extension() != ".toml") continue;
+
+                    auto tbl = toml::parse_file(entry.path().string());
 
                     RepositoryVersion rv;
-                    rv.version = types::PackageVersion{verDir.path().filename().string()};
+                    rv.version = types::PackageVersion{entry.path().stem().string()};
 
-                    for (const auto& file : std::filesystem::directory_iterator(verDir.path())) {
-                        if (file.is_regular_file()) {
-                            rv.archive = file.path();
-                            break;
-                        }
+                    if (auto* art = tbl["artifact"].as_table()) {
+                        rv.artifact.filename = (*art)["filename"].value_or("");
+                        rv.artifact.url = (*art)["url"].value_or("");
+                        rv.artifact.sha256 = (*art)["sha256"].value_or("");
                     }
 
-                    if (!rv.archive.empty()) {
-                        pkg.versions.push_back(std::move(rv));
-                    }
+                    pkg.versions.push_back(std::move(rv));
                 }
                 std::sort(pkg.versions.begin(), pkg.versions.end(),
                     [](const RepositoryVersion& a, const RepositoryVersion& b) {

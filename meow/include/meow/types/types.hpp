@@ -36,6 +36,12 @@ namespace meow::types {
     struct FileList {
         std::vector<std::filesystem::path> value;
     };
+
+    struct PackageArtifact {
+        std::string filename;
+        std::string url;
+        std::string sha256;
+    };
 }
 
 #endif

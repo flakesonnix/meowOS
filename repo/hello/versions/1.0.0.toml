@@ -1,0 +1,4 @@
+[artifact]
+filename = "hello-1.0.0.pkg.tar.xz"
+url = "file:///tmp/hello-1.0.0.pkg.tar.xz"
+sha256 = "88ac8c947d38cfba18ba202374833ca7509bc43df7f239df41ba2020aeafa423"
