@@ -1,5 +1,6 @@
 #include <meow/verify/verifier.hpp>
 #include <meow/download/downloader.hpp>
+#include <meow/log/logger.hpp>
 #include <iostream>
 
 namespace meow::verify {
@@ -35,7 +36,7 @@ VerificationResult verifyAll(
     auto packages = database::listInstalled(db);
 
     for (const auto& pkg : packages) {
-        std::cout << "  " << pkg.value << "\n";
+        log::log(log::LogLevel::Info, "checking " + pkg.value);
         auto pkgResult = verifyPackage(db, pkg);
         for (const auto& f : pkgResult.missing) {
             std::cout << "    \x1b[31m\u2717 " << f.string() << " (missing)\x1b[0m\n";

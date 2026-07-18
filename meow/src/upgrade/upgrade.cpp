@@ -4,6 +4,7 @@
 #include <meow/archive/archive.hpp>
 #include <meow/transaction/transaction.hpp>
 #include <meow/error/error.hpp>
+#include <meow/log/logger.hpp>
 #include <iostream>
 #include <filesystem>
 
@@ -57,16 +58,15 @@ namespace meow::upgrade {
         auto tx = transaction::beginTransaction();
 
         try {
-            std::cout << "Upgrading " << name.value << "\n\n"
-                      << "  " << installedVer->value << " -> " << latest->value << "\n\n";
+            log::log(log::LogLevel::Info, "upgrading " + name.value + " " + installedVer->value + " -> " + latest->value);
 
-            std::cout << "  removing old files\n";
+            log::log(log::LogLevel::Info, "removing old files");
             std::error_code ec;
             for (const auto& f : oldFiles) {
                 std::filesystem::remove(f, ec);
             }
 
-            std::cout << "  installing " << latest->value << "\n";
+            log::log(log::LogLevel::Info, "installing " + latest->value);
             archive::Archive archive{latestPkg.archivePath};
             auto newFiles = archive::extractAll(archive, root);
             transaction::recordExtractedFiles(tx, newFiles);
@@ -76,9 +76,9 @@ namespace meow::upgrade {
             entry.installedFiles = newFiles.value;
             tx.packages.push_back(std::move(entry));
             transaction::commitTransaction(tx, db);
-            std::cout << "\nUpgrade complete\n";
+            log::log(log::LogLevel::Info, "upgrade complete");
         } catch (...) {
-            std::cerr << "  upgrade failed, rolling back...\n";
+            log::log(log::LogLevel::Error, "upgrade failed, rolling back");
             transaction::rollbackTransaction(tx);
             throw;
         }

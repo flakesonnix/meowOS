@@ -1,7 +1,7 @@
 #include <meow/install/installer.hpp>
 #include <meow/archive/archive.hpp>
 #include <meow/transaction/transaction.hpp>
-#include <iostream>
+#include <meow/log/logger.hpp>
 
 namespace meow::install {
     void installPackage(const package::PackageFile& package, const std::filesystem::path& root, database::Database& db) {
@@ -15,7 +15,7 @@ namespace meow::install {
 
         try {
             for (const auto& pkg : packages) {
-                std::cout << "  installing " << pkg.metadata.name.value << " " << pkg.metadata.version.value << "\n";
+                log::log(log::LogLevel::Info, "installing " + pkg.metadata.name.value + " " + pkg.metadata.version.value);
                 archive::Archive archive{pkg.archivePath};
                 auto files = archive::extractAll(archive, root);
                 transaction::recordExtractedFiles(tx, files);
@@ -26,9 +26,9 @@ namespace meow::install {
             }
 
             transaction::commitTransaction(tx, db);
-            std::cout << "  transaction committed\n";
+            log::log(log::LogLevel::Info, "transaction committed");
         } catch (...) {
-            std::cerr << "  transaction failed, rolling back...\n";
+            log::log(log::LogLevel::Error, "transaction failed, rolling back");
             transaction::rollbackTransaction(tx);
             throw;
         }

@@ -4,6 +4,7 @@
 #include <meow/archive/archive.hpp>
 #include <meow/download/downloader.hpp>
 #include <meow/error/error.hpp>
+#include <meow/log/logger.hpp>
 #include <iostream>
 #include <filesystem>
 
