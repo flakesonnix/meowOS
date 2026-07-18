@@ -15,6 +15,9 @@ namespace meow::error {
         InvalidManifest,
         ArchiveOpenFailed,
         RepositoryNotFound,
+        DatabaseOpenFailed,
+        DatabaseQueryFailed,
+        DatabaseMigrationFailed,
         Internal
     };
 

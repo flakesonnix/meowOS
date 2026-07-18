@@ -12,8 +12,11 @@ namespace meow::error {
             case ErrorCode::FileNotFound:       codeStr = "FileNotFound";       break;
             case ErrorCode::InvalidManifest:    codeStr = "InvalidManifest";    break;
             case ErrorCode::ArchiveOpenFailed:  codeStr = "ArchiveOpenFailed";  break;
-            case ErrorCode::RepositoryNotFound: codeStr = "RepositoryNotFound"; break;
-            case ErrorCode::Internal:           codeStr = "Internal";           break;
+            case ErrorCode::RepositoryNotFound:    codeStr = "RepositoryNotFound";    break;
+            case ErrorCode::DatabaseOpenFailed:    codeStr = "DatabaseOpenFailed";    break;
+            case ErrorCode::DatabaseQueryFailed:   codeStr = "DatabaseQueryFailed";   break;
+            case ErrorCode::DatabaseMigrationFailed: codeStr = "DatabaseMigrationFailed"; break;
+            case ErrorCode::Internal:              codeStr = "Internal";              break;
         }
         return "error: " + std::string(e.what()) + "\ncode: " + codeStr;
     }
