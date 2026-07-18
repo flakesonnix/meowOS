@@ -2,12 +2,18 @@
 #include <string_view>
 
 #include <meow/error/error.hpp>
+#include <meow/database/database.hpp>
 #include <meow/repository/repository.hpp>
 #include <meow/repository/version.hpp>
 #include <meow/repository/resolver.hpp>
 #include <meow/install/installer.hpp>
 
 namespace {
+    auto openDb() {
+        auto db = meow::database::openDatabase("");
+        return db;
+    }
+
     void cmdInfo(const meow::repository::Repository& repo, std::string_view name) {
         auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{std::string(name)});
 
@@ -51,6 +57,20 @@ namespace {
             }
         }
     }
+
+    void cmdInstalled(meow::database::Database& db) {
+        auto packages = meow::database::listInstalled(db);
+        if (packages.empty()) {
+            std::cout << "(no packages installed)\n";
+            return;
+        }
+        for (const auto& pkg : packages) {
+            auto ver = meow::database::installedVersion(db, pkg);
+            std::cout << pkg.value;
+            if (ver) std::cout << " " << ver->value;
+            std::cout << "\n";
+        }
+    }
 }
 
 int main(int argc, char** argv) {
@@ -59,12 +79,14 @@ int main(int argc, char** argv) {
               << "  info   <package>\n"
               << "  list\n"
               << "  search <query>\n"
-              << "  install <package>\n";
+              << "  install <package>\n"
+              << "  installed\n";
         return 1;
     }
 
     try {
         auto repo = meow::repository::loadRepository("./repo");
+        auto db = openDb();
 
         std::string_view cmd = argv[1];
 
@@ -88,8 +110,10 @@ int main(int argc, char** argv) {
                 return 1;
             }
             auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{argv[2]});
-            meow::install::installPackage(pkg, "/tmp/meow-install");
+            meow::install::installPackage(pkg, "/tmp/meow-install", db);
             std::cout << "installed " << argv[2] << " to /tmp/meow-install\n";
+        } else if (cmd == "installed") {
+            cmdInstalled(db);
         } else {
             std::cerr << "unknown command: " << cmd << "\n";
             return 1;
