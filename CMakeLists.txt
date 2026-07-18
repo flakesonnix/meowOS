@@ -25,6 +25,7 @@ add_executable(${PROJECT_NAME}
         meow/src/verify/verifier.cpp
         meow/src/repair/repair.cpp
         meow/src/sync/sync.cpp
+        meow/src/update/updater.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

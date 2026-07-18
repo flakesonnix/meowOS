@@ -15,6 +15,7 @@
 #include <meow/verify/verifier.hpp>
 #include <meow/repair/repair.hpp>
 #include <meow/sync/sync.hpp>
+#include <meow/update/updater.hpp>
 
 namespace {
     const auto lockfilePath = std::filesystem::path("meow.lock");
@@ -122,7 +123,8 @@ int main(int argc, char** argv) {
               << "  installed\n"
               << "  verify\n"
               << "  repair [<package>]\n"
-              << "  sync\n";
+              << "  sync\n"
+              << "  update [--dry-run]\n";
         return 1;
     }
 
@@ -220,6 +222,23 @@ int main(int argc, char** argv) {
                 return 1;
             }
             meow::remove::removePackage(meow::types::PackageName{argv[2]}, db);
+        } else if (cmd == "update") {
+            if (argc >= 3 && argv[2] == std::string_view("--dry-run")) {
+                auto updates = meow::sync::checkUpdates(repo, db);
+                if (updates.empty()) {
+                    std::cout << "All packages up to date\n";
+                } else {
+                    std::cout << "Would update:\n\n";
+                    for (const auto& u : updates) {
+                        std::cout << "  " << u.name.value
+                                  << "  " << u.installed.value
+                                  << " -> " << u.available.value << "\n";
+                    }
+                    std::cout << "\nNo changes made\n";
+                }
+            } else {
+                meow::update::updateAll(repo, db);
+            }
         } else if (cmd == "sync") {
             auto updates = meow::sync::checkUpdates(repo, db);
             if (updates.empty()) {
