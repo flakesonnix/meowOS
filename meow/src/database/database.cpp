@@ -45,7 +45,7 @@ namespace meow::database {
             throw error::MeowError(error::ErrorCode::DatabaseOpenFailed, sqlite3_errmsg(handle));
         }
 
-        Database db{handle};
+        Database db{handle, dbPath};
         initializeDatabase(db);
         return db;
     }

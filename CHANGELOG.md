@@ -1,15 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-07-19
 
 ### Added
 
-- `meow doctor` system diagnostics command (config, database schema,
-  repository trust/identity/expiry, cache, lockfile consistency, installed
-  file integrity summary, disk space, permissions)
-- `meow doctor --json` machine-readable output for bug reports / CI
-- `log::setLevel` / `log::getLevel` to control emitted log verbosity
-- `database::checkSchema` to verify the on-disk schema tables
 - Reproducible package generation: `meow-build` emits byte-identical
   `.pkg.tar.zst` archives for identical source + metadata + environment
   (sorted entries, root ownership, `SOURCE_DATE_EPOCH` timestamps,
@@ -21,6 +15,9 @@
   (SIGTERM → SIGKILL). New error codes `HookFailed`, `HookTimeout`,
   `HookDenied`. A failed hook rolls back the install transaction.
 - `[hooks]` config: `timeout`, `network` (advisory), `inheritEnvironment`
+- `meow doctor` system diagnostics command (config, database schema,
+  repository trust/identity/expiry, cache, lockfile consistency, installed
+  file integrity summary, disk space, permissions) with `--json` output
 - `meow doctor --security` focused security report (trusted keys, trust
   chain signature→key→identity→expiry, cache partials, lockfile integrity,
   hook policy). Read-only; never mutates state.
@@ -28,22 +25,36 @@
   repository metadata (no downloads), then all artifacts are fetched
   concurrently via a bounded worker pool (`meow/download/queue.hpp`);
   installation remains strictly serial
-- `download_workers` config option (0 = default `min(hardware_concurrency, 8)`)
 - Dependency closure resolution from repository metadata only
   (`resolveDependencyNames`), with cycle detection
+- `download_workers` config option (0 = default `min(hardware_concurrency, 8)`)
+
+### Changed
+
+- Download transport rewritten on libcurl (no shell execution); captures
+  HTTP status codes, headers, and curl errors
 - Download robustness: atomic writes (`.part` + rename), HTTP resume,
-  retries, timeouts, and ETag `If-None-Match` passthrough
-- `docs/downloads.md` documenting download behavior
-- libcurl-based download transport (no shell execution); capture HTTP
-  status codes, headers, and curl errors
+  retries, timeouts, and ETag `If-None-Match` passthrough; `Content-Length`
+  size guard (`maxBytes`) to reject oversized downloads early;
+  `304 Not Modified` reuses the cached file
 - New download errors: `DownloadTimeout`, `DownloadHttpError`,
-  `DownloadInterrupted`, `InvalidDownload`
-- `DownloadResult` (path, size, etag, last-modified, 304 flag) and
-  `DownloadOptions` (retries, timeout, TLS, etag, maxBytes)
-- `Content-Length` size guard (`maxBytes`) to reject oversized downloads
-  early; `304 Not Modified` reuses the existing cached file
+  `DownloadInterrupted`, `InvalidDownload`; `DownloadResult` (path, size,
+  etag, last-modified, 304 flag) and `DownloadOptions` (retries, timeout,
+  TLS, etag, maxBytes)
+- `log::setLevel` / `log::getLevel` to control emitted log verbosity
+- `database::checkSchema` to verify the on-disk schema tables
 - Self-contained integration suite: builds its own package fixtures
   (no dependency on pre-existing `/tmp` artifacts)
+
+### Security
+
+- Trusted local key store (`~/.config/meow/keys/`) for Ed25519 verification
+- Repository metadata signature verification anchored to trusted keys
+- Stable `repository_id` for cache and trust anchoring
+- Repository metadata expiry (`generated` / `expires`) enforcement
+- Signed, verified repository metadata cache (`~/.cache/meow/repos/`)
+- Hook execution isolated (staging cwd, minimal env, timeout); network
+  policy is advisory until OS-level sandboxing lands
 
 ## [0.3.0] - 2026-07-19
 

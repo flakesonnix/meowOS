@@ -118,10 +118,10 @@ Diagnosis diagnose(const config::Config& cfg,
     // 2. Database schema
     {
         std::error_code ec;
-        bool exists = std::filesystem::exists(cfg.database, ec);
+        bool exists = std::filesystem::exists(db.path, ec);
         if (!exists) {
             add(checks, "database", "schema present", CheckStatus::Warning,
-                "database file missing (will be created on first operation): " + cfg.database.string());
+                "database file missing (will be created on first operation): " + db.path.string());
         } else {
             auto ok = database::checkSchema(db);
             add(checks, "database", "schema present",

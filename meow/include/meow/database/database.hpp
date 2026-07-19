@@ -18,6 +18,7 @@ struct FileEntry {
 
 struct Database {
     void* handle;
+    std::filesystem::path path;
 };
 
 Database openDatabase(const std::filesystem::path& path);
