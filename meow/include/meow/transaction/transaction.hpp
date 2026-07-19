@@ -13,6 +13,7 @@ namespace meow::transaction {
         struct PackageEntry {
             package::PackageFile pkg;
             std::vector<std::filesystem::path> installedFiles;
+            database::InstallReason reason = database::InstallReason::Explicit;
         };
 
         std::vector<PackageEntry> packages;

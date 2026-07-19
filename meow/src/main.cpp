@@ -1,4 +1,6 @@
+#include <ctime>
 #include <iostream>
+#include <set>
 #include <string_view>
 #include <vector>
 
@@ -90,6 +92,75 @@ namespace {
             std::cout << pkg.value;
             if (ver) std::cout << " " << ver->value;
             std::cout << "\n";
+        }
+    }
+
+    // Append-only history log (oldest first). With a package name, restrict to
+    // that package.
+    void cmdHistory(meow::database::Database& db, const std::string& name) {
+        std::vector<meow::database::HistoryEntry> entries =
+            name.empty() ? meow::database::packageHistory(db)
+                         : meow::database::packageHistory(db, meow::types::PackageName{name});
+        if (entries.empty()) {
+            std::cout << "(no history)\n";
+            return;
+        }
+        for (const auto& e : entries) {
+            std::time_t t = static_cast<std::time_t>(e.timestamp);
+            char buf[64];
+            std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", std::localtime(&t));
+            std::cout << buf << " " << e.action << " " << e.package;
+            if (!e.version.empty()) std::cout << " " << e.version;
+            std::cout << "\n  reason: " << e.reason;
+            if (!e.transactionId.empty()) std::cout << "\n  transaction: " << e.transactionId;
+            std::cout << "\n";
+        }
+    }
+
+    // Why a package is installed: its current reason plus the packages that
+    // require it (the resolver graph powers richer "provided by" output later).
+    void cmdWhy(meow::database::Database& db, const std::string& name) {
+        meow::types::PackageName pkg{name};
+        if (!meow::database::isInstalled(db, pkg)) {
+            std::cout << "(not installed: " << name << ")\n";
+            return;
+        }
+        auto ver = meow::database::installedVersion(db, pkg);
+        auto reason = meow::database::installReason(db, pkg);
+        std::cout << name;
+        if (ver) std::cout << " " << ver->value;
+        std::cout << "\n";
+        std::cout << "reason: ";
+        if (reason) {
+            switch (*reason) {
+                case meow::database::InstallReason::Explicit:    std::cout << "explicit"; break;
+                case meow::database::InstallReason::GroupMember: std::cout << "group"; break;
+                case meow::database::InstallReason::Dependency:  std::cout << "dependency"; break;
+            }
+        } else {
+            std::cout << "unknown";
+        }
+        std::cout << "\n";
+
+        auto requiredBy = meow::database::requiredBy(db, pkg);
+        std::cout << "required by:\n";
+        if (requiredBy.empty()) {
+            std::cout << "  (nothing)\n";
+        } else {
+            for (const auto& r : requiredBy) {
+                std::cout << "  " << r.value << "\n";
+            }
+        }
+    }
+
+    void cmdExplicitlyInstalled(meow::database::Database& db) {
+        auto pkgs = meow::database::explicitlyInstalled(db);
+        if (pkgs.empty()) {
+            std::cout << "(no explicitly-installed packages)\n";
+            return;
+        }
+        for (const auto& p : pkgs) {
+            std::cout << p.value << "\n";
         }
     }
 
@@ -236,6 +307,9 @@ int main(int argc, char** argv) {
               << "  update [--dry-run]\n"
                << "  owns <file>\n"
                << "  required-by <package>\n"
+               << "  history [package]\n"
+               << "  why <package>\n"
+               << "  explicitly-installed\n"
                << "  keys list\n"
                << "  keys add <file>\n"
                << "  clean\n";
@@ -399,7 +473,10 @@ int main(int argc, char** argv) {
             }
 
             meow::log::log(meow::log::LogLevel::Info, "installing packages");
-            meow::install::installPackages(toInstall, installRoot, db);
+            std::set<std::string> requested{meow::types::PackageName{pkgName}.value};
+            meow::install::installPackages(toInstall, requested,
+                                           meow::database::InstallReason::Explicit,
+                                           installRoot, db);
 
             if (!locked) {
                 cmdSaveLockfile(toInstall, repo);
@@ -442,7 +519,11 @@ int main(int argc, char** argv) {
 
                 meow::log::log(meow::log::LogLevel::Info,
                                "installing group " + groupName);
-                meow::install::installPackages(toInstall, installRoot, db);
+                std::set<std::string> requested;
+                for (const auto& p : grp->packages) requested.insert(p);
+                meow::install::installPackages(toInstall, requested,
+                                               meow::database::InstallReason::GroupMember,
+                                               installRoot, db);
                 cmdSaveLockfile(toInstall, repo);
                 std::cout << "\ndone\n";
             } else {
@@ -575,6 +656,18 @@ int main(int argc, char** argv) {
                     std::cout << d.value << "\n";
                 }
             }
+        } else if (cmd == "history") {
+            std::string name;
+            if (cmdArgc >= 2) name = cmdArgv[1];
+            cmdHistory(db, name);
+        } else if (cmd == "why") {
+            if (cmdArgc < 2) {
+                std::cerr << "usage: meow why <package>\n";
+                return 1;
+            }
+            cmdWhy(db, cmdArgv[1]);
+        } else if (cmd == "explicitly-installed") {
+            cmdExplicitlyInstalled(db);
         } else if (cmd == "installed") {
             cmdInstalled(db);
         } else if (cmd == "clean") {

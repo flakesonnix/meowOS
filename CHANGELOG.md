@@ -4,6 +4,12 @@
 
 ### Added
 
+- Package history: every install/remove records an append-only `package_history`
+  row with timestamp, action, version, install reason, and a per-transaction
+  UUID; the `packages` table now stores a current `install_reason` (Explicit >
+  GroupMember > Dependency, upgrade-only). New commands `meow history
+  [package]`, `meow why <package>`, and `meow explicitly-installed` expose this
+  (`docs/package-history.md`). Existing v1 databases auto-migrate on open.
 - `meow-server`: minimal dependency-free static HTTP server that hosts a
   signed repository produced by `meow-repo` (`docs/repository-server.md`).
   Serves `repository.toml`, `repository.toml.sig`, `by-name/...` manifests, and

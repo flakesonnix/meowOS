@@ -23,3 +23,4 @@
 - [Download transport](downloads.md)
 - [Restricted hook runner](hooks.md)
 - [Cache & verification](cache.md)
+- [Package history & install reasons](package-history.md)

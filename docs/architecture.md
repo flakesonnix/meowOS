@@ -66,7 +66,7 @@ commit → register in SQLite database
 | Transaction     | `transaction`             | begin/record/commit/rollback                 |
 | Install         | `install`                 | installPackages + hook runner               |
 | Hooks           | `hooks`                   | isolated, timed, logged script execution    |
-| Database        | `database`                | SQLite package/file registry                 |
+| Database        | `database`                | SQLite package/file registry + history       |
 | Lockfile        | `lock`                    | reproducible install pinning                |
 | Verify/Repair   | `verify`, `repair`        | integrity check / restore                    |
 | Sync/Update     | `sync`, `update`          | upstream diff / bulk upgrade                 |

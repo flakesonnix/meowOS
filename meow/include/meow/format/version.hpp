@@ -8,7 +8,7 @@ namespace meow::format {
 constexpr int CurrentPackageFormat = 1;
 constexpr int CurrentRepositoryFormat = 1;
 constexpr int CurrentLockfileFormat = 1;
-constexpr int CurrentDatabaseSchema = 1;
+constexpr int CurrentDatabaseSchema = 2;
 
 void requireVersion(
     const std::string& name,

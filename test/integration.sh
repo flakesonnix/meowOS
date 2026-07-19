@@ -1496,6 +1496,10 @@ else
     fail=$((fail + 1))
 fi
 
+    echo "  FAIL: info differs across backends (fs='$FS_INFO' http='$HTTP_INFO')"
+    fail=$((fail + 1))
+fi
+
 kill "$SRV_PID" 2>/dev/null || true
 wait "$SRV_PID" 2>/dev/null || true
 git clean -fdq repo-dual 2>/dev/null || true
@@ -2458,6 +2462,131 @@ fi
 rm -f meow-groups.toml meow-groups-bad.toml meow-groups-dup.toml meow-groups-rsv.toml
 
 echo ""
+echo "=== 36. Package history ==="
+# Locks the package-history contract: install reason (explicit / group /
+# dependency), append-only history, transaction grouping, and the
+# `history` / `why` / `explicitly-installed` commands.
+
+cat > meow-hist.toml << EOF
+[[repositories]]
+id = "main"
+url = "./repo"
+priority = 100
+
+[[groups]]
+name = "base-devel"
+packages = ["hello", "libfoo"]
+EOF
+
+HDB="/tmp/meow-hist-$$.db"
+
+# Case: explicit install records reason.
+if $MEOW --db-path "$HDB" --config meow-hist.toml install hello >/dev/null 2>&1; then
+    if OUT=$($MEOW --db-path "$HDB" why hello 2>/dev/null); echo "$OUT" | grep -qi "reason: explicit"; then
+        echo "  PASS: explicit install records reason"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: explicit reason not recorded"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  FAIL: explicit install failed"
+    fail=$((fail + 1))
+fi
+
+# Case: group install records group member (not downgraded later).
+if $MEOW --db-path "$HDB" --config meow-hist.toml group install base-devel >/dev/null 2>&1; then
+    if OUT=$($MEOW --db-path "$HDB" why libfoo 2>/dev/null); echo "$OUT" | grep -qi "reason: group"; then
+        echo "  PASS: group install records group member"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: group member reason not recorded"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  FAIL: group install failed"
+    fail=$((fail + 1))
+fi
+
+# Case: explicit reason survives later group install (no downgrade).
+# `hello` was explicit; base-devel also contains hello, so it must stay explicit.
+if $MEOW --db-path "$HDB" --config meow-hist.toml group install base-devel >/dev/null 2>&1; then
+    if OUT=$($MEOW --db-path "$HDB" why hello 2>/dev/null); echo "$OUT" | grep -qi "reason: explicit"; then
+        echo "  PASS: explicit reason survives later group install"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: explicit reason downgraded by group install"
+        fail=$((fail + 1))
+    fi
+fi
+
+# Case: dependency install records dependency.
+# `app` pulls hello + libfoo as dependencies in this repo fixture.
+HDB2="/tmp/meow-hist2-$$.db"
+if $MEOW --db-path "$HDB2" --config meow-hist.toml install app >/dev/null 2>&1; then
+    OUT=$($MEOW --db-path "$HDB2" installed 2>/dev/null)
+    if echo "$OUT" | grep -q "^app"; then
+        if WOUT=$($MEOW --db-path "$HDB2" why libfoo 2>/dev/null); echo "$WOUT" | grep -qi "reason: dependency"; then
+            echo "  PASS: dependency install records dependency"
+            pass=$((pass + 1))
+        else
+            echo "  FAIL: dependency reason not recorded"
+            fail=$((fail + 1))
+        fi
+    else
+        echo "  FAIL: app install did not resolve"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  FAIL: dependency install failed"
+    fail=$((fail + 1))
+fi
+
+# Case: history command shows install actions.
+if OUT=$($MEOW --db-path "$HDB" history 2>/dev/null); echo "$OUT" | grep -qi "install hello"; then
+    echo "  PASS: history lists install actions"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: history missing install actions"
+    fail=$((fail + 1))
+fi
+
+# Case: history <package> restricts to one package.
+if OUT=$($MEOW --db-path "$HDB" history hello 2>/dev/null); echo "$OUT" | grep -q "hello" && ! echo "$OUT" | grep -q "libfoo"; then
+    echo "  PASS: history <package> restricts to package"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: history <package> not scoped"
+    fail=$((fail + 1))
+fi
+
+# Case: remove records history.
+if $MEOW --db-path "$HDB" remove libfoo >/dev/null 2>&1; then
+    if OUT=$($MEOW --db-path "$HDB" history libfoo 2>/dev/null); echo "$OUT" | grep -qi "remove libfoo"; then
+        echo "  PASS: remove records history"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: remove not in history"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  FAIL: remove failed"
+    fail=$((fail + 1))
+fi
+
+# Case: explicitly-installed lists only explicit packages.
+if OUT=$($MEOW --db-path "$HDB" explicitly-installed 2>/dev/null); \
+   echo "$OUT" | grep -q "^hello" && ! echo "$OUT" | grep -q "libfoo"; then
+    echo "  PASS: explicitly-installed lists explicit only"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: explicitly-installed incorrect"
+    fail=$((fail + 1))
+fi
+
+rm -f meow-hist.toml
+
+echo ""
 echo "=== 30. In-memory backend unit tests (disk/network-free) ==="
 UNIT_BIN="$(cd "$(dirname "$0")" && pwd)/../build/meow-unit-backend"
 if [ ! -x "$UNIT_BIN" ]; then
@@ -2471,6 +2600,24 @@ else
         pass=$((pass + 1))
     else
         echo "  FAIL: $UNIT_FAIL in-memory backend checks failed"
+        fail=$((fail + 1))
+    fi
+fi
+
+echo ""
+echo "=== 31. Package history unit tests (disk/network-free) ==="
+HIST_BIN="$(cd "$(dirname "$0")" && pwd)/../build/meow-unit-history"
+if [ ! -x "$HIST_BIN" ]; then
+    echo "  SKIP: history unit test binary not built ($HIST_BIN)"
+else
+    HIST_OUT=$("$HIST_BIN" 2>&1)
+    HIST_FAIL=$(printf '%s\n' "$HIST_OUT" | grep -c '^  FAIL:' || true)
+    HIST_PASS=$(printf '%s\n' "$HIST_OUT" | grep -c '^  PASS:' || true)
+    if [ "$HIST_FAIL" -eq 0 ]; then
+        echo "  PASS: $HIST_PASS package history checks passed"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: $HIST_FAIL package history checks failed"
         fail=$((fail + 1))
     fi
 fi

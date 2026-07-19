@@ -76,6 +76,12 @@ target_include_directories(meow-unit-backend
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-backend PRIVATE meow_core)
 
+# Disk/network-free unit tests for the package-history / install-reason layer.
+add_executable(meow-unit-history test/unit/history_test.cpp)
+target_include_directories(meow-unit-history
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-history PRIVATE meow_core)
+
 target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-repo PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)

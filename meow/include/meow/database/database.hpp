@@ -10,10 +10,31 @@
 
 namespace meow::database {
 
+// Why a package is present in the database. A package has a single current
+// reason; it can only be upgraded, never downgraded (Explicit > GroupMember >
+// Dependency). History rows are append-only and preserve the reason at the time
+// of each action.
+enum class InstallReason {
+    Explicit,    // user ran: meow install foo
+    GroupMember, // installed through meow group install <group>
+    Dependency,  // pulled in by the resolver
+};
+
 struct FileEntry {
     std::filesystem::path path;
     std::string sha256;
     int64_t size;
+};
+
+// One append-only history record. History is a log of install/remove actions,
+// never the source of truth for "what is installed" (that is `packages`).
+struct HistoryEntry {
+    long long timestamp = 0;  // unix seconds
+    std::string action;        // "install" / "remove"
+    std::string package;
+    std::string version;
+    std::string reason;        // string form of InstallReason
+    std::string transactionId;
 };
 
 struct Database {
@@ -38,6 +59,28 @@ void removePackageRecord(Database& db, const types::PackageName& name);
 
 std::optional<types::PackageName> owns(Database& db, const std::filesystem::path& filePath);
 std::vector<types::PackageName> requiredBy(Database& db, const types::PackageName& name);
-}
+
+// --- Install reason (current state, one row per package) ---
+
+// Set the reason for a package, upgrading only (Explicit > GroupMember >
+// Dependency). Never downgrades an existing stronger reason.
+void setInstallReason(Database& db, const types::PackageName& name, InstallReason reason);
+// Current reason for a package, or nullopt if not installed / unknown.
+std::optional<InstallReason> installReason(Database& db, const types::PackageName& name);
+// All explicitly-installed packages (reason == Explicit).
+std::vector<types::PackageName> explicitlyInstalled(Database& db);
+
+// --- History (append-only log) ---
+
+// Record an install/remove action. History is never edited after insertion.
+void recordHistory(Database& db, const std::string& action,
+                   const types::PackageName& name, const types::PackageVersion& version,
+                   InstallReason reason, const std::string& transactionId);
+// All history entries, oldest first.
+std::vector<HistoryEntry> packageHistory(Database& db);
+// History entries for a single package, oldest first.
+std::vector<HistoryEntry> packageHistory(Database& db, const types::PackageName& name);
+
+}  // namespace meow::database
 
 #endif //MEOWOS_DATABASE_H

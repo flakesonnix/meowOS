@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <set>
 
 namespace meow::install {
     namespace {
@@ -72,7 +73,11 @@ namespace meow::install {
         runHookFor("post_install", hooks::HookType::PostInstall, package, policy);
     }
 
-    void installPackages(const std::vector<package::PackageFile>& packages, const std::filesystem::path& root, database::Database& db) {
+    void installPackages(const std::vector<package::PackageFile>& packages,
+                          const std::set<std::string>& requested,
+                          database::InstallReason requestReason,
+                          const std::filesystem::path& root,
+                          database::Database& db) {
         auto policy = defaultPolicy();
         auto tx = transaction::beginTransaction();
 
@@ -91,6 +96,12 @@ namespace meow::install {
                 transaction::Transaction::PackageEntry entry;
                 entry.pkg = pkg;
                 entry.installedFiles = files.value;
+                // `requested` carries the names the user asked for (either a
+                // direct install target or a group member). Everything else in
+                // the closure is a transitive dependency.
+                entry.reason = requested.count(pkg.metadata.name.value)
+                    ? requestReason
+                    : database::InstallReason::Dependency;
                 tx.packages.push_back(std::move(entry));
             }
 

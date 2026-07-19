@@ -19,6 +19,8 @@ namespace meow::remove {
         }
 
         auto files = database::listPackageFiles(db, name);
+        auto removedVer = database::installedVersion(db, name);
+        auto removedReason = database::installReason(db, name).value_or(database::InstallReason::Dependency);
 
         auto tx = transaction::beginTransaction();
         try {
@@ -31,6 +33,9 @@ namespace meow::remove {
             }
 
             database::removePackageRecord(db, name);
+            if (removedVer) {
+                database::recordHistory(db, "remove", name, *removedVer, removedReason, "");
+            }
             tx.committed = true;
             log::log(log::LogLevel::Info, "removed " + name.value + " from database");
         } catch (...) {

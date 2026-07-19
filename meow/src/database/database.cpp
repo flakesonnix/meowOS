@@ -63,7 +63,7 @@ namespace meow::database {
         const char* sql =
             "SELECT name FROM sqlite_master "
             "WHERE type='table' AND name IN "
-            "('packages','files','package_deps','package_provides','metadata');";
+            "('packages','files','package_deps','package_provides','package_history','metadata');";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             return false;
@@ -71,7 +71,7 @@ namespace meow::database {
         int found = 0;
         while (sqlite3_step(stmt) == SQLITE_ROW) ++found;
         sqlite3_finalize(stmt);
-        return found == 5;
+        return found == 6;
     }
 
     void initializeDatabase(Database& db) {
@@ -83,7 +83,8 @@ namespace meow::database {
             "  name TEXT NOT NULL UNIQUE,"
             "  version TEXT NOT NULL,"
             "  architecture TEXT NOT NULL,"
-            "  install_time INTEGER NOT NULL"
+            "  install_time INTEGER NOT NULL,"
+            "  install_reason TEXT NOT NULL DEFAULT 'Dependency'"
             ");"
             "CREATE TABLE IF NOT EXISTS files ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -104,6 +105,15 @@ namespace meow::database {
             "  package_id INTEGER NOT NULL,"
             "  provide_name TEXT NOT NULL,"
             "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+            ");"
+            "CREATE TABLE IF NOT EXISTS package_history ("
+            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  timestamp INTEGER NOT NULL,"
+            "  action TEXT NOT NULL,"
+            "  package TEXT NOT NULL,"
+            "  version TEXT,"
+            "  reason TEXT,"
+            "  transaction_id TEXT"
             ");"
             "CREATE TABLE IF NOT EXISTS metadata ("
             "  key TEXT PRIMARY KEY,"
@@ -144,8 +154,65 @@ namespace meow::database {
         }
 
         if (schemaVersion != format::CurrentDatabaseSchema) {
-            throw error::MeowError(error::ErrorCode::DatabaseMigrationFailed,
-                "unsupported database schema version: " + std::to_string(schemaVersion));
+            if (schemaVersion == 1) {
+                // Migrate v1 -> v2: add per-package install reason and the
+                // append-only history table. Existing packages default to
+                // Dependency until a future reason is recorded.
+                const char* alterPkg =
+                    "ALTER TABLE packages ADD COLUMN install_reason TEXT NOT NULL DEFAULT 'Dependency';";
+                char* merr = nullptr;
+                sqlite3_exec(handle, alterPkg, nullptr, nullptr, &merr);
+                if (merr) sqlite3_free(merr);
+                const char* mkHist =
+                    "CREATE TABLE IF NOT EXISTS package_history ("
+                    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    "  timestamp INTEGER NOT NULL,"
+                    "  action TEXT NOT NULL,"
+                    "  package TEXT NOT NULL,"
+                    "  version TEXT,"
+                    "  reason TEXT,"
+                    "  transaction_id TEXT"
+                    ");";
+                sqlite3_exec(handle, mkHist, nullptr, nullptr, &merr);
+                if (merr) sqlite3_free(merr);
+                // A v1 database may predate the files / deps / provides tables
+                // entirely. Create them idempotently so the schema is complete
+                // and checkSchema() passes after migration.
+                const char* mkMissing =
+                    "CREATE TABLE IF NOT EXISTS files ("
+                    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    "  package_id INTEGER NOT NULL,"
+                    "  path TEXT NOT NULL,"
+                    "  sha256 TEXT DEFAULT '',"
+                    "  size INTEGER DEFAULT 0,"
+                    "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+                    ");"
+                    "CREATE TABLE IF NOT EXISTS package_deps ("
+                    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    "  package_id INTEGER NOT NULL,"
+                    "  dep_name TEXT NOT NULL,"
+                    "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+                    ");"
+                    "CREATE TABLE IF NOT EXISTS package_provides ("
+                    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    "  package_id INTEGER NOT NULL,"
+                    "  provide_name TEXT NOT NULL,"
+                    "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+                    ");";
+                sqlite3_exec(handle, mkMissing, nullptr, nullptr, &merr);
+                if (merr) sqlite3_free(merr);
+                const char* setVer =
+                    "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', ?);";
+                if (sqlite3_prepare_v2(handle, setVer, -1, &vstmt, nullptr) == SQLITE_OK) {
+                    auto verStr = std::to_string(format::CurrentDatabaseSchema);
+                    sqlite3_bind_text(vstmt, 1, verStr.c_str(), -1, SQLITE_TRANSIENT);
+                    sqlite3_step(vstmt);
+                    sqlite3_finalize(vstmt);
+                }
+            } else {
+                throw error::MeowError(error::ErrorCode::DatabaseMigrationFailed,
+                    "unsupported database schema version: " + std::to_string(schemaVersion));
+            }
         }
     }
 
@@ -155,7 +222,16 @@ namespace meow::database {
         auto archStr = package.metadata.architecture == types::CpuArch::AMD64 ? "amd64" : "aarch64";
         auto now = std::time(nullptr);
 
-        const char* insertPkg = "INSERT OR REPLACE INTO packages (name, version, architecture, install_time) VALUES (?, ?, ?, ?);";
+        // INSERT ... ON CONFLICT preserves the existing `install_reason`
+        // column (set separately via setInstallReason), whereas INSERT OR
+        // REPLACE would wipe it back to the 'Dependency' default on upgrade.
+        const char* insertPkg =
+            "INSERT INTO packages (name, version, architecture, install_time) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(name) DO UPDATE SET "
+            "  version = excluded.version, "
+            "  architecture = excluded.architecture, "
+            "  install_time = excluded.install_time;";
         sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(handle, insertPkg, -1, &stmt, nullptr) != SQLITE_OK) {
             throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
@@ -416,5 +492,140 @@ namespace meow::database {
         }
         sqlite3_finalize(stmt);
         return result;
+    }
+
+    namespace {
+        const char* reasonString(InstallReason r) {
+            switch (r) {
+                case InstallReason::Explicit:    return "Explicit";
+                case InstallReason::GroupMember: return "GroupMember";
+                case InstallReason::Dependency:  return "Dependency";
+            }
+            return "Dependency";
+        }
+        // Priority: higher number wins (Explicit > GroupMember > Dependency).
+        int reasonRank(InstallReason r) {
+            switch (r) {
+                case InstallReason::Explicit:    return 3;
+                case InstallReason::GroupMember: return 2;
+                case InstallReason::Dependency:  return 1;
+            }
+            return 1;
+        }
+        std::optional<InstallReason> parseReason(const std::string& s) {
+            if (s == "Explicit")    return InstallReason::Explicit;
+            if (s == "GroupMember") return InstallReason::GroupMember;
+            if (s == "Dependency")  return InstallReason::Dependency;
+            return std::nullopt;
+        }
+    }  // namespace
+
+    void setInstallReason(Database& db, const types::PackageName& name, InstallReason reason) {
+        auto* handle = h(db);
+        // Upgrade only: read current reason, keep the stronger one.
+        auto current = installReason(db, name);
+        if (current && reasonRank(*current) >= reasonRank(reason)) return;
+
+        const char* sql = "UPDATE packages SET install_reason = ? WHERE name = ?;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        sqlite3_bind_text(stmt, 1, reasonString(reason), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, name.value.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            sqlite3_finalize(stmt);
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    std::optional<InstallReason> installReason(Database& db, const types::PackageName& name) {
+        auto* handle = h(db);
+        const char* sql = "SELECT install_reason FROM packages WHERE name = ?;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        sqlite3_bind_text(stmt, 1, name.value.c_str(), -1, SQLITE_TRANSIENT);
+        std::optional<InstallReason> result;
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            auto text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (text) result = parseReason(text);
+        }
+        sqlite3_finalize(stmt);
+        return result;
+    }
+
+    std::vector<types::PackageName> explicitlyInstalled(Database& db) {
+        auto* handle = h(db);
+        const char* sql = "SELECT name FROM packages WHERE install_reason = 'Explicit' ORDER BY name;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        std::vector<types::PackageName> names;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            auto text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (text) names.push_back(types::PackageName{text});
+        }
+        sqlite3_finalize(stmt);
+        return names;
+    }
+
+    void recordHistory(Database& db, const std::string& action,
+                       const types::PackageName& name, const types::PackageVersion& version,
+                       InstallReason reason, const std::string& transactionId) {
+        auto* handle = h(db);
+        const char* sql =
+            "INSERT INTO package_history (timestamp, action, package, version, reason, transaction_id) "
+            "VALUES (?, ?, ?, ?, ?, ?);";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(std::time(nullptr)));
+        sqlite3_bind_text(stmt, 2, action.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, name.value.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, version.value.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 5, reasonString(reason), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 6, transactionId.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            sqlite3_finalize(stmt);
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    std::vector<HistoryEntry> packageHistory(Database& db) {
+        return packageHistory(db, types::PackageName{""});
+    }
+
+    std::vector<HistoryEntry> packageHistory(Database& db, const types::PackageName& name) {
+        auto* handle = h(db);
+        const char* sql =
+            "SELECT timestamp, action, package, version, reason, transaction_id "
+            "FROM package_history ORDER BY id;";
+        if (!name.value.empty()) sql = "SELECT timestamp, action, package, version, reason, transaction_id "
+                                       "FROM package_history WHERE package = ? ORDER BY id;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        if (!name.value.empty())
+            sqlite3_bind_text(stmt, 1, name.value.c_str(), -1, SQLITE_TRANSIENT);
+        std::vector<HistoryEntry> out;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            HistoryEntry e;
+            e.timestamp = sqlite3_column_int64(stmt, 0);
+            if (auto t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1))) e.action = t;
+            if (auto t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2))) e.package = t;
+            if (auto t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3))) e.version = t;
+            if (auto t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4))) e.reason = t;
+            if (auto t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5))) e.transactionId = t;
+            out.push_back(std::move(e));
+        }
+        sqlite3_finalize(stmt);
+        return out;
     }
 }
