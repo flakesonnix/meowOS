@@ -23,10 +23,6 @@ namespace {
     const auto lockfilePath = std::filesystem::path("meow.lock");
     const auto installRoot = std::filesystem::path("/tmp/meow-install");
 
-    auto openDb() {
-        return meow::database::openDatabase("");
-    }
-
     void cmdInfo(const meow::repository::Repository& repo, std::string_view name) {
         auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{std::string(name)});
 
@@ -45,11 +41,19 @@ namespace {
             std::cout << "(none)\n";
         } else {
             for (const auto& dep : pkg.metadata.dependencies.value) {
-                std::cout << "  " << dep.value << "\n";
+                std::cout << "  " << dep.name.value;
+                for (const auto& c : dep.constraints) {
+                    std::cout << " " << c.op << c.version.value;
+                }
+                std::cout << "\n";
             }
         }
 
         std::cout << "\n"
+                  << "License: " << pkg.metadata.license << "\n"
+                  << "Homepage: " << pkg.metadata.homepage << "\n"
+                  << "Maintainer: " << pkg.metadata.maintainer << "\n"
+                  << "\n"
                   << "Files\n"
                   << "-----\n";
         for (const auto& f : pkg.files.value) {
@@ -111,11 +115,43 @@ namespace {
         meow::lock::saveLockfile(lock, lockfilePath);
         meow::log::log(meow::log::LogLevel::Info, "created meow.lock");
     }
+
+    void cmdVerify(meow::database::Database& db) {
+        meow::log::log(meow::log::LogLevel::Info, "checking installed packages");
+        auto vr = meow::verify::verifyAll(db);
+        size_t errors = vr.missing.size() + vr.modified.size();
+
+        if (errors == 0) {
+            meow::log::log(meow::log::LogLevel::Info, "all files intact");
+        } else {
+            for (const auto& f : vr.missing) {
+                std::cout << "  \x1b[31m\u2717 " << f.string() << " (missing)\x1b[0m\n";
+            }
+            for (const auto& f : vr.modified) {
+                std::cout << "  \x1b[33m\u2717 " << f.string() << " (modified)\x1b[0m\n";
+            }
+            meow::log::log(meow::log::LogLevel::Warning,
+                std::to_string(errors) + " error" + (errors == 1 ? "" : "s") + " found");
+        }
+    }
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-    std::cerr << "usage: meow <command> [args]\n"
+    // parse global options
+    std::string dbPath;
+    int argi = 1;
+    while (argi < argc) {
+        std::string_view a = argv[argi];
+        if (a == "--db-path" && argi + 1 < argc) {
+            dbPath = argv[++argi];
+            ++argi;
+        } else {
+            break;
+        }
+    }
+
+    if (argi >= argc) {
+    std::cerr << "usage: meow [--db-path <path>] <command> [args]\n"
               << "  info   <package>\n"
               << "  list\n"
               << "  search <query>\n"
@@ -126,35 +162,41 @@ int main(int argc, char** argv) {
               << "  verify\n"
               << "  repair [<package>]\n"
               << "  sync\n"
-              << "  update [--dry-run]\n";
+              << "  update [--dry-run]\n"
+              << "  owns <file>\n"
+              << "  required-by <package>\n";
         return 1;
     }
+
+    auto cmd = argv[argi];
+    int cmdArgc = argc - argi;
+    char** cmdArgv = argv + argi;
 
     try {
         auto cfg = meow::config::defaultConfig();
         auto repo = meow::repository::openRepository(cfg.repositories[0]);
-        auto db = openDb();
+        auto db = meow::database::openDatabase(dbPath.empty() ? "" : dbPath);
 
         meow::log::log(meow::log::LogLevel::Debug, "config loaded, database opened");
 
-        std::string_view cmd = argv[1];
+        std::string_view cmd = cmdArgv[0];
 
         if (cmd == "info") {
-            if (argc < 3) {
+            if (cmdArgc < 2) {
                 std::cerr << "usage: meow info <package>\n";
                 return 1;
             }
-            cmdInfo(repo, argv[2]);
+            cmdInfo(repo, cmdArgv[1]);
         } else if (cmd == "list") {
             cmdList(repo);
         } else if (cmd == "search") {
-            if (argc < 3) {
+            if (cmdArgc < 2) {
                 std::cerr << "usage: meow search <query>\n";
                 return 1;
             }
-            cmdSearch(repo, argv[2]);
+            cmdSearch(repo, cmdArgv[1]);
         } else if (cmd == "install") {
-            if (argc < 3) {
+            if (cmdArgc < 2) {
                 std::cerr << "usage: meow install [--locked] <package>\n";
                 return 1;
             }
@@ -162,15 +204,15 @@ int main(int argc, char** argv) {
             bool locked = false;
             std::string pkgName;
 
-            if (argv[2] == std::string_view("--locked")) {
-                if (argc < 4) {
+            if (cmdArgv[1] == std::string_view("--locked")) {
+                if (cmdArgc < 3) {
                     std::cerr << "usage: meow install --locked <package>\n";
                     return 1;
                 }
                 locked = true;
-                pkgName = argv[3];
+                pkgName = cmdArgv[2];
             } else {
-                pkgName = argv[2];
+                pkgName = cmdArgv[1];
             }
 
             meow::package::PackageMetadata meta;
@@ -216,34 +258,39 @@ int main(int argc, char** argv) {
 
             std::cout << "\ndone\n";
         } else if (cmd == "upgrade") {
-            if (argc < 3) {
+            if (cmdArgc < 2) {
                 std::cerr << "usage: meow upgrade <package>\n";
                 return 1;
             }
-            meow::upgrade::upgradePackage(repo, db, meow::types::PackageName{argv[2]}, installRoot);
+            auto result = meow::upgrade::upgradePackage(repo, db, meow::types::PackageName{cmdArgv[1]}, installRoot);
+            if (result.upToDate) {
+                std::cout << cmdArgv[1] << " " << result.oldVersion->value << " is already up to date\n";
+            }
         } else if (cmd == "remove") {
-            if (argc < 3) {
+            if (cmdArgc < 2) {
                 std::cerr << "usage: meow remove <package>\n";
                 return 1;
             }
-            meow::remove::removePackage(meow::types::PackageName{argv[2]}, db);
+            meow::remove::removePackage(meow::types::PackageName{cmdArgv[1]}, db);
         } else if (cmd == "verify") {
-            meow::log::log(meow::log::LogLevel::Info, "checking installed packages");
-            auto vr = meow::verify::verifyAll(db);
-            size_t errors = vr.missing.size() + vr.modified.size();
-            if (errors == 0) {
-                meow::log::log(meow::log::LogLevel::Info, "all files intact");
-            } else {
-                meow::log::log(meow::log::LogLevel::Warning,
-                    std::to_string(errors) + " error" + (errors == 1 ? "" : "s") + " found");
-            }
+            cmdVerify(db);
         } else if (cmd == "repair") {
-            if (argc >= 3) {
-                meow::log::log(meow::log::LogLevel::Info, std::string("checking ") + argv[2]);
-                meow::repair::repairPackage(repo, db, meow::types::PackageName{argv[2]}, installRoot);
+            if (cmdArgc >= 2) {
+                meow::log::log(meow::log::LogLevel::Info, std::string("checking ") + cmdArgv[1]);
+                auto result = meow::repair::repairPackage(repo, db, meow::types::PackageName{cmdArgv[1]}, installRoot);
+                if (result.ok) {
+                    std::cout << "  " << cmdArgv[1] << " OK\n";
+                } else {
+                    for (const auto& f : result.repaired) {
+                        std::cout << "  \x1b[32m\u2713 " << f << "\x1b[0m\n";
+                    }
+                }
             } else {
                 meow::log::log(meow::log::LogLevel::Info, "checking installed packages");
-                meow::repair::repairAll(repo, db, installRoot);
+                auto result = meow::repair::repairAll(repo, db, installRoot);
+                for (const auto& f : result.repaired) {
+                    std::cout << "  \x1b[32m\u2713 " << f << "\x1b[0m\n";
+                }
             }
         } else if (cmd == "sync") {
             auto updates = meow::sync::checkUpdates(repo, db);
@@ -260,21 +307,62 @@ int main(int argc, char** argv) {
                     std::to_string(updates.size()) + " update" + (updates.size() == 1 ? "" : "s") + " available");
             }
         } else if (cmd == "update") {
-            if (argc >= 3 && argv[2] == std::string_view("--dry-run")) {
+            if (cmdArgc >= 2 && cmdArgv[1] == std::string_view("--dry-run")) {
                 auto updates = meow::sync::checkUpdates(repo, db);
                 if (updates.empty()) {
-                    meow::log::log(meow::log::LogLevel::Info, "all packages up to date");
+                    std::cout << "All packages up to date\n";
                 } else {
-                    meow::log::log(meow::log::LogLevel::Info, "would update:");
+                    std::cout << "Would update:\n";
                     for (const auto& u : updates) {
                         std::cout << "  " << u.name.value
                                   << "  " << u.installed.value
                                   << " -> " << u.available.value << "\n";
                     }
-                    meow::log::log(meow::log::LogLevel::Info, "no changes made");
+                    std::cout << "No changes made\n";
                 }
             } else {
-                meow::update::updateAll(repo, db);
+                auto result = meow::update::updateAll(repo, db);
+                if (!result.updated.empty()) {
+                    std::cout << "Updated:\n";
+                    for (const auto& n : result.updated) {
+                        std::cout << "  " << n.value << "\n";
+                    }
+                }
+                if (!result.failed.empty()) {
+                    for (const auto& f : result.failed) {
+                        std::cout << "  \x1b[31m" << f.name.value << " FAILED: " << f.reason << "\x1b[0m\n";
+                    }
+                }
+                if (result.updated.empty() && result.failed.empty()) {
+                    std::cout << "All packages up to date\n";
+                }
+            }
+        } else if (cmd == "owns") {
+            if (cmdArgc < 2) {
+                std::cerr << "usage: meow owns <file>\n";
+                return 1;
+            }
+            auto owner = meow::database::owns(db, std::filesystem::path(cmdArgv[1]));
+            if (owner) {
+                auto ver = meow::database::installedVersion(db, *owner);
+                std::cout << owner->value;
+                if (ver) std::cout << " " << ver->value;
+                std::cout << "\n";
+            } else {
+                std::cout << "(no package owns this file)\n";
+            }
+        } else if (cmd == "required-by") {
+            if (cmdArgc < 2) {
+                std::cerr << "usage: meow required-by <package>\n";
+                return 1;
+            }
+            auto deps = meow::database::requiredBy(db, meow::types::PackageName{cmdArgv[1]});
+            if (deps.empty()) {
+                std::cout << "(nothing depends on " << cmdArgv[1] << ")\n";
+            } else {
+                for (const auto& d : deps) {
+                    std::cout << d.value << "\n";
+                }
             }
         } else if (cmd == "installed") {
             cmdInstalled(db);

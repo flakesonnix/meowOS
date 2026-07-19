@@ -88,6 +88,20 @@ namespace meow::repository {
                             if (auto desc = pkgTbl["description"].value<std::string>()) {
                                 pkg.description = types::Description{*desc};
                             }
+                            if (auto* arr = pkgTbl["provides"].as_array()) {
+                                for (auto&& node : *arr) {
+                                    if (auto val = node.value<std::string>()) {
+                                        pkg.provides.push_back(types::PackageName{*val});
+                                    }
+                                }
+                            }
+                            if (auto* arr = pkgTbl["conflicts"].as_array()) {
+                                for (auto&& node : *arr) {
+                                    if (auto val = node.value<std::string>()) {
+                                        pkg.conflicts.push_back(types::PackageName{*val});
+                                    }
+                                }
+                            }
                         } catch (...) {
                             log::log(log::LogLevel::Warning,
                                 "failed to parse " + pkgMetaPath.string());

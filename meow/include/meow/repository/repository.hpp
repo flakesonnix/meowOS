@@ -23,6 +23,8 @@ struct RepositoryVersion {
 struct RepositoryPackage {
     types::PackageName name;
     std::optional<types::Description> description;
+    std::vector<types::PackageName> provides;
+    std::vector<types::PackageName> conflicts;
     std::vector<RepositoryVersion> versions;
 };
 

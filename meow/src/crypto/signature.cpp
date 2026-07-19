@@ -7,6 +7,7 @@
 #include <openssl/err.h>
 #include <cstdio>
 #include <vector>
+#include <sstream>
 
 namespace meow::crypto {
 
@@ -49,7 +50,7 @@ bool verifyFile(
     long sz = ftell(cf);
     fseek(cf, 0, SEEK_SET);
     std::vector<char> content(sz);
-    fread(content.data(), 1, sz, cf);
+    (void)fread(content.data(), 1, sz, cf);
     fclose(cf);
 
     int pad = 0;
@@ -81,6 +82,84 @@ bool verifyFile(
 
     EVP_PKEY_free(pkey);
     return ok;
+}
+
+void saveSignature(const Signature& sig, const std::filesystem::path& path) {
+    std::ostringstream ss;
+    ss << "algorithm = \"" << sig.algorithm << "\"\n"
+       << "keyId = \"" << sig.keyId << "\"\n"
+       << "signature = \"" << sig.signature << "\"\n";
+    auto content = ss.str();
+    FILE* f = fopen(path.c_str(), "wb");
+    if (!f) {
+        throw error::MeowError(error::ErrorCode::FileNotFound,
+            "cannot write signature: " + path.string());
+    }
+    fwrite(content.data(), 1, content.size(), f);
+    fclose(f);
+}
+
+void signFile(
+    const std::filesystem::path& filePath,
+    const std::filesystem::path& keyPath,
+    const std::filesystem::path& sigPath,
+    const std::string& keyId
+) {
+    FILE* f = fopen(keyPath.c_str(), "rb");
+    if (!f) {
+        throw error::MeowError(error::ErrorCode::FileNotFound,
+            "key not found: " + keyPath.string());
+    }
+    EVP_PKEY* pkey = PEM_read_PrivateKey(f, nullptr, nullptr, nullptr);
+    fclose(f);
+    if (!pkey) {
+        throw error::MeowError(error::ErrorCode::InvalidSignature,
+            "failed to read private key");
+    }
+
+    FILE* cf = fopen(filePath.c_str(), "rb");
+    if (!cf) { EVP_PKEY_free(pkey); return; }
+    fseek(cf, 0, SEEK_END);
+    long sz = ftell(cf);
+    fseek(cf, 0, SEEK_SET);
+    std::vector<unsigned char> content(sz);
+    (void)fread(content.data(), 1, sz, cf);
+    fclose(cf);
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) { EVP_PKEY_free(pkey); return; }
+
+    size_t sigLen = EVP_PKEY_size(pkey);
+    std::vector<unsigned char> rawSig(sigLen);
+
+    int rc = EVP_DigestSignInit(ctx, nullptr, nullptr, nullptr, pkey);
+    if (rc == 1) {
+        rc = EVP_DigestSign(ctx, rawSig.data(), &sigLen,
+                           content.data(), content.size());
+    }
+
+    EVP_MD_CTX_free(ctx);
+    EVP_PKEY_free(pkey);
+
+    if (rc != 1) {
+        throw error::MeowError(error::ErrorCode::InvalidSignature,
+            "signing failed");
+    }
+
+    size_t b64Len = ((sigLen + 2) / 3) * 4 + 1;
+    std::vector<unsigned char> b64(b64Len);
+    int encodeLen = EVP_EncodeBlock(b64.data(), rawSig.data(),
+                                     static_cast<int>(sigLen));
+    if (encodeLen < 0) {
+        throw error::MeowError(error::ErrorCode::InvalidSignature,
+            "base64 encode failed");
+    }
+
+    Signature sig;
+    sig.algorithm = "ed25519";
+    sig.keyId = keyId;
+    sig.signature = reinterpret_cast<const char*>(b64.data());
+    saveSignature(sig, sigPath);
 }
 
 }

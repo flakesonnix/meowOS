@@ -2,37 +2,36 @@
 #include <meow/sync/sync.hpp>
 #include <meow/upgrade/upgrade.hpp>
 #include <meow/error/error.hpp>
-#include <iostream>
+#include <meow/log/logger.hpp>
 
 namespace meow::update {
 
-void updateAll(
+UpdateResult updateAll(
     repository::Repository& repo,
     database::Database& db
 ) {
+    UpdateResult result;
     auto updates = sync::checkUpdates(repo, db);
 
     if (updates.empty()) {
-        std::cout << "All packages up to date\n";
-        return;
+        return result;
     }
-
-    std::cout << "Updates available:\n\n";
-    for (const auto& u : updates) {
-        std::cout << "  " << u.name.value
-                  << "  " << u.installed.value
-                  << " -> " << u.available.value << "\n";
-    }
-
-    std::cout << "\n";
 
     for (const auto& u : updates) {
-        std::cout << "Updating " << u.name.value << "...\n";
-        upgrade::upgradePackage(repo, db, u.name, "/tmp/meow-install");
-        std::cout << "\n";
+        try {
+            log::log(log::LogLevel::Info, "updating " + u.name.value + " " + u.installed.value + " -> " + u.available.value);
+            auto ur = upgrade::upgradePackage(repo, db, u.name, "/tmp/meow-install");
+            if (ur.success) {
+                result.updated.push_back(u.name);
+            }
+        } catch (const error::MeowError& e) {
+            log::log(log::LogLevel::Error,
+                "failed to update " + u.name.value + ": " + e.what());
+            result.failed.push_back({u.name, e.what()});
+        }
     }
 
-    std::cout << "Update complete\n";
+    return result;
 }
 
 }

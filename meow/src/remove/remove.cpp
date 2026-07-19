@@ -1,12 +1,21 @@
 #include <meow/remove/remove.hpp>
 #include <meow/transaction/transaction.hpp>
 #include <meow/error/error.hpp>
-#include <iostream>
+#include <meow/log/logger.hpp>
 
 namespace meow::remove {
     void removePackage(const types::PackageName& name, database::Database& db) {
         if (!database::isInstalled(db, name)) {
             throw error::MeowError(error::ErrorCode::PackageNotFound, "package not installed: " + name.value);
+        }
+
+        auto dependents = database::requiredBy(db, name);
+        if (!dependents.empty()) {
+            std::string msg = "cannot remove " + name.value + ": required by";
+            for (const auto& d : dependents) {
+                msg += " " + d.value;
+            }
+            throw error::MeowError(error::ErrorCode::DependencyNotFound, msg);
         }
 
         auto files = database::listPackageFiles(db, name);
@@ -17,17 +26,15 @@ namespace meow::remove {
                 std::error_code ec;
                 std::filesystem::remove(f, ec);
                 if (ec) {
-                    std::cerr << "  warning: could not remove " << f.string() << ": " << ec.message() << "\n";
-                } else {
-                    std::cout << "  removed " << f.string() << "\n";
+                    log::log(log::LogLevel::Warning, "could not remove " + f.string() + ": " + ec.message());
                 }
             }
 
             database::removePackageRecord(db, name);
             tx.committed = true;
-            std::cout << "  removed " << name.value << " from database\n";
+            log::log(log::LogLevel::Info, "removed " + name.value + " from database");
         } catch (...) {
-            std::cerr << "  remove failed, transaction not committed\n";
+            log::log(log::LogLevel::Error, "remove failed, transaction not committed");
             throw;
         }
     }

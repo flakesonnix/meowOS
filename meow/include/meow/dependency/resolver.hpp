@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <optional>
+#include <string>
 
 #include <meow/types/types.hpp>
 #include <meow/package/package.hpp>
@@ -21,6 +22,11 @@ namespace meow::dependency {
         database::Database& db,
         const lock::Lockfile* lock = nullptr
     );
+
+    std::vector<types::PackageName> findProvider(
+        const repository::Repository& repo,
+        const types::PackageName& virtualName
+    );
 }
 
-#endif //MEOWOS_DEPENDENCY_RESOLVER_H
+#endif

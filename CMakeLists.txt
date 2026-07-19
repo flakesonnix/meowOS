@@ -4,36 +4,54 @@ project(meowOS)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(${PROJECT_NAME}
-        meow/src/main.cpp
-        meow/src/archive/archive.cpp
-        meow/src/package/parser.cpp
-        meow/src/package/load.cpp
-        meow/src/repository/repository.cpp
-        meow/src/repository/version.cpp
-        meow/src/repository/resolver.cpp
-        meow/src/install/installer.cpp
-        meow/src/download/downloader.cpp
-        meow/src/error/printer.cpp
-        meow/src/database/database.cpp
-        meow/src/dependency/resolver.cpp
-        meow/src/transaction/transaction.cpp
-        meow/src/remove/remove.cpp
-        meow/src/upgrade/upgrade.cpp
-        meow/src/lock/lockfile.cpp
-        meow/src/verify/verifier.cpp
-        meow/src/repair/repair.cpp
-        meow/src/sync/sync.cpp
-        meow/src/update/updater.cpp
-        meow/src/log/logger.cpp
-        meow/src/config/config.cpp
-        meow/src/crypto/signature.cpp
+# Common library sources
+set(MEOW_SOURCES
+    meow/src/archive/archive.cpp
+    meow/src/package/parser.cpp
+    meow/src/package/load.cpp
+    meow/src/repository/repository.cpp
+    meow/src/repository/version.cpp
+    meow/src/repository/resolver.cpp
+    meow/src/install/installer.cpp
+    meow/src/download/downloader.cpp
+    meow/src/error/printer.cpp
+    meow/src/database/database.cpp
+    meow/src/dependency/resolver.cpp
+    meow/src/dependency/constraint.cpp
+    meow/src/transaction/transaction.cpp
+    meow/src/remove/remove.cpp
+    meow/src/upgrade/upgrade.cpp
+    meow/src/lock/lockfile.cpp
+    meow/src/verify/verifier.cpp
+    meow/src/repair/repair.cpp
+    meow/src/sync/sync.cpp
+    meow/src/update/updater.cpp
+    meow/src/log/logger.cpp
+    meow/src/config/config.cpp
+    meow/src/crypto/signature.cpp
+    meow/src/builder/builder.cpp
+    meow/src/repo-builder/repo_builder.cpp
 )
 
-target_include_directories(${PROJECT_NAME}
-        PRIVATE
-            ${PROJECT_SOURCE_DIR}/meow/include
+# CLI tools
+add_executable(meow
+    meow/src/main.cpp
+    ${MEOW_SOURCES}
 )
+
+add_executable(meow-build
+    meow/src/meow-build/main.cpp
+    ${MEOW_SOURCES}
+)
+
+add_executable(meow-repo
+    meow/src/meow-repo/main.cpp
+    ${MEOW_SOURCES}
+)
+
+target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_include_directories(meow-repo PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 
 find_package(SQLite3 REQUIRED)
 find_package(LibArchive REQUIRED)
@@ -48,10 +66,12 @@ if(NOT tomlplusplus_FOUND)
     FetchContent_MakeAvailable(tomlplusplus)
 endif()
 
-target_link_libraries(${PROJECT_NAME}
+foreach(tgt meow meow-build meow-repo)
+    target_link_libraries(${tgt}
         PRIVATE
         SQLite::SQLite3
         LibArchive::LibArchive
         OpenSSL::Crypto
         tomlplusplus::tomlplusplus
-)
+    )
+endforeach()

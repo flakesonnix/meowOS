@@ -1,0 +1,8 @@
+[metadata]
+name = "app"
+version = "1.0.0"
+architecture = "AMD64"
+description = "Test app with dependencies"
+depends = ["hello>=1.0.0", "libfoo"]
+conflicts = []
+provides = []

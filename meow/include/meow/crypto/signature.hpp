@@ -13,11 +13,19 @@ struct Signature {
 };
 
 Signature loadSignature(const std::filesystem::path& path);
+void saveSignature(const Signature& sig, const std::filesystem::path& path);
 
 bool verifyFile(
     const std::filesystem::path& filePath,
     const std::filesystem::path& sigPath,
     const std::filesystem::path& keyPath
+);
+
+void signFile(
+    const std::filesystem::path& filePath,
+    const std::filesystem::path& keyPath,
+    const std::filesystem::path& sigPath,
+    const std::string& keyId = "default"
 );
 
 }

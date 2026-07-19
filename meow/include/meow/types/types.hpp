@@ -29,8 +29,18 @@ namespace meow::types {
     };
 
 
+    struct VersionConstraint {
+        std::string op; // >=, <=, >, <, =
+        PackageVersion version;
+    };
+
+    struct Dependency {
+        PackageName name;
+        std::vector<VersionConstraint> constraints;
+    };
+
     struct Dependencies {
-        std::vector<PackageName> value;
+        std::vector<Dependency> value;
     };
 
     struct FileList {

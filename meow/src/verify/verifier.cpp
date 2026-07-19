@@ -1,54 +1,50 @@
 #include <meow/verify/verifier.hpp>
+#include <meow/database/database.hpp>
 #include <meow/download/downloader.hpp>
 #include <meow/log/logger.hpp>
-#include <iostream>
+#include <filesystem>
 
 namespace meow::verify {
 
-VerificationResult verifyPackage(
-    database::Database& db,
-    const types::PackageName& name
-) {
-    VerificationResult result;
-    auto entries = database::listPackageFileEntries(db, name);
+    VerificationResult verifyPackage(
+        database::Database& db,
+        const types::PackageName& name
+    ) {
+        VerificationResult result;
 
-    for (const auto& entry : entries) {
-        if (!std::filesystem::exists(entry.path)) {
-            result.missing.push_back(entry.path);
-            continue;
-        }
+        auto entries = database::listPackageFileEntries(db, name);
 
-        if (!entry.sha256.empty()) {
-            auto currentHash = download::computeFileHash(entry.path);
-            if (currentHash != entry.sha256) {
-                result.modified.push_back(entry.path);
+        for (const auto& entry : entries) {
+            if (!std::filesystem::exists(entry.path)) {
+                result.missing.push_back(entry.path);
+                continue;
+            }
+
+            if (!entry.sha256.empty()) {
+                auto currentHash = download::computeFileHash(entry.path);
+                if (currentHash != entry.sha256) {
+                    result.modified.push_back(entry.path);
+                }
             }
         }
+
+        return result;
     }
 
-    return result;
-}
+    VerificationResult verifyAll(database::Database& db) {
+        VerificationResult combined;
+        auto packages = database::listInstalled(db);
 
-VerificationResult verifyAll(
-    database::Database& db
-) {
-    VerificationResult combined;
-    auto packages = database::listInstalled(db);
+        for (const auto& name : packages) {
+            log::log(log::LogLevel::Info, "checking " + name.value);
+            auto result = verifyPackage(db, name);
+            combined.missing.insert(combined.missing.end(),
+                result.missing.begin(), result.missing.end());
+            combined.modified.insert(combined.modified.end(),
+                result.modified.begin(), result.modified.end());
+        }
 
-    for (const auto& pkg : packages) {
-        log::log(log::LogLevel::Info, "checking " + pkg.value);
-        auto pkgResult = verifyPackage(db, pkg);
-        for (const auto& f : pkgResult.missing) {
-            std::cout << "    \x1b[31m\u2717 " << f.string() << " (missing)\x1b[0m\n";
-            combined.missing.push_back(f);
-        }
-        for (const auto& f : pkgResult.modified) {
-            std::cout << "    \x1b[33m\u2717 " << f.string() << " (modified)\x1b[0m\n";
-            combined.modified.push_back(f);
-        }
+        return combined;
     }
-
-    return combined;
-}
 
 }

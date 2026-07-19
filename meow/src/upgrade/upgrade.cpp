@@ -5,16 +5,17 @@
 #include <meow/transaction/transaction.hpp>
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
-#include <iostream>
 #include <filesystem>
 
 namespace meow::upgrade {
-    void upgradePackage(
+    UpgradeResult upgradePackage(
         repository::Repository& repo,
         database::Database& db,
         const types::PackageName& name,
         const std::filesystem::path& root
     ) {
+        UpgradeResult result;
+
         if (!database::isInstalled(db, name)) {
             throw error::MeowError(
                 error::ErrorCode::PackageNotFound,
@@ -46,10 +47,12 @@ namespace meow::upgrade {
             );
         }
 
+        result.oldVersion = *installedVer;
+        result.newVersion = *latest;
+
         if (repository::compareVersions(*latest, *installedVer) <= 0) {
-            std::cout << name.value << " " << installedVer->value
-                      << " is already up to date\n";
-            return;
+            result.upToDate = true;
+            return result;
         }
 
         auto latestPkg = repository::resolvePackage(repo, name, *latest);
@@ -76,11 +79,14 @@ namespace meow::upgrade {
             entry.installedFiles = newFiles.value;
             tx.packages.push_back(std::move(entry));
             transaction::commitTransaction(tx, db);
+            result.success = true;
             log::log(log::LogLevel::Info, "upgrade complete");
         } catch (...) {
             log::log(log::LogLevel::Error, "upgrade failed, rolling back");
             transaction::rollbackTransaction(tx);
             throw;
         }
+
+        return result;
     }
 }

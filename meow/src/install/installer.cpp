@@ -11,7 +11,7 @@ namespace meow::install {
                 auto script = archive::readPackageScript(archive, name);
                 if (!script.empty()) {
                     log::log(log::LogLevel::Info, "running " + name + " for " + pkg.metadata.name.value);
-                    std::system(script.c_str());
+                    (void)std::system(script.c_str());
                 }
             } catch (...) {
                 // script not found in archive, skip

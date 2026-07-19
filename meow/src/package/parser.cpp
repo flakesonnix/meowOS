@@ -1,18 +1,19 @@
 #include <toml++/toml.hpp>
 #include <meow/package/parser.hpp>
 #include <meow/package/package.hpp>
+#include <meow/dependency/constraint.hpp>
 
 namespace meow::package {
-    static std::vector<types::PackageName> parseDepArray(const toml::table& tbl, const std::string& key) {
-        std::vector<types::PackageName> deps;
+    static types::Dependencies parseDeps(const toml::table& tbl, const std::string& key) {
+        std::vector<types::Dependency> deps;
         if (auto* arr = tbl[key].as_array()) {
             for (auto&& node : *arr) {
                 if (auto val = node.value<std::string>()) {
-                    deps.push_back(types::PackageName{*val});
+                    deps.push_back(dependency::parseDependencyString(*val));
                 }
             }
         }
-        return deps;
+        return types::Dependencies{std::move(deps)};
     }
 
     PackageMetadata parsePackageManifest(const std::string& tomlContent) {
@@ -31,10 +32,10 @@ namespace meow::package {
         metadata.homepage = tbl["homepage"].value_or("");
         metadata.maintainer = tbl["maintainer"].value_or("");
 
-        metadata.dependencies = types::Dependencies{parseDepArray(tbl, "depends")};
-        metadata.conflicts = types::Dependencies{parseDepArray(tbl, "conflicts")};
-        metadata.provides = types::Dependencies{parseDepArray(tbl, "provides")};
-        metadata.replaces = types::Dependencies{parseDepArray(tbl, "replaces")};
+        metadata.dependencies = parseDeps(tbl, "depends");
+        metadata.conflicts = parseDeps(tbl, "conflicts");
+        metadata.provides = parseDeps(tbl, "provides");
+        metadata.replaces = parseDeps(tbl, "replaces");
 
         return metadata;
     }

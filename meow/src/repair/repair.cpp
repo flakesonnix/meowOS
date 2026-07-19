@@ -5,17 +5,18 @@
 #include <meow/download/downloader.hpp>
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
-#include <iostream>
 #include <filesystem>
 
 namespace meow::repair {
 
-void repairPackage(
+RepairResult repairPackage(
     repository::Repository& repo,
     database::Database& db,
     const types::PackageName& name,
     const std::filesystem::path& root
 ) {
+    RepairResult result;
+
     if (!database::isInstalled(db, name)) {
         throw error::MeowError(
             error::ErrorCode::PackageNotFound,
@@ -24,19 +25,9 @@ void repairPackage(
     }
 
     auto issues = verify::verifyPackage(db, name);
-    size_t total = issues.missing.size() + issues.modified.size();
-
-    if (total == 0) {
-        std::cout << "  " << name.value << " OK\n";
-        return;
-    }
-
-    std::cout << "Found:\n";
-    for (const auto& f : issues.missing) {
-        std::cout << "  \x1b[31m\u2717 " << f.string() << " (missing)\x1b[0m\n";
-    }
-    for (const auto& f : issues.modified) {
-        std::cout << "  \x1b[33m\u2717 " << f.string() << " (modified)\x1b[0m\n";
+    if (issues.missing.empty() && issues.modified.empty()) {
+        result.ok = true;
+        return result;
     }
 
     auto installedVer = database::installedVersion(db, name);
@@ -50,7 +41,6 @@ void repairPackage(
     auto pkg = repository::resolvePackage(repo, name, *installedVer);
     auto rootStr = root.string();
 
-    std::cout << "\nRepairing:\n";
     for (const auto& f : issues.missing) {
         auto pathStr = f.string();
         auto relPath = pathStr.substr(rootStr.size());
@@ -60,7 +50,7 @@ void repairPackage(
         archive::Archive archive{pkg.archivePath};
         archive::extractPackageFile(archive, relPath, root);
         database::updateFileHash(db, f);
-        std::cout << "  \x1b[32m\u2713 " << relPath << "\x1b[0m\n";
+        result.repaired.push_back(relPath);
     }
 
     for (const auto& f : issues.modified) {
@@ -72,20 +62,27 @@ void repairPackage(
         archive::Archive archive{pkg.archivePath};
         archive::extractPackageFile(archive, relPath, root);
         database::updateFileHash(db, f);
-        std::cout << "  \x1b[32m\u2713 " << relPath << "\x1b[0m\n";
+        result.repaired.push_back(relPath);
     }
+
+    return result;
 }
 
-void repairAll(
+RepairResult repairAll(
     repository::Repository& repo,
     database::Database& db,
     const std::filesystem::path& root
 ) {
+    RepairResult combined;
     auto packages = database::listInstalled(db);
     for (const auto& name : packages) {
-        std::cout << name.value << ":\n";
-        repairPackage(repo, db, name, root);
+        auto r = repairPackage(repo, db, name, root);
+        if (!r.ok) {
+            combined.repaired.insert(combined.repaired.end(),
+                r.repaired.begin(), r.repaired.end());
+        }
     }
+    return combined;
 }
 
 }

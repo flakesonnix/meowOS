@@ -74,7 +74,19 @@ namespace meow::database {
             "  path TEXT NOT NULL,"
             "  sha256 TEXT DEFAULT '',"
             "  size INTEGER DEFAULT 0,"
-            "  FOREIGN KEY (package_id) REFERENCES packages(id)"
+            "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+            ");"
+            "CREATE TABLE IF NOT EXISTS package_deps ("
+            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  package_id INTEGER NOT NULL,"
+            "  dep_name TEXT NOT NULL,"
+            "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+            ");"
+            "CREATE TABLE IF NOT EXISTS package_provides ("
+            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  package_id INTEGER NOT NULL,"
+            "  provide_name TEXT NOT NULL,"
+            "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
             ");";
 
         char* err = nullptr;
@@ -131,6 +143,38 @@ namespace meow::database {
             sqlite3_bind_text(stmt, 3, hash.c_str(), -1, SQLITE_TRANSIENT);
             sqlite3_bind_int64(stmt, 4, fileSize);
 
+            if (sqlite3_step(stmt) != SQLITE_DONE) {
+                sqlite3_finalize(stmt);
+                throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+            }
+            sqlite3_reset(stmt);
+        }
+        sqlite3_finalize(stmt);
+
+        // store dependencies
+        const char* insertDep = "INSERT INTO package_deps (package_id, dep_name) VALUES (?, ?);";
+        if (sqlite3_prepare_v2(handle, insertDep, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        for (const auto& dep : package.metadata.dependencies.value) {
+            sqlite3_bind_int64(stmt, 1, packageId);
+            sqlite3_bind_text(stmt, 2, dep.name.value.c_str(), -1, SQLITE_TRANSIENT);
+            if (sqlite3_step(stmt) != SQLITE_DONE) {
+                sqlite3_finalize(stmt);
+                throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+            }
+            sqlite3_reset(stmt);
+        }
+        sqlite3_finalize(stmt);
+
+        // store provides
+        const char* insertProvide = "INSERT INTO package_provides (package_id, provide_name) VALUES (?, ?);";
+        if (sqlite3_prepare_v2(handle, insertProvide, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        for (const auto& prov : package.metadata.provides.value) {
+            sqlite3_bind_int64(stmt, 1, packageId);
+            sqlite3_bind_text(stmt, 2, prov.name.value.c_str(), -1, SQLITE_TRANSIENT);
             if (sqlite3_step(stmt) != SQLITE_DONE) {
                 sqlite3_finalize(stmt);
                 throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
@@ -264,6 +308,7 @@ namespace meow::database {
     void removePackageRecord(Database& db, const types::PackageName& name) {
         auto* handle = h(db);
 
+        // cascade delete via FK should handle deps/provides/files
         const char* delPkg = "DELETE FROM packages WHERE name = ?;";
         sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(handle, delPkg, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -277,5 +322,49 @@ namespace meow::database {
             throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
         }
         sqlite3_finalize(stmt);
+    }
+
+    std::optional<types::PackageName> owns(Database& db, const std::filesystem::path& filePath) {
+        auto* handle = h(db);
+        const char* sql =
+            "SELECT p.name FROM files f "
+            "JOIN packages p ON f.package_id = p.id "
+            "WHERE f.path = ? LIMIT 1;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+
+        sqlite3_bind_text(stmt, 1, filePath.c_str(), -1, SQLITE_TRANSIENT);
+
+        std::optional<types::PackageName> result;
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            auto text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (text) result = types::PackageName{text};
+        }
+        sqlite3_finalize(stmt);
+        return result;
+    }
+
+    std::vector<types::PackageName> requiredBy(Database& db, const types::PackageName& name) {
+        auto* handle = h(db);
+        const char* sql =
+            "SELECT p.name FROM packages p "
+            "JOIN package_deps d ON d.package_id = p.id "
+            "WHERE d.dep_name = ?;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+
+        sqlite3_bind_text(stmt, 1, name.value.c_str(), -1, SQLITE_TRANSIENT);
+
+        std::vector<types::PackageName> result;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            auto text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (text) result.push_back(types::PackageName{text});
+        }
+        sqlite3_finalize(stmt);
+        return result;
     }
 }
