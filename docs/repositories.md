@@ -65,3 +65,28 @@ trusted without re-running signature verification.
 Each repository is keyed by `repository_id`. Mirror selection, cache
 directories, and trust policy are anchored to this identity rather than the
 configured URL, so URL or mirror changes do not disturb local state.
+
+## Backends (transport abstraction)
+
+`meow` accesses every repository through a `meow::repository::IRepositoryBackend`
+interface (`loadRepository()`, `loadPackage()`, `fetchArtifact()`). Concrete
+backends currently implemented:
+
+| Backend                  | URL scheme(s)                | Notes                              |
+|--------------------------|------------------------------|------------------------------------|
+| `FilesystemRepositoryBackend` | `file://`, local path   | Scans `by-name/`, verifies signature on disk |
+| `HttpRepositoryBackend`  | `http://`, `https://`        | Reuses the shared `download::` layer; same trust chain as filesystem |
+
+Both backends follow the identical trust chain (signature fetch → trusted-key
+lookup → verify → expiry check). Network traffic always goes through the shared
+downloader, so retries, timeouts, ETag/304 caching, partial downloads, and
+checksum verification are uniform across transports.
+
+Artifact URLs in `versions/<ver>.toml` may be **relative** (`packages/<file>`);
+the HTTP backend resolves them against the server base URL, keeping a
+repository portable across hosts. Absolute `file://` / `http(s)://` URLs are
+used as-is.
+
+A repository served over HTTP is enumerated via an optional `packages.index`
+file (newline-separated `name version` pairs) at the repository root, since the
+static server performs no directory listing.

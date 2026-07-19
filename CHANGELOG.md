@@ -9,6 +9,15 @@
   Serves `repository.toml`, `repository.toml.sig`, `by-name/...` manifests, and
   `packages/...` artifacts with correct content types, byte-range requests
   (`206 Partial Content`), and ETag/304 caching.
+- HTTP repository backend (`HttpRepositoryBackend`): `meow` can now install,
+  list, and resolve packages over `http(s)://` repositories. The backend reuses
+  the shared `download::` layer (retries, timeouts, ETag/304, partial
+  downloads, checksum verification) and follows the **same trust chain** as the
+  filesystem backend (signature fetch → trusted-key lookup → verify → expiry
+  check). Relative artifact URLs (`packages/<file>`) are resolved against the
+  server base URL, keeping repositories portable.
+- `--repository <url>` global flag on `meow` to target a specific repository
+  (filesystem path, `file://`, or `http(s)://`) without editing config.
 
 ## [0.4.0] - 2026-07-19
 

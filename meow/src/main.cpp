@@ -142,11 +142,15 @@ namespace {
 int main(int argc, char** argv) {
     // parse global options
     std::string dbPath;
+    std::string repositoryOverride;
     int argi = 1;
     while (argi < argc) {
         std::string_view a = argv[argi];
         if (a == "--db-path" && argi + 1 < argc) {
             dbPath = argv[++argi];
+            ++argi;
+        } else if (a == "--repository" && argi + 1 < argc) {
+            repositoryOverride = argv[++argi];
             ++argi;
         } else {
             break;
@@ -211,6 +215,10 @@ int main(int argc, char** argv) {
 
     try {
         auto cfg = meow::config::defaultConfig();
+        if (!repositoryOverride.empty()) {
+            cfg.repositories.clear();
+            cfg.repositories.push_back(repositoryOverride);
+        }
         auto db = meow::database::openDatabase(dbPath.empty() ? "" : dbPath);
 
         std::string_view cmd = cmdArgv[0];

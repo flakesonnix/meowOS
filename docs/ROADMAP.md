@@ -135,9 +135,11 @@ complete distribution pipeline by adding hosting and stronger isolation.
 Priority order:
 
 1. **Remote Binary Repository Service** — `meow-server` (done in v0.4.0
-   hardening) already hosts a static repository over HTTP. Next: wire HTTP(S)
-   repository URLs into the client (`openRepository`) so `meow sync`/`install`
-   can consume a remote repo end-to-end.
+   hardening) hosts a static repository over HTTP, and the client now consumes
+   it end-to-end via `HttpRepositoryBackend` (added in the v0.5 line):
+   `meow` can `list`/`info`/`install` over `http(s)://` with the same trust
+   chain as the filesystem backend. The repository abstraction
+   (`IRepositoryBackend`) is in place.
 2. **Mirror selection + repository federation** — `[[repositories]]` entries
    with multiple `url`s sharing one `repository_id`; failover between mirrors;
    mirror priority.
