@@ -35,6 +35,14 @@ public:
     // loaded). Useful for surfacing why no repository is available.
     const std::string& lastError() const { return lastError_; }
 
+    // Per-repository load failures (config id, url, error message).
+    struct Failed {
+        std::string id;
+        std::string url;
+        std::string error;
+    };
+    const std::vector<Failed>& failures() const { return failures_; }
+
     // A merged, in-memory Repository representing the union of all loaded
     // repositories. For each package name, the chosen version set comes from
     // the highest-priority repository that contains it; ties in priority are
@@ -51,6 +59,7 @@ private:
     config::Config cfg_;
     Repository merged_;
     std::string lastError_;
+    std::vector<Failed> failures_;
 
     Repository buildMerged() const;
 };

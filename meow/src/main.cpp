@@ -245,8 +245,8 @@ int main(int argc, char** argv) {
 
         std::string_view cmd = cmdArgv[0];
 
-        // doctor tolerates a broken repository: it reports the failure as a
-        // check rather than aborting, so it can diagnose trust/expiry issues.
+        // doctor reports every configured repository via the manager; a
+        // broken source is surfaced as a check rather than aborting.
         if (cmd == "doctor") {
             meow::log::setLevel(meow::log::LogLevel::Error);
             bool asJson = false;
@@ -255,22 +255,16 @@ int main(int argc, char** argv) {
                 if (std::string_view(cmdArgv[i]) == "--json") asJson = true;
                 else if (std::string_view(cmdArgv[i]) == "--security") security = true;
             }
-            const meow::repository::Repository* repoPtr = nullptr;
-            meow::repository::Repository repoValue;
-            if (!manager.repositories().empty()) {
-                repoValue = manager.repositories().front().repository;
-                repoPtr = &repoValue;
-            }
             if (security) {
                 meow::hooks::HookPolicy policy;
                 policy.timeout = std::chrono::seconds(cfg.hookTimeout);
                 policy.allowNetwork = cfg.hookAllowNetwork;
-                auto diag = meow::doctor::diagnoseSecurity(cfg, db, repoPtr, policy);
+                auto diag = meow::doctor::diagnoseSecurity(cfg, db, manager, policy);
                 if (asJson) meow::doctor::printJson(diag, std::cout);
                 else meow::doctor::printReport(diag, std::cout);
                 return diag.healthy() ? 0 : 1;
             }
-            auto diag = meow::doctor::diagnose(cfg, db, repoPtr);
+            auto diag = meow::doctor::diagnose(cfg, db, manager);
             if (asJson) {
                 meow::doctor::printJson(diag, std::cout);
             } else {

@@ -96,7 +96,7 @@ int Diagnosis::warningCount() const {
 
 Diagnosis diagnose(const config::Config& cfg,
                     database::Database& db,
-                    const repository::Repository* repo) {
+                    const repository::RepositoryManager& manager) {
     std::vector<Check> checks;
 
     // 1. Configuration
@@ -130,34 +130,48 @@ Diagnosis diagnose(const config::Config& cfg,
         }
     }
 
-    // 3. Repository trust + identity
-    if (repo) {
-        add(checks, "repository", "signature trusted", CheckStatus::Ok,
-            "repository signature verified (id: " + repo->id + ")");
-        if (repo->id.empty()) {
-            add(checks, "repository", "repository identity", CheckStatus::Error, "missing repository_id");
+    // 3. Per-repository trust + identity (one report per configured source).
+    const auto& loaded = manager.repositories();
+    for (const auto& l : loaded) {
+        const auto& repo = l.repository;
+        const std::string tag = "[" + l.config.id + "] ";
+        add(checks, "repository", tag + "signature trusted", CheckStatus::Ok,
+            "repository signature verified (id: " + repo.id + ")");
+        if (repo.id.empty()) {
+            add(checks, "repository", tag + "repository identity", CheckStatus::Error,
+                "missing repository_id");
         } else {
-            add(checks, "repository", "repository identity", CheckStatus::Ok, "repository_id=" + repo->id);
+            add(checks, "repository", tag + "repository identity", CheckStatus::Ok,
+                "repository_id=" + repo.id);
         }
-    } else {
+    }
+    // Failed repositories (could not be opened).
+    for (const auto& f : manager.failures()) {
+        add(checks, "repository", "[" + f.id + "] available", CheckStatus::Error,
+            "repository could not be opened: " + f.error);
+    }
+    if (loaded.empty() && manager.failures().empty()) {
         add(checks, "repository", "signature trusted", CheckStatus::Error,
-            "repository could not be opened (signature/expiry/identity failure)");
+            "no repositories configured or available");
     }
 
-    // 4. Repository expiry
-    if (repo && repo->expires) {
-        auto exp = parseRfc3339Z(*repo->expires);
+    // 4. Repository expiry (per loaded repository).
+    for (const auto& l : loaded) {
+        const auto& repo = l.repository;
+        const std::string tag = "[" + l.config.id + "] ";
+        if (!repo.expires) continue;
+        auto exp = parseRfc3339Z(*repo.expires);
         auto now = std::time(nullptr);
         if (exp == 0) {
-            add(checks, "repository", "metadata not expired", CheckStatus::Warning,
-                "unparseable expires value: " + *repo->expires);
+            add(checks, "repository", tag + "metadata not expired", CheckStatus::Warning,
+                "unparseable expires value: " + *repo.expires);
         } else if (exp <= now) {
-            add(checks, "repository", "metadata not expired", CheckStatus::Error,
-                "repository expired at " + *repo->expires);
+            add(checks, "repository", tag + "metadata not expired", CheckStatus::Error,
+                "repository expired at " + *repo.expires);
         } else {
             double days = std::difftime(exp, now) / 86400.0;
-            add(checks, "repository", "metadata not expired", CheckStatus::Ok,
-                "expires in " + std::to_string(static_cast<int>(std::ceil(days))) + "d (" + *repo->expires + ")");
+            add(checks, "repository", tag + "metadata not expired", CheckStatus::Ok,
+                "expires in " + std::to_string(static_cast<int>(std::ceil(days))) + "d (" + *repo.expires + ")");
         }
     }
 
@@ -174,12 +188,13 @@ Diagnosis diagnose(const config::Config& cfg,
         } else {
             add(checks, "cache", "cache directory", CheckStatus::Ok, cfg.cache.string());
         }
-        if (repo) {
+        for (const auto& l : loaded) {
             std::error_code ec2;
-            bool rcache = std::filesystem::exists(repo->cache, ec2);
-            add(checks, "cache", "verified metadata cache",
+            bool rcache = std::filesystem::exists(l.repository.cache, ec2);
+            add(checks, "cache", "[" + l.config.id + "] verified metadata cache",
                 rcache ? CheckStatus::Ok : CheckStatus::Warning,
-                rcache ? repo->cache.string() : "no cached metadata for this repository_id");
+                rcache ? l.repository.cache.string()
+                       : "no cached metadata for this repository_id");
         }
     }
 
@@ -285,9 +300,9 @@ namespace {
 }
 
 Diagnosis diagnoseSecurity(const config::Config& cfg,
-                           database::Database& db,
-                           const repository::Repository* repo,
-                           const hooks::HookPolicy& policy) {
+                            database::Database& db,
+                            const repository::RepositoryManager& manager,
+                            const hooks::HookPolicy& policy) {
     std::vector<Check> checks;
 
     // 1. Trusted key store.
@@ -309,29 +324,36 @@ Diagnosis diagnoseSecurity(const config::Config& cfg,
     }
 
     // 2. Repository trust chain: signature -> trusted key -> identity -> expiry.
-    if (repo) {
-        add(checks, "repository", "signature valid", CheckStatus::Ok,
-            "signed by trusted key (id: " + repo->id + ")");
-        add(checks, "repository", "identity matches cache", CheckStatus::Ok,
-            "repository_id=" + repo->id + " cache=" + repo->cache.string());
-        if (repo->expires) {
-            auto exp = parseRfc3339Z(*repo->expires);
+    // Reported per configured repository so a single broken source is visible
+    // without aborting the whole diagnosis.
+    const auto& loaded = manager.repositories();
+    for (const auto& l : loaded) {
+        const auto& repo = l.repository;
+        const std::string tag = "[" + l.config.id + "] ";
+        add(checks, "repository", tag + "signature valid", CheckStatus::Ok,
+            "signed by trusted key (id: " + repo.id + ")");
+        add(checks, "repository", tag + "identity matches cache", CheckStatus::Ok,
+            "repository_id=" + repo.id + " cache=" + repo.cache.string());
+        if (repo.expires) {
+            auto exp = parseRfc3339Z(*repo.expires);
             auto now = std::time(nullptr);
             if (exp == 0) {
-                add(checks, "repository", "metadata not expired", CheckStatus::Warning,
-                    "unparseable expires: " + *repo->expires);
+                add(checks, "repository", tag + "metadata not expired", CheckStatus::Warning,
+                    "unparseable expires: " + *repo.expires);
             } else if (exp <= now) {
-                add(checks, "repository", "metadata not expired", CheckStatus::Error,
-                    "repository expired at " + *repo->expires);
+                add(checks, "repository", tag + "metadata not expired", CheckStatus::Error,
+                    "repository expired at " + *repo.expires);
             } else {
                 double days = std::difftime(exp, now) / 86400.0;
-                add(checks, "repository", "metadata not expired", CheckStatus::Ok,
+                add(checks, "repository", tag + "metadata not expired", CheckStatus::Ok,
                     "expires in " + std::to_string(static_cast<int>(std::ceil(days))) + "d");
             }
         }
-    } else {
-        add(checks, "repository", "trust chain", CheckStatus::Error,
-            "repository could not be opened (signature / identity / expiry failure)");
+    }
+    for (const auto& f : manager.failures()) {
+        add(checks, "repository", "[" + f.id + "] trust chain", CheckStatus::Error,
+            "repository could not be opened (signature / identity / expiry failure): " +
+                f.error);
     }
 
     // 3. Cache security: stale partial downloads, zero-size/broken artifacts.
@@ -379,9 +401,6 @@ Diagnosis diagnoseSecurity(const config::Config& cfg,
                 int problems = missingHash + missingVer;
                 if (problems == 0) {
                     std::string detail = std::to_string(lock.packages.size()) + " package(s) pinned with hash+version";
-                    if (repo && !lock.repositoryHash.empty()) {
-                        // repository_id consistency is captured by the repo identity check.
-                    }
                     add(checks, "lockfile", "lockfile artifacts verified", CheckStatus::Ok, detail);
                 } else {
                     add(checks, "lockfile", "lockfile artifacts verified", CheckStatus::Warning,

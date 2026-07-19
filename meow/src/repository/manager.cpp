@@ -31,12 +31,13 @@ RepositoryManager::RepositoryManager(const config::Config& cfg) : cfg_(cfg) {
             loaded_.push_back(std::move(l));
         } catch (const std::exception& e) {
             ++failed_;
-            if (lastError_.empty()) {
-                if (auto* me = dynamic_cast<const error::MeowError*>(&e))
-                    lastError_ = error::formatError(*me);
-                else
-                    lastError_ = e.what();
-            }
+            std::string msg;
+            if (auto* me = dynamic_cast<const error::MeowError*>(&e))
+                msg = error::formatError(*me);
+            else
+                msg = e.what();
+            if (lastError_.empty()) lastError_ = msg;
+            failures_.push_back(Failed{rc.id, rc.url, msg});
             log::log(log::LogLevel::Warning,
                      "repository '" + rc.id + "' (" + rc.url +
                          ") unavailable: " + e.what());

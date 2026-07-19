@@ -7,6 +7,7 @@
 #include <meow/config/config.hpp>
 #include <meow/database/database.hpp>
 #include <meow/repository/repository.hpp>
+#include <meow/repository/manager.hpp>
 #include <meow/hooks/policy.hpp>
 
 namespace meow::doctor {
@@ -32,19 +33,21 @@ struct Diagnosis {
 };
 
 // Runs all diagnostic checks against the given configuration, database and
-// (optionally loaded) repository. `repo` may be null when the repository
-// could not be opened (the trust/expiry checks then report the failure
-// instead of throwing).
+// repository manager. Every configured repository is reported individually
+// (trust, identity, expiry, metadata cache); a repository that failed to load
+// is reported as a failure rather than aborting the diagnosis. This keeps
+// doctor backend-agnostic: it never inspects a single fixed repository.
 Diagnosis diagnose(const config::Config& cfg,
                     database::Database& db,
-                    const repository::Repository* repo);
+                    const repository::RepositoryManager& manager);
 
 // Runs security-focused checks (keys, trust chain, cache, lockfile, hooks
-// policy). Read-only: never mutates state.
+// policy). Read-only: never mutates state. Reports each configured repository
+// via the manager.
 Diagnosis diagnoseSecurity(const config::Config& cfg,
-                           database::Database& db,
-                           const repository::Repository* repo,
-                           const hooks::HookPolicy& policy);
+                            database::Database& db,
+                            const repository::RepositoryManager& manager,
+                            const hooks::HookPolicy& policy);
 
 // Prints a human-readable report. Exits non-zero semantics are the caller's
 // responsibility (see errorCount()).

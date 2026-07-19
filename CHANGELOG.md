@@ -28,6 +28,13 @@
   config file; the legacy single `repository = "url"` form is still accepted.
   The cache continues to be keyed by the cryptographic `repository_id`, not the
   config name.
+- Doctor is now backend-agnostic: `meow doctor` and `meow doctor --security`
+  report **every configured repository** individually (trust, identity,
+  expiry, metadata cache) via the `RepositoryManager`, instead of inspecting a
+  single fixed repository. A repository that fails to load is surfaced as a
+  check (and makes the diagnosis unhealthy) rather than aborting. `sync` and
+  `update` already operate on the merged repository view, so they are
+  transport-agnostic as well.
 
 ## [0.4.0] - 2026-07-19
 
