@@ -42,25 +42,36 @@ set(MEOW_SOURCES
     meow/src/database/migration.cpp
 )
 
+# Shared core library (everything except the CLI entry points) so unit tests
+# can link the backend, resolver, and package loader without a main().
+add_library(meow_core STATIC ${MEOW_SOURCES})
+target_include_directories(meow_core PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+
 # CLI tools
 add_executable(meow
     meow/src/main.cpp
-    ${MEOW_SOURCES}
 )
+target_link_libraries(meow PRIVATE meow_core)
 
 add_executable(meow-build
     meow/src/meow-build/main.cpp
-    ${MEOW_SOURCES}
 )
+target_link_libraries(meow-build PRIVATE meow_core)
 
 add_executable(meow-repo
     meow/src/meow-repo/main.cpp
-    ${MEOW_SOURCES}
 )
+target_link_libraries(meow-repo PRIVATE meow_core)
 
 add_executable(meow-server
     meow/src/meow-server/main.cpp
 )
+
+# Disk/network-free unit tests for the repository backends.
+add_executable(meow-unit-backend test/unit/backend_test.cpp)
+target_include_directories(meow-unit-backend
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-backend PRIVATE meow_core)
 
 target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
@@ -81,7 +92,7 @@ if(NOT tomlplusplus_FOUND)
     FetchContent_MakeAvailable(tomlplusplus)
 endif()
 
-foreach(tgt meow meow-build meow-repo)
+foreach(tgt meow meow-build meow-repo meow_core)
     target_link_libraries(${tgt}
         PRIVATE
         SQLite::SQLite3

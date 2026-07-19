@@ -1,5 +1,6 @@
 #include "meow/repository/backend.hpp"
 #include "meow/repository/http_backend.hpp"
+#include "meow/repository/memory_backend.hpp"
 #include "backend_detail.hpp"
 
 #include <meow/error/error.hpp>
@@ -162,6 +163,10 @@ package::PackageFile FilesystemRepositoryBackend::fetchArtifact(
 }
 
 std::unique_ptr<IRepositoryBackend> createBackend(const std::string& url) {
+    if (url.starts_with("memory://"))
+        throw error::MeowError(
+            error::ErrorCode::Internal,
+            "memory:// repositories must be constructed directly for tests");
     if (url.starts_with("http://") || url.starts_with("https://"))
         return std::make_unique<HttpRepositoryBackend>(url);
     return std::make_unique<FilesystemRepositoryBackend>(url);

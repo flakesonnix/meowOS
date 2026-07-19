@@ -34,7 +34,16 @@
   single fixed repository. A repository that fails to load is surfaced as a
   check (and makes the diagnosis unhealthy) rather than aborting. `sync` and
   `update` already operate on the merged repository view, so they are
-  transport-agnostic as well.
+   transport-agnostic as well.
+- In-memory repository backend (`MemoryRepositoryBackend`) for fast,
+  disk/network-free unit tests. It carries a fully built in-memory `Repository`
+  plus preloaded package artifacts, so the backend, resolver, and dependency
+  closure can be exercised without touching the filesystem or network. The
+  `memory://` scheme is reserved for this backend (constructed directly in
+  tests; `createBackend` rejects it for production use). A `meow-unit-backend`
+  target builds `test/unit/backend_test.cpp`, covering metadata load,
+  single-package load (incl. `PackageNotFound`), artifact fetch (present and
+  `FileNotFound`), dependency closure, and conflicting-package metadata.
 
 ## [0.4.0] - 2026-07-19
 

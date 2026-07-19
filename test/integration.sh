@@ -1501,6 +1501,24 @@ wait "$SRV_PID" 2>/dev/null || true
 git clean -fdq repo-dual 2>/dev/null || true
 
 echo ""
+echo "=== 30. In-memory backend unit tests (disk/network-free) ==="
+UNIT_BIN="$(cd "$(dirname "$0")" && pwd)/../build/meow-unit-backend"
+if [ ! -x "$UNIT_BIN" ]; then
+    echo "  SKIP: unit test binary not built ($UNIT_BIN)"
+else
+    UNIT_OUT=$("$UNIT_BIN" 2>&1)
+    UNIT_FAIL=$(printf '%s\n' "$UNIT_OUT" | grep -c '^  FAIL:' || true)
+    UNIT_PASS=$(printf '%s\n' "$UNIT_OUT" | grep -c '^  PASS:' || true)
+    if [ "$UNIT_FAIL" -eq 0 ]; then
+        echo "  PASS: $UNIT_PASS in-memory backend checks passed"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: $UNIT_FAIL in-memory backend checks failed"
+        fail=$((fail + 1))
+    fi
+fi
+
+echo ""
 echo "Results: $pass passed, $fail failed"
 git checkout -- repo 2>/dev/null || true
 git clean -fdq repo 2>/dev/null || true
