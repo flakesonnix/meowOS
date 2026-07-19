@@ -6,7 +6,6 @@
 #include <vector>
 
 #include <meow/types/types.hpp>
-#include <meow/repository/index.hpp>
 
 namespace meow::repository {
     struct RepositoryVersion {
@@ -22,7 +21,6 @@ namespace meow::repository {
 
     struct Repository {
         std::filesystem::path root;
-        std::optional<RepositoryIndex> index;
         std::vector<RepositoryPackage> packages;
     };
 
@@ -32,4 +30,4 @@ namespace meow::repository {
     std::vector<types::PackageVersion> listVersions(const RepositoryPackage& package);
 }
 
-#endif //MEOWOS_REPOSITORY_H
+#endif

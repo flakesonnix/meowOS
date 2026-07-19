@@ -1,7 +1,6 @@
 #include <meow/repository/repository.hpp>
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
-#include <meow/crypto/signature.hpp>
 #include <toml++/toml.hpp>
 #include <algorithm>
 
@@ -14,46 +13,45 @@ namespace meow::repository {
         Repository repo;
         repo.root = root;
 
-        auto indexPath = root / "index.toml";
-        if (std::filesystem::exists(indexPath)) {
-            try {
-                auto sigPath = root / "index.toml.sig";
-                auto keyPath = root / "public.pem";
-                if (std::filesystem::exists(sigPath) && std::filesystem::exists(keyPath)) {
-                    if (crypto::verifyIndex(indexPath, sigPath, keyPath)) {
-                        log::log(log::LogLevel::Info, "index signature verified");
-                    } else {
-                        throw error::MeowError(
-                            error::ErrorCode::InvalidSignature,
-                            "index signature verification failed"
-                        );
-                    }
-                } else {
-                    log::log(log::LogLevel::Warning, "index not signed, skipping verification");
-                }
-                repo.index = loadIndex(indexPath);
-                log::log(log::LogLevel::Debug, "loaded repository index");
-            } catch (const error::MeowError& e) {
-                if (e.code == error::ErrorCode::InvalidSignature) throw;
-                log::log(log::LogLevel::Warning, "failed to load repository index, falling back to directory scan");
-            }
+        auto byNameDir = root / "by-name";
+        if (!std::filesystem::is_directory(byNameDir)) {
+            throw error::MeowError(
+                error::ErrorCode::RepositoryNotFound,
+                "by-name directory not found in repository: " + root.string()
+            );
         }
 
-        for (const auto& pkgDir : std::filesystem::directory_iterator(root)) {
-            if (!pkgDir.is_directory()) continue;
-            if (pkgDir.path().filename() == "packages") {
-                for (const auto& subDir : std::filesystem::directory_iterator(pkgDir.path())) {
-                    if (!subDir.is_directory()) continue;
+        for (const auto& shardDir : std::filesystem::directory_iterator(byNameDir)) {
+            if (!shardDir.is_directory()) continue;
 
-                    RepositoryPackage pkg;
-                    pkg.name = types::PackageName{subDir.path().filename().string()};
+            for (const auto& pkgDir : std::filesystem::directory_iterator(shardDir.path())) {
+                if (!pkgDir.is_directory()) continue;
 
-                    auto versionsDir = subDir.path() / "versions";
-                    if (std::filesystem::is_directory(versionsDir)) {
-                        for (const auto& entry : std::filesystem::directory_iterator(versionsDir)) {
-                            if (!entry.is_regular_file()) continue;
-                            if (entry.path().extension() != ".toml") continue;
+                RepositoryPackage pkg;
+                pkg.name = types::PackageName{pkgDir.path().filename().string()};
 
+                auto pkgMetaPath = pkgDir.path() / "package.toml";
+                if (std::filesystem::exists(pkgMetaPath)) {
+                    try {
+                        auto pkgTbl = toml::parse_file(pkgMetaPath.string());
+                        if (auto* meta = pkgTbl["metadata"].as_table()) {
+                            if (auto desc = (*meta)["description"].value<std::string>()) {
+                                pkg.description = types::Description{*desc};
+                            }
+                        }
+                    } catch (...) {
+                        log::log(log::LogLevel::Warning,
+                            "failed to parse " + pkgMetaPath.string());
+                    }
+                }
+
+                auto versionsDir = pkgDir.path() / "versions";
+                if (std::filesystem::is_directory(versionsDir)) {
+                    for (const auto& entry : std::filesystem::directory_iterator(versionsDir)) {
+                        if (!entry.is_regular_file()) continue;
+                        if (entry.path().extension() != ".toml") continue;
+
+                        try {
                             auto tbl = toml::parse_file(entry.path().string());
                             RepositoryVersion rv;
                             rv.version = types::PackageVersion{entry.path().stem().string()};
@@ -65,62 +63,20 @@ namespace meow::repository {
                             }
 
                             pkg.versions.push_back(std::move(rv));
+                        } catch (...) {
+                            log::log(log::LogLevel::Warning,
+                                "failed to parse " + entry.path().string());
                         }
                     }
-
-                    if (repo.index) {
-                        const auto* entry = findIndexEntry(*repo.index, pkg.name);
-                        if (entry) {
-                            pkg.description = entry->description;
-                        }
-                    }
-
-                    std::sort(pkg.versions.begin(), pkg.versions.end(),
-                        [](const RepositoryVersion& a, const RepositoryVersion& b) {
-                            return a.version.value < b.version.value;
-                        });
-
-                    repo.packages.push_back(std::move(pkg));
                 }
-                continue;
+
+                std::sort(pkg.versions.begin(), pkg.versions.end(),
+                    [](const RepositoryVersion& a, const RepositoryVersion& b) {
+                        return a.version.value < b.version.value;
+                    });
+
+                repo.packages.push_back(std::move(pkg));
             }
-
-            RepositoryPackage pkg;
-            pkg.name = types::PackageName{pkgDir.path().filename().string()};
-
-            auto versionsDir = pkgDir.path() / "versions";
-            if (std::filesystem::is_directory(versionsDir)) {
-                for (const auto& entry : std::filesystem::directory_iterator(versionsDir)) {
-                    if (!entry.is_regular_file()) continue;
-                    if (entry.path().extension() != ".toml") continue;
-
-                    auto tbl = toml::parse_file(entry.path().string());
-                    RepositoryVersion rv;
-                    rv.version = types::PackageVersion{entry.path().stem().string()};
-
-                    if (auto* art = tbl["artifact"].as_table()) {
-                        rv.artifact.filename = (*art)["filename"].value_or("");
-                        rv.artifact.url = (*art)["url"].value_or("");
-                        rv.artifact.sha256 = (*art)["sha256"].value_or("");
-                    }
-
-                    pkg.versions.push_back(std::move(rv));
-                }
-            }
-
-            if (repo.index) {
-                const auto* entry = findIndexEntry(*repo.index, pkg.name);
-                if (entry) {
-                    pkg.description = entry->description;
-                }
-            }
-
-            std::sort(pkg.versions.begin(), pkg.versions.end(),
-                [](const RepositoryVersion& a, const RepositoryVersion& b) {
-                    return a.version.value < b.version.value;
-                });
-
-            repo.packages.push_back(std::move(pkg));
         }
 
         return repo;

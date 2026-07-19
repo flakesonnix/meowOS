@@ -12,7 +12,6 @@ add_executable(${PROJECT_NAME}
         meow/src/repository/repository.cpp
         meow/src/repository/version.cpp
         meow/src/repository/resolver.cpp
-        meow/src/repository/index.cpp
         meow/src/install/installer.cpp
         meow/src/download/downloader.cpp
         meow/src/error/printer.cpp
@@ -28,7 +27,6 @@ add_executable(${PROJECT_NAME}
         meow/src/update/updater.cpp
         meow/src/log/logger.cpp
         meow/src/config/config.cpp
-        meow/src/crypto/signature.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

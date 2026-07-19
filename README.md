@@ -4,7 +4,7 @@ A transactional Linux package manager with signed repositories, dependency resol
 
 ## Features
 
-- Signed repository metadata (Ed25519)
+- Sharded by-name repository layout (no global index)
 - Package download + SHA256 verification
 - Dependency resolution with cycle detection
 - Atomic transactions with rollback
@@ -85,11 +85,13 @@ cmake --build build
 
 A repository contains:
 
-- `index.toml` — metadata index (package names + versions)
-- `index.toml.sig` — Ed25519 signature of index
-- `public.pem` — Public key for verification
-- `packages/<name>/versions/<version>.toml` — Per-version artifact metadata (url, sha256, filename)
-- `packages/<name>/package.toml` — Package metadata
+- `repository.toml` — repository metadata (name, schema version)
+- `by-name/<shard>/<package>/package.toml` — Package metadata
+- `by-name/<shard>/<package>/versions/<version>.toml` — Per-version artifact metadata (url, sha256, filename)
+
+The shard directory is the first two lowercase characters of the package name.
+Single-character names use `<char>_` as the shard. This layout scales to millions
+of packages without a single monolithic index file.
 
 ## Database
 

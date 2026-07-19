@@ -5,4 +5,3 @@ architecture = "AMD64"
 description = "GNU Hello - a friendly greeting program"
 
 dependencies = []
-z
