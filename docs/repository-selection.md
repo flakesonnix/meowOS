@@ -18,9 +18,10 @@ documented; trust is never relaxed for availability.
 - **Mirror** — one transport endpoint that serves a given repository
   (`file://`, local path, or `http(s)://`). Mirrors of the same repository share
   the `repository_id`, signature, metadata, and cache.
-- **Configured source** — one entry under `[[repositories]]` in `meow.toml`.
-  Today a source is a single URL. Mirror groups (multiple URLs per repository)
-  are a future extension described below.
+- **Configured source** — one entry under `[[repositories]]` in `meow.toml`. A
+  source is one *repository identity* served from one or more *mirrors*
+  (transport locations). The legacy single `url = "..."` form is still accepted
+  and is internally migrated to a one-element `mirrors = ["..."]` list.
 - **Priority** — an integer on a configured source. Higher priority wins when a
   package exists in more than one source.
 - **Backend** — the transport implementation behind a URL scheme
@@ -31,9 +32,12 @@ documented; trust is never relaxed for availability.
 
 The following already ships and is the contract for the rules below.
 
-- Config supports `[[repositories]]` with `id`, `url`, `priority`. A legacy
-  single `repository = "url"` form is still accepted and mapped to one source
-  with priority `0`.
+- Config supports `[[repositories]]` with `id`, `priority`, and a `mirrors`
+  list of URLs (`file://`, local path, or `http(s)://`). The legacy single
+  `url = "..."` form is still accepted and mapped to one source with
+  `mirrors = ["..."]`. A source is a *repository identity*; all its mirrors must
+  yield the same `repository_id`, signature, and metadata. Priority is per
+  source (group), not per mirror.
 - `RepositoryManager` loads every configured source through `createBackend`.
   Loading is **tolerant**: a source that throws (network error, missing repo,
   expired, bad signature) is recorded in `failures()` and skipped. The rest of
@@ -167,7 +171,25 @@ missing names from the next source by priority).
 so priority, trust, and cache are computed once per repository, not once per
 URL.
 
-Proposed config:
+The model is now implemented. A configured source is one repository identity
+with a `mirrors` list; the legacy single `url` form is migrated internally to a
+one-element `mirrors` list. This separation is the data model; the runtime
+failover policy (when to try the next mirror) is a separate, later step.
+
+### Repository vs mirror
+
+| Aspect            | Repository                                  | Mirror                              |
+|-------------------|---------------------------------------------|-------------------------------------|
+| Identity          | has a cryptographic `repository_id`         | none (transport location only)     |
+| Signature         | has and verifies a signature                | none (inherits the repo's)          |
+| Metadata          | owns the package metadata                   | none (serves the repo's)            |
+| Cache             | one cache keyed by `repository_id`          | none (shares the repo's cache)      |
+
+Because a mirror has no identity of its own, two mirrors of the same repository
+must produce identical `repository_id`, signature, and metadata. A mirror that
+diverges is a broken mirror, not a different repository.
+
+Config:
 
 ```toml
 [[repositories]]

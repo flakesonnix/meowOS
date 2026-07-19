@@ -11,7 +11,8 @@ Config defaultConfig() {
     Config cfg;
     cfg.root = "/";
     cfg.cache = std::filesystem::path(std::getenv("HOME")) / ".cache" / "meow";
-    cfg.repositories.push_back(RepositoryConfig{"default", "./repo", 0});
+    cfg.repositories.push_back(
+        RepositoryConfig{.id = "default", .mirrors = {"./repo"}, .url = "./repo"});
     cfg.downloadWorkers = 0;
     cfg.hookTimeout = 30;
     cfg.hookAllowNetwork = false;
@@ -45,10 +46,27 @@ Config loadConfig(const std::filesystem::path& path) {
             if (auto* t = node.as_table()) {
                 RepositoryConfig rc;
                 rc.id = (*t)["id"].value_or("");
-                rc.url = (*t)["url"].value_or("");
-                if (rc.url.empty()) rc.url = (*t)["path"].value_or("");
                 rc.priority = (*t)["priority"].value_or(0);
-                if (!rc.url.empty()) repos.push_back(std::move(rc));
+
+                if (auto* mirrors = (*t)["mirrors"].as_array()) {
+                    for (const auto& m : *mirrors) {
+                        if (auto s = m.value<std::string>())
+                            if (!s->empty()) rc.mirrors.push_back(*s);
+                    }
+                }
+                // Legacy single-endpoint fields fold into the mirror list.
+                if (rc.mirrors.empty()) {
+                    std::string u = (*t)["url"].value_or("");
+                    if (u.empty()) u = (*t)["path"].value_or("");
+                    if (!u.empty()) {
+                        rc.mirrors.push_back(u);
+                        rc.url = u;
+                    }
+                } else {
+                    rc.url = rc.mirrors.front();
+                }
+
+                if (!rc.mirrors.empty()) repos.push_back(std::move(rc));
             }
         }
     }
@@ -56,8 +74,13 @@ Config loadConfig(const std::filesystem::path& path) {
     // Legacy form: repository = "url"
     if (repos.empty()) {
         if (auto url = tbl["repository"].value<std::string>()) {
-            if (!url->empty())
-                repos.push_back(RepositoryConfig{"default", *url, 0});
+            if (!url->empty()) {
+                RepositoryConfig rc;
+                rc.id = "default";
+                rc.mirrors = {*url};
+                rc.url = *url;
+                repos.push_back(std::move(rc));
+            }
         }
     }
 

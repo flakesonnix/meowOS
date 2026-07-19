@@ -225,8 +225,10 @@ int main(int argc, char** argv) {
         }
         if (!repositoryOverride.empty()) {
             cfg.repositories.clear();
-            cfg.repositories.push_back(
-                meow::config::RepositoryConfig{"default", repositoryOverride, 0});
+            cfg.repositories.push_back(meow::config::RepositoryConfig{
+                .id = "default",
+                .mirrors = {repositoryOverride},
+                .url = repositoryOverride});
         }
 
         meow::repository::RepositoryManager manager(cfg);

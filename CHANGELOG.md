@@ -51,6 +51,18 @@
   hide a healthy fallback (and stays visible in the health table), and distinct
   `repository_id`s keep separate caches. `docs/repository-selection.md` gained a
   **Selection algorithm** section stating the procedure as a fixed contract.
+- **Mirror groups** (data model): a configured source is now one *repository
+  identity* served from one or more *mirrors*. Config accepts
+  `mirrors = ["url", ...]`; the legacy single `url = "..."` form is migrated
+  internally to a one-element mirror list. All mirrors of a source must yield the
+  same `repository_id`, signature, and metadata, and they share a single cache
+  keyed by `repository_id` (never by mirror path). Priority is per source (group),
+  not per mirror. Transport-level load failures fall through to the next mirror;
+  trust failures (bad signature, expired, invalid id) stop the group rather than
+  being papered over by another mirror. The runtime failover *policy* remains a
+  separate later step. Integration test section **33. Repository mirror groups**
+  covers single-mirror, shared `repository_id`, cache keying, priority
+  preservation, and legacy `url` migration.
 
 ## [0.4.0] - 2026-07-19
 

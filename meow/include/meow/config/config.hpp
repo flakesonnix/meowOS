@@ -11,10 +11,28 @@ namespace meow::config {
 // name (may be renamed freely); it is NOT the cryptographic repository
 // identity (repository.toml's repository_id), which is discovered when the
 // repo is loaded.
+//
+// A source is one *repository identity* served from one or more *mirrors*
+// (transport locations). All mirrors of a source must yield the same
+// `repository_id`, signature, and metadata. The cache is keyed by
+// `repository_id`, so mirrors of one source share a single cache and are not
+// separate repositories.
 struct RepositoryConfig {
     std::string id;
-    std::string url;   // file://, local path, or http(s):// (scheme selects backend)
+    std::vector<std::string> mirrors;  // file://, local path, or http(s):// endpoints
     int priority = 0;  // higher priority repos win when a package exists in several
+
+    // Effective transport endpoints. Falls back to the legacy single `url`
+    // when `mirrors` was not specified, preserving backwards compatibility.
+    std::vector<std::string> urls() const {
+        if (!mirrors.empty()) return mirrors;
+        if (!url.empty()) return {url};
+        return {};
+    }
+
+    // Legacy single-endpoint form. Retained so old configs keep parsing; it is
+    // folded into `mirrors` by the config loader.
+    std::string url;
 };
 
 struct Config {

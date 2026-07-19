@@ -25,23 +25,54 @@ RepositoryManager::RepositoryManager(const config::Config& cfg) : cfg_(cfg) {
     for (const auto& rc : cfg.repositories) {
         RepositoryState state;
         state.config = rc;
-        try {
-            auto backend = createBackend(rc.url);
-            state.repository = backend->loadRepository();
-            state.status = RepositoryStatus::Available;
-        } catch (const error::MeowError& e) {
-            state.status = classifyRepositoryError(e);
-            state.error = e;
-            if (lastError_.empty()) lastError_ = error::formatError(e);
-            log::log(log::LogLevel::Warning,
-                     "repository '" + rc.id + "' (" + rc.url +
-                          ") unavailable: " + e.what());
-        } catch (const std::exception& e) {
+
+        const auto endpoints = rc.urls();
+        // Mirrors are alternate transport locations for the *same* repository
+        // identity. Try them in listed order; the first that loads and verifies
+        // wins. Trust failures (bad signature, expired, invalid id) are not
+        // "mirror retries" -- they are fatal for the whole source and must not
+        // be papered over by trying another mirror, so we stop on those.
+        bool loaded = false;
+        for (const auto& endpoint : endpoints) {
+            try {
+                auto backend = createBackend(endpoint);
+                state.repository = backend->loadRepository();
+                state.status = RepositoryStatus::Available;
+                state.error.reset();
+                loaded = true;
+                break;
+            } catch (const error::MeowError& e) {
+                if (e.code == error::ErrorCode::InvalidSignature ||
+                    e.code == error::ErrorCode::TrustedKeyNotFound ||
+                    e.code == error::ErrorCode::RepositoryExpired ||
+                    e.code == error::ErrorCode::InvalidRepository ||
+                    e.code == error::ErrorCode::InvalidManifest) {
+                    // Trust failure: do not fall through to another mirror.
+                    state.status = classifyRepositoryError(e);
+                    state.error = e;
+                    log::log(log::LogLevel::Warning,
+                             "repository '" + rc.id + "' (" + endpoint +
+                                 ") trust failure: " + e.what());
+                    loaded = true;  // stop trying further mirrors
+                    break;
+                }
+                state.status = classifyRepositoryError(e);
+                state.error = e;
+                if (lastError_.empty()) lastError_ = error::formatError(e);
+                log::log(log::LogLevel::Warning,
+                         "repository '" + rc.id + "' (" + endpoint +
+                             ") unavailable, trying next mirror: " + e.what());
+            } catch (const std::exception& e) {
+                state.status = RepositoryStatus::Unavailable;
+                state.error = error::MeowError(error::ErrorCode::Internal, e.what());
+                if (lastError_.empty()) lastError_ = e.what();
+                log::log(log::LogLevel::Warning,
+                         "repository '" + rc.id + "' (" + endpoint +
+                             ") unavailable, trying next mirror: " + e.what());
+            }
+        }
+        if (!loaded && state.status == RepositoryStatus::Available) {
             state.status = RepositoryStatus::Unavailable;
-            if (lastError_.empty()) lastError_ = e.what();
-            log::log(log::LogLevel::Warning,
-                     "repository '" + rc.id + "' (" + rc.url +
-                          ") unavailable: " + e.what());
         }
         if (state.status != RepositoryStatus::Available) ++failed_;
         loaded_.push_back(std::move(state));
@@ -54,7 +85,10 @@ std::vector<RepositoryManager::Failed> RepositoryManager::failures() const {
     for (const auto& s : loaded_) {
         if (s.status == RepositoryStatus::Available) continue;
         std::string msg = s.error ? error::formatError(*s.error) : "load failed";
-        out.push_back(Failed{s.config.id, s.config.url, msg});
+        std::string endpoint = s.config.mirrors.empty()
+                                   ? s.config.url
+                                   : s.config.mirrors.front();
+        out.push_back(Failed{s.config.id, endpoint, msg});
     }
     return out;
 }
