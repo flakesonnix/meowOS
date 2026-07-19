@@ -7,6 +7,7 @@
 #include <meow/config/config.hpp>
 #include <meow/database/database.hpp>
 #include <meow/repository/repository.hpp>
+#include <meow/hooks/policy.hpp>
 
 namespace meow::doctor {
 
@@ -37,6 +38,13 @@ struct Diagnosis {
 Diagnosis diagnose(const config::Config& cfg,
                     database::Database& db,
                     const repository::Repository* repo);
+
+// Runs security-focused checks (keys, trust chain, cache, lockfile, hooks
+// policy). Read-only: never mutates state.
+Diagnosis diagnoseSecurity(const config::Config& cfg,
+                           database::Database& db,
+                           const repository::Repository* repo,
+                           const hooks::HookPolicy& policy);
 
 // Prints a human-readable report. Exits non-zero semantics are the caller's
 // responsibility (see errorCount()).

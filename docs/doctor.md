@@ -37,3 +37,29 @@ The command exits non-zero when one or more checks report an error
   repositories.
 - Logs are suppressed to `Error` level while `doctor` runs so the report
   is not drowned in `[INFO]` noise.
+
+## `meow doctor --security`
+
+A read-only, security-focused variant. It never repairs or mutates state
+(that is left to `meow repair --security`, a future command). Checks:
+
+| Category    | Check                      | Notes                                          |
+|-------------|----------------------------|------------------------------------------------|
+| `keys`      | trusted keys configured    | key store exists + non-empty + readable        |
+| `repository`| signature valid            | signed by a trusted key                        |
+| `repository`| identity matches cache     | `repository_id` consistent with cache dir      |
+| `repository`| metadata not expired       | `expires` in the future                        |
+| `cache`     | no stale partial downloads  | no `.part` leftovers                            |
+| `cache`     | no zero-size artifacts     | no truncated cached files                      |
+| `lockfile`  | lockfile artifacts verified | every entry has artifact hash + version        |
+| `lockfile`  | repository identity recorded| `repositoryHash` present                       |
+| `hooks`     | hook policy loaded         | timeout / network / environment reported       |
+| `hooks`     | hook network isolation     | advisory: OS-level enforcement not yet present |
+
+This gives a single summarized view of the chain of custody:
+
+```
+source → meow-build → deterministic artifact → sha256 →
+repository metadata → signature → lockfile
+```
+

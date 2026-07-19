@@ -219,6 +219,12 @@ int main(int argc, char** argv) {
         // check rather than aborting, so it can diagnose trust/expiry issues.
         if (cmd == "doctor") {
             meow::log::setLevel(meow::log::LogLevel::Error);
+            bool asJson = false;
+            bool security = false;
+            for (int i = 1; i < cmdArgc; ++i) {
+                if (std::string_view(cmdArgv[i]) == "--json") asJson = true;
+                else if (std::string_view(cmdArgv[i]) == "--security") security = true;
+            }
             const meow::repository::Repository* repoPtr = nullptr;
             meow::repository::Repository repoValue;
             try {
@@ -227,8 +233,16 @@ int main(int argc, char** argv) {
             } catch (const std::exception&) {
                 repoPtr = nullptr;
             }
+            if (security) {
+                meow::hooks::HookPolicy policy;
+                policy.timeout = std::chrono::seconds(cfg.hookTimeout);
+                policy.allowNetwork = cfg.hookAllowNetwork;
+                auto diag = meow::doctor::diagnoseSecurity(cfg, db, repoPtr, policy);
+                if (asJson) meow::doctor::printJson(diag, std::cout);
+                else meow::doctor::printReport(diag, std::cout);
+                return diag.healthy() ? 0 : 1;
+            }
             auto diag = meow::doctor::diagnose(cfg, db, repoPtr);
-            bool asJson = (cmdArgc >= 2 && std::string_view(cmdArgv[1]) == "--json");
             if (asJson) {
                 meow::doctor::printJson(diag, std::cout);
             } else {

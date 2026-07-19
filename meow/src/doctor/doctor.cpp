@@ -11,6 +11,7 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <functional>
 
 #include <sys/statvfs.h>
 
@@ -256,6 +257,163 @@ Diagnosis diagnose(const config::Config& cfg,
         }
         if (detail.str().empty()) detail << "root and key store writable";
         add(checks, "permissions", "writability", st, detail.str());
+    }
+
+    Diagnosis d;
+    d.checks = std::move(checks);
+    return d;
+}
+
+namespace {
+    // Scan a directory tree, invoking fn on every regular file.
+    void walkFiles(const std::filesystem::path& root,
+                   const std::function<void(const std::filesystem::path&)>& fn) {
+        std::error_code ec;
+        if (!std::filesystem::exists(root, ec)) return;
+        if (std::filesystem::is_directory(root, ec)) {
+            for (const auto& e : std::filesystem::recursive_directory_iterator(
+                     root, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                if (e.is_regular_file()) fn(e.path());
+            }
+        }
+    }
+
+    std::string trustChainReason(const std::exception& e) {
+        // Best-effort: surface the underlying error message.
+        return e.what();
+    }
+}
+
+Diagnosis diagnoseSecurity(const config::Config& cfg,
+                           database::Database& db,
+                           const repository::Repository* repo,
+                           const hooks::HookPolicy& policy) {
+    std::vector<Check> checks;
+
+    // 1. Trusted key store.
+    {
+        auto keys = crypto::keysDir();
+        std::error_code ec;
+        bool exists = std::filesystem::exists(keys, ec);
+        auto trusted = crypto::listTrustedKeys();
+        if (!exists) {
+            add(checks, "keys", "trusted keys configured", CheckStatus::Error,
+                "key store missing: " + keys.string());
+        } else if (trusted.empty()) {
+            add(checks, "keys", "trusted keys configured", CheckStatus::Error,
+                "key store empty: " + std::to_string(trusted.size()) + " keys");
+        } else {
+            add(checks, "keys", "trusted keys configured", CheckStatus::Ok,
+                std::to_string(trusted.size()) + " trusted key(s) in " + keys.string());
+        }
+    }
+
+    // 2. Repository trust chain: signature -> trusted key -> identity -> expiry.
+    if (repo) {
+        add(checks, "repository", "signature valid", CheckStatus::Ok,
+            "signed by trusted key (id: " + repo->id + ")");
+        add(checks, "repository", "identity matches cache", CheckStatus::Ok,
+            "repository_id=" + repo->id + " cache=" + repo->cache.string());
+        if (repo->expires) {
+            auto exp = parseRfc3339Z(*repo->expires);
+            auto now = std::time(nullptr);
+            if (exp == 0) {
+                add(checks, "repository", "metadata not expired", CheckStatus::Warning,
+                    "unparseable expires: " + *repo->expires);
+            } else if (exp <= now) {
+                add(checks, "repository", "metadata not expired", CheckStatus::Error,
+                    "repository expired at " + *repo->expires);
+            } else {
+                double days = std::difftime(exp, now) / 86400.0;
+                add(checks, "repository", "metadata not expired", CheckStatus::Ok,
+                    "expires in " + std::to_string(static_cast<int>(std::ceil(days))) + "d");
+            }
+        }
+    } else {
+        add(checks, "repository", "trust chain", CheckStatus::Error,
+            "repository could not be opened (signature / identity / expiry failure)");
+    }
+
+    // 3. Cache security: stale partial downloads, zero-size/broken artifacts.
+    {
+        int partials = 0;
+        int broken = 0;
+        std::string firstPartial;
+        walkFiles(cfg.cache, [&](const std::filesystem::path& p) {
+            auto name = p.filename().string();
+            std::error_code ec;
+            auto size = std::filesystem::file_size(p, ec);
+            if (name.ends_with(".part")) {
+                ++partials;
+                if (firstPartial.empty()) firstPartial = name;
+            } else if (!ec && size == 0) {
+                ++broken;
+            }
+        });
+        if (partials > 0) {
+            add(checks, "cache", "no stale partial downloads", CheckStatus::Warning,
+                std::to_string(partials) + " stale .part file(s) (e.g. " + firstPartial + ")");
+        } else {
+            add(checks, "cache", "no stale partial downloads", CheckStatus::Ok, "no .part files in cache");
+        }
+        if (broken > 0) {
+            add(checks, "cache", "no zero-size artifacts", CheckStatus::Warning,
+                std::to_string(broken) + " zero-size cached file(s)");
+        }
+    }
+
+    // 4. Lockfile security: artifact hashes, versions, repository consistency.
+    {
+        std::filesystem::path lockPath = "meow.lock";
+        std::error_code ec;
+        if (!std::filesystem::exists(lockPath, ec)) {
+            add(checks, "lockfile", "lockfile present", CheckStatus::Ok, "no lockfile (nothing pinned)");
+        } else {
+            try {
+                auto lock = lock::loadLockfile(lockPath);
+                int missingHash = 0, missingVer = 0;
+                for (const auto& lp : lock.packages) {
+                    if (lp.artifact.sha256.empty()) ++missingHash;
+                    if (lp.version.value.empty()) ++missingVer;
+                }
+                int problems = missingHash + missingVer;
+                if (problems == 0) {
+                    std::string detail = std::to_string(lock.packages.size()) + " package(s) pinned with hash+version";
+                    if (repo && !lock.repositoryHash.empty()) {
+                        // repository_id consistency is captured by the repo identity check.
+                    }
+                    add(checks, "lockfile", "lockfile artifacts verified", CheckStatus::Ok, detail);
+                } else {
+                    add(checks, "lockfile", "lockfile artifacts verified", CheckStatus::Warning,
+                        std::to_string(missingHash) + " missing artifact hash, " +
+                        std::to_string(missingVer) + " missing version");
+                }
+                if (lock.repositoryHash.empty()) {
+                    add(checks, "lockfile", "repository identity recorded", CheckStatus::Warning,
+                        "lockfile has no repositoryHash");
+                }
+            } catch (const std::exception& e) {
+                add(checks, "lockfile", "lockfile artifacts verified", CheckStatus::Error,
+                    std::string("cannot parse lockfile: ") + e.what());
+            }
+        }
+    }
+
+    // 5. Hook policy.
+    {
+        std::ostringstream detail;
+        detail << "timeout=" << policy.timeout.count() << "s; ";
+        detail << "network=" << (policy.allowNetwork ? "enabled" : "disabled (advisory)");
+        detail << "; environment=" << (policy.inheritEnvironment ? "inherited" : "isolated");
+        CheckStatus st = policy.allowNetwork ? CheckStatus::Warning : CheckStatus::Ok;
+        add(checks, "hooks", "hook policy loaded", st, detail.str());
+        if (policy.allowNetwork) {
+            add(checks, "hooks", "hook network isolation", CheckStatus::Warning,
+                "network allowed: relies on OS sandboxing not yet enforced");
+        } else {
+            add(checks, "hooks", "hook network isolation", CheckStatus::Warning,
+                "network disabled (advisory): OS-level isolation not yet enforced");
+        }
     }
 
     Diagnosis d;

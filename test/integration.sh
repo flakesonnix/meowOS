@@ -765,6 +765,33 @@ $MEOW --db-path "$TEST_DB" remove hookslow >/dev/null 2>&1 || true
 rm -rf "$HOOK_OK" "$HOOK_BAD" "$HOOK_SLOW" /tmp/meow-hook-src-* 
 
 echo ""
+echo "=== 21. doctor --security ==="
+# Security report must run and cover the key areas.
+sec=$(MEOW_HOOK_TIMEOUT=30 $MEOW --db-path "$TEST_DB" doctor --security 2>&1)
+for needle in "trusted keys configured" "signature valid" "metadata not expired" "no stale partial downloads" "hook policy loaded"; do
+    if echo "$sec" | grep -q "$needle"; then
+        echo "  PASS: security check present: $needle"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: missing security check: $needle"
+        fail=$((fail + 1))
+    fi
+done
+# A stale .part file in the cache must be flagged as a warning.
+if [ -d "$HOME/.cache/meow" ]; then
+    touch "$HOME/.cache/meow/stale-$$.pkg.tar.zst.part"
+    sec2=$($MEOW --db-path "$TEST_DB" doctor --security 2>&1)
+    if echo "$sec2" | grep -q "stale .part"; then
+        echo "  PASS: stale partial download detected"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: stale partial download not detected"
+        fail=$((fail + 1))
+    fi
+    rm -f "$HOME/.cache/meow/stale-$$.pkg.tar.zst.part"
+fi
+
+echo ""
 echo "Results: $pass passed, $fail failed"
 git checkout -- repo 2>/dev/null || true
 git clean -fdq repo 2>/dev/null || true

@@ -21,6 +21,9 @@
   (SIGTERM → SIGKILL). New error codes `HookFailed`, `HookTimeout`,
   `HookDenied`. A failed hook rolls back the install transaction.
 - `[hooks]` config: `timeout`, `network` (advisory), `inheritEnvironment`
+- `meow doctor --security` focused security report (trusted keys, trust
+  chain signature→key→identity→expiry, cache partials, lockfile integrity,
+  hook policy). Read-only; never mutates state.
 - Parallel package downloads: the dependency closure is resolved from
   repository metadata (no downloads), then all artifacts are fetched
   concurrently via a bounded worker pool (`meow/download/queue.hpp`);

@@ -27,6 +27,7 @@ A transactional Linux package manager with signed repositories, dependency resol
 - Sync (check for upstream updates)
 - Update (bulk upgrade)
 - Doctor (system diagnostics: config, db, trust, cache, integrity, disk)
+- `doctor --security` (keys, trust chain, cache, lockfile, hook policy)
 
 ## Architecture
 
