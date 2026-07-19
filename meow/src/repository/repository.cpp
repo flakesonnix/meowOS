@@ -2,96 +2,186 @@
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
 #include <meow/crypto/signature.hpp>
+#include <meow/download/downloader.hpp>
 #include <toml++/toml.hpp>
 #include <algorithm>
+#include <cstdlib>
+#include <set>
 
 namespace meow::repository {
-    Repository loadRepository(const std::filesystem::path& root) {
-        if (!std::filesystem::is_directory(root)) {
-            throw error::MeowError(error::ErrorCode::RepositoryNotFound, "repository not found: " + root.string());
-        }
-
-        Repository repo;
-        repo.root = root;
-
-        auto sigPath = root / "repository.toml.sig";
-        auto keyPath = root / "public.pem";
-        auto repoMetaPath = root / "repository.toml";
-        if (std::filesystem::exists(sigPath) && std::filesystem::exists(keyPath)) {
-            if (crypto::verifyFile(repoMetaPath, sigPath, keyPath)) {
-                log::log(log::LogLevel::Info, "repository signature verified");
-            } else {
-                throw error::MeowError(
-                    error::ErrorCode::InvalidSignature,
-                    "repository signature verification failed"
-                );
+    namespace {
+        std::filesystem::path repoCacheDir(const std::string& url) {
+            const char* home = std::getenv("HOME");
+            if (!home) throw error::MeowError(error::ErrorCode::Internal, "HOME not set");
+            std::string safe;
+            for (char c : url) {
+                if (isalnum(c) || c == '/' || c == '.') safe += c;
+                else safe += '_';
             }
-        } else {
-            log::log(log::LogLevel::Warning, "repository not signed, skipping verification");
+            auto dir = std::filesystem::path(home) / ".cache" / "meow" / "repos" / safe;
+            std::filesystem::create_directories(dir);
+            return dir;
         }
 
-        auto byNameDir = root / "by-name";
-        if (!std::filesystem::is_directory(byNameDir)) {
-            throw error::MeowError(
-                error::ErrorCode::RepositoryNotFound,
-                "by-name directory not found in repository: " + root.string()
-            );
+        std::string fetchUrl(const std::string& base, const std::string& path) {
+            if (base.back() == '/') return base + path;
+            return base + "/" + path;
         }
 
-        for (const auto& shardDir : std::filesystem::directory_iterator(byNameDir)) {
-            if (!shardDir.is_directory()) continue;
+        bool isHttpUrl(const std::string& url) {
+            return url.starts_with("http://") || url.starts_with("https://");
+        }
 
-            for (const auto& pkgDir : std::filesystem::directory_iterator(shardDir.path())) {
-                if (!pkgDir.is_directory()) continue;
+        bool isFilePath(const std::string& url) {
+            if (url.starts_with("file://")) return true;
+            if (!isHttpUrl(url) && url.find("://") == std::string::npos) return true;
+            return false;
+        }
 
-                RepositoryPackage pkg;
-                pkg.name = types::PackageName{pkgDir.path().filename().string()};
+        std::filesystem::path resolveLocalPath(const std::string& url) {
+            if (url.starts_with("file://")) {
+                return std::filesystem::path(url.substr(7));
+            }
+            return std::filesystem::absolute(std::filesystem::path(url));
+        }
 
-                auto pkgMetaPath = pkgDir.path() / "package.toml";
-                if (std::filesystem::exists(pkgMetaPath)) {
-                    try {
-                        auto pkgTbl = toml::parse_file(pkgMetaPath.string());
-                        if (auto desc = pkgTbl["description"].value<std::string>()) {
-                            pkg.description = types::Description{*desc};
-                        }
-                    } catch (...) {
-                        log::log(log::LogLevel::Warning,
-                            "failed to parse " + pkgMetaPath.string());
-                    }
+        void verifyRepoSig(const std::filesystem::path& repoMetaPath,
+                           const std::filesystem::path& cacheDir) {
+            auto sigPath = cacheDir / "repository.toml.sig";
+            auto keyPath = cacheDir / "public.pem";
+
+            if (!std::filesystem::exists(sigPath) && std::filesystem::exists(repoMetaPath.parent_path() / "repository.toml.sig")) {
+                sigPath = repoMetaPath.parent_path() / "repository.toml.sig";
+                keyPath = repoMetaPath.parent_path() / "public.pem";
+            }
+
+            if (std::filesystem::exists(sigPath) && std::filesystem::exists(keyPath)) {
+                if (crypto::verifyFile(repoMetaPath, sigPath, keyPath)) {
+                    log::log(log::LogLevel::Info, "repository signature verified");
+                } else {
+                    throw error::MeowError(
+                        error::ErrorCode::InvalidSignature,
+                        "repository signature verification failed"
+                    );
                 }
+            } else {
+                log::log(log::LogLevel::Warning, "repository not signed, skipping verification");
+            }
+        }
 
-                auto versionsDir = pkgDir.path() / "versions";
-                if (std::filesystem::is_directory(versionsDir)) {
-                    for (const auto& entry : std::filesystem::directory_iterator(versionsDir)) {
-                        if (!entry.is_regular_file()) continue;
-                        if (entry.path().extension() != ".toml") continue;
+        std::vector<RepositoryPackage> scanByNameDir(const std::filesystem::path& byNameDir) {
+            std::vector<RepositoryPackage> packages;
 
+            for (const auto& shardDir : std::filesystem::directory_iterator(byNameDir)) {
+                if (!shardDir.is_directory()) continue;
+
+                for (const auto& pkgDir : std::filesystem::directory_iterator(shardDir.path())) {
+                    if (!pkgDir.is_directory()) continue;
+
+                    RepositoryPackage pkg;
+                    pkg.name = types::PackageName{pkgDir.path().filename().string()};
+
+                    auto pkgMetaPath = pkgDir.path() / "package.toml";
+                    if (std::filesystem::exists(pkgMetaPath)) {
                         try {
-                            auto tbl = toml::parse_file(entry.path().string());
-                            RepositoryVersion rv;
-                            rv.version = types::PackageVersion{entry.path().stem().string()};
-
-                            if (auto* art = tbl["artifact"].as_table()) {
-                                rv.artifact.filename = (*art)["filename"].value_or("");
-                                rv.artifact.url = (*art)["url"].value_or("");
-                                rv.artifact.sha256 = (*art)["sha256"].value_or("");
+                            auto pkgTbl = toml::parse_file(pkgMetaPath.string());
+                            if (auto desc = pkgTbl["description"].value<std::string>()) {
+                                pkg.description = types::Description{*desc};
                             }
-
-                            pkg.versions.push_back(std::move(rv));
                         } catch (...) {
                             log::log(log::LogLevel::Warning,
-                                "failed to parse " + entry.path().string());
+                                "failed to parse " + pkgMetaPath.string());
                         }
                     }
+
+                    auto versionsDir = pkgDir.path() / "versions";
+                    if (std::filesystem::is_directory(versionsDir)) {
+                        for (const auto& entry : std::filesystem::directory_iterator(versionsDir)) {
+                            if (!entry.is_regular_file()) continue;
+                            if (entry.path().extension() != ".toml") continue;
+
+                            try {
+                                auto tbl = toml::parse_file(entry.path().string());
+                                RepositoryVersion rv;
+                                rv.version = types::PackageVersion{entry.path().stem().string()};
+
+                                if (auto* art = tbl["artifact"].as_table()) {
+                                    rv.artifact.filename = (*art)["filename"].value_or("");
+                                    rv.artifact.url = (*art)["url"].value_or("");
+                                    rv.artifact.sha256 = (*art)["sha256"].value_or("");
+                                }
+
+                                pkg.versions.push_back(std::move(rv));
+                            } catch (...) {
+                                log::log(log::LogLevel::Warning,
+                                    "failed to parse " + entry.path().string());
+                            }
+                        }
+                    }
+
+                    std::sort(pkg.versions.begin(), pkg.versions.end(),
+                        [](const RepositoryVersion& a, const RepositoryVersion& b) {
+                            return a.version.value < b.version.value;
+                        });
+
+                    packages.push_back(std::move(pkg));
                 }
-
-                std::sort(pkg.versions.begin(), pkg.versions.end(),
-                    [](const RepositoryVersion& a, const RepositoryVersion& b) {
-                        return a.version.value < b.version.value;
-                    });
-
-                repo.packages.push_back(std::move(pkg));
             }
+
+            return packages;
+        }
+    }
+
+    Repository openRepository(const std::string& url) {
+        Repository repo;
+        repo.cache = repoCacheDir(url);
+
+        if (isFilePath(url)) {
+            auto root = resolveLocalPath(url);
+
+            if (!std::filesystem::is_directory(root)) {
+                throw error::MeowError(error::ErrorCode::RepositoryNotFound, "repository not found: " + root.string());
+            }
+
+            auto repoMetaPath = root / "repository.toml";
+            if (std::filesystem::exists(repoMetaPath)) {
+                try {
+                    auto tbl = toml::parse_file(repoMetaPath.string());
+                    repo.name = tbl["name"].value_or("unnamed");
+
+                    if (auto* mirrorsArr = tbl["mirror"].as_array()) {
+                        for (const auto& elem : *mirrorsArr) {
+                            if (auto* mtbl = elem.as_table()) {
+                                Mirror m;
+                                m.url = (*mtbl)["url"].value_or("");
+                                m.priority = (*mtbl)["priority"].value_or(10);
+                                repo.mirrors.push_back(std::move(m));
+                            }
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    log::log(log::LogLevel::Warning, std::string("failed to parse repository.toml: ") + e.what());
+                }
+            }
+
+            if (repo.mirrors.empty()) {
+                Mirror m;
+                m.url = "file://" + root.string();
+                m.priority = 10;
+                repo.mirrors.push_back(std::move(m));
+            }
+
+            verifyRepoSig(repoMetaPath, root);
+
+            auto byNameDir = root / "by-name";
+            if (std::filesystem::is_directory(byNameDir)) {
+                repo.packages = scanByNameDir(byNameDir);
+                log::log(log::LogLevel::Debug, std::to_string(repo.packages.size()) + " packages loaded");
+            } else {
+                log::log(log::LogLevel::Warning, "by-name directory not found, creating empty repository");
+            }
+        } else {
+            throw error::MeowError(error::ErrorCode::RepositoryNotFound, "remote repositories not yet implemented: " + url);
         }
 
         return repo;

@@ -1,2 +1,6 @@
 schema = 1
 name = "local"
+
+[[mirror]]
+url = "./repo"
+priority = 10

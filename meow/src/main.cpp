@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
 
     try {
         auto cfg = meow::config::defaultConfig();
-        auto repo = meow::repository::loadRepository(cfg.repositories[0]);
+        auto repo = meow::repository::openRepository(cfg.repositories[0]);
         auto db = openDb();
 
         meow::log::log(meow::log::LogLevel::Debug, "config loaded, database opened");

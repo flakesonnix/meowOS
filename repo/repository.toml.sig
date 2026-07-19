@@ -1,3 +1,3 @@
 algorithm = "ed25519"
 keyId = "local-dev"
-signature = "Gy5V7/DdXLIe/2OVjvBISr1iyCjnIxraZcanKraRDRh1b3U0d6Yk9uPKcxAOLt/4N64flBjdZRJpUtRqSXBPBQ=="
+signature = "BLuCQ50olovx44Y+QFiBmj0rcQTyuLE7uZL6oWMNXE1zFUgM/te1iJ4T6fsMOfIfzWQEcw4Z+bXG53N4aTxKCg=="
