@@ -3,7 +3,7 @@
 # Run from repo root: nix develop --command ./test/integration.sh
 set -euo pipefail
 
-MEOW="$(dirname "$0")/../build/meow"
+MEOW="$(cd "$(dirname "$0")" && pwd)/../build/meow"
 TEST_DB="/tmp/meow-test-$$.db"
 export MEOW TEST_DB
 
