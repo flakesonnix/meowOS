@@ -51,6 +51,20 @@
   hide a healthy fallback (and stays visible in the health table), and distinct
   `repository_id`s keep separate caches. `docs/repository-selection.md` gained a
   **Selection algorithm** section stating the procedure as a fixed contract.
+- **Parallel metadata refresh**: `RepositoryManager` now refreshes every
+  configured source concurrently via `refreshRepositories()`
+  (`meow/src/repository/refresh.cpp`), a bounded worker pool reusing the
+  download-worker philosophy (default `min(hardware_concurrency, 8)`, overridable
+  via `downloadWorkers`). The pool is **not** fail-fast: a broken source is
+  recorded and the others keep going. Results return in **input order**, so the
+  merged view (priority-then-version) is deterministic regardless of which source
+  finished first -- refresh timing can never influence package selection. Each
+  source is still verified independently through the failover policy, and cache
+  writes stay atomic (temp + rename) keyed by `repository_id` with no new locking
+  dependency. Integration test section **35. Parallel repository refresh** covers
+  parallel-vs-serial speedup, broken-repo isolation, failover-under-parallel,
+  per-`repository_id` cache isolation, and deterministic selection across repeated
+  refreshes.
 - **Mirror groups** (data model): a configured source is now one *repository
   identity* served from one or more *mirrors*. Config accepts
   `mirrors = ["url", ...]`; the legacy single `url = "..."` form is migrated

@@ -284,11 +284,15 @@ hanging the whole operation.
 
 ## Parallel metadata refresh
 
-Only after health state, priorities, and failover are in place.
+Refresh order is nondeterministic.
+Selection order is deterministic.
 
-`meow sync` refreshes every configured group's metadata. Because each group's
-load is independent and transport-bound, refresh runs in a pool that reuses the
-existing download-worker logic:
+This step is now implemented in `refreshRepositories()`
+(`meow/src/repository/refresh.cpp`), which `RepositoryManager` uses to load all
+configured sources. Every source is refreshed concurrently in a bounded worker
+pool that reuses the existing download-worker philosophy (default
+`min(hardware_concurrency, 8)`, overridable via `downloadWorkers`). The pool is
+**not** fail-fast: a broken source is recorded and the others keep going.
 
 ```
 meow sync
@@ -307,10 +311,16 @@ Rules:
 - Within a group that has multiple mirrors, metadata refresh itself uses the
   failover order above (try mirror A, then B, ...), stopping at the first that
   returns valid, verifiable metadata.
+- Results are returned in **input order**, so the merged view is rebuilt from a
+  stable source ordering regardless of which source finished first. Selection
+  (priority-then-version) therefore never depends on refresh completion timing.
 - The merged view is rebuilt once after all refreshes settle, using the
   priority-then-version rule. A refresh that produced `InvalidSignature` /
   `Expired` / `InvalidMetadata` is excluded from the merged view but recorded in
   the health table.
+- Cache writes use atomic temp-file + rename keyed by `repository_id`, so two
+  sources with different identities never collide, and no heavy locking
+  dependency is introduced.
 - Parallel refresh never weakens trust: every refreshed metadata set still goes
   through signature verification against the trusted keys before it is admitted.
 

@@ -3,6 +3,8 @@
 #include <meow/config/config.hpp>
 #include <meow/error/error.hpp>
 #include <meow/repository/backend.hpp>
+#include <meow/repository/failover.hpp>
+#include <meow/repository/refresh.hpp>
 #include <meow/repository/repository.hpp>
 #include <meow/repository/status.hpp>
 
@@ -31,6 +33,7 @@ public:
         Repository repository;
         RepositoryStatus status = RepositoryStatus::Available;
         std::optional<error::MeowError> error;
+        std::vector<MirrorAttempt> attempts;
     };
 
     explicit RepositoryManager(const config::Config& cfg);

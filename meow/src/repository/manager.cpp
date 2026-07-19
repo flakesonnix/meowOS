@@ -22,30 +22,23 @@ std::optional<types::PackageVersion> latestOf(const RepositoryPackage& pkg) {
 }  // namespace
 
 RepositoryManager::RepositoryManager(const config::Config& cfg) : cfg_(cfg) {
-    for (const auto& rc : cfg.repositories) {
+    // Refresh every configured source concurrently. Each source is loaded and
+    // verified independently through the existing failover policy; a broken
+    // source never blocks the others. Results come back in input order so the
+    // merged view (priority/version selection) is deterministic regardless of
+    // which source finished first.
+    auto results = refreshRepositories(cfg.repositories, cfg.downloadWorkers);
+    for (auto& r : results) {
         RepositoryState state;
-        state.config = rc;
-
-        // Mirrors are alternate transport locations for the *same* repository
-        // identity. The failover policy decides when to move to the next mirror:
-        // transport failures (timeout, DNS/connection refused, HTTP 5xx) are
-        // retried; trust failures (bad signature, expired, invalid metadata/id)
-        // abort the chain immediately so a bad mirror is never papered over by
-        // another copy of the same untrusted data. The backend layer stays the
-        // single owner of transport.
-        auto result = loadRepositoryWithFailover(
-            rc.urls(), [](const std::string& url) {
-                return createBackend(url)->loadRepository();
-            });
-
-        state.attempts = std::move(result.attempts);
-        state.status = result.status;
-        if (result.success) {
-            state.repository = std::move(result.repository);
+        state.config = r.config;
+        state.status = r.status;
+        state.attempts = std::move(r.attempts);
+        if (r.repository) {
+            state.repository = std::move(*r.repository);
         } else if (!state.attempts.empty()) {
             const auto& last = state.attempts.back();
-            state.error =
-                error::MeowError(last.error, "all mirrors failed for '" + rc.id + "'");
+            state.error = error::MeowError(
+                last.error, "all mirrors failed for '" + r.config.id + "'");
             if (lastError_.empty() && state.error)
                 lastError_ = error::formatError(*state.error);
         }

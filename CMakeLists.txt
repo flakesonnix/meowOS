@@ -15,6 +15,7 @@ set(MEOW_SOURCES
     meow/src/repository/manager.cpp
     meow/src/repository/status.cpp
     meow/src/repository/failover.cpp
+    meow/src/repository/refresh.cpp
     meow/src/repository/version.cpp
     meow/src/repository/resolver.cpp
     meow/src/install/installer.cpp
