@@ -12,6 +12,7 @@ struct Config {
     std::filesystem::path cache;
     std::filesystem::path database;
     std::vector<std::string> repositories;
+    int downloadWorkers = 0; // 0 = default (min(hardware_concurrency, 8))
 };
 
 Config defaultConfig();

@@ -116,13 +116,7 @@ namespace meow::download {
             auto part = destination;
             part += ".part";
 
-            std::ofstream out(part, std::ios::binary | std::ios::trunc);
-            if (!out) {
-                throw error::MeowError(error::ErrorCode::DownloadFailed,
-                    "cannot open download target: " + part.string());
-            }
-
-            WriteCtx wctx{&out, 0, options.maxBytes, false};
+            WriteCtx wctx{nullptr, 0, options.maxBytes, false};
             HeaderCtx hctx;
 
             int attempts = options.retries < 0 ? 0 : options.retries;
@@ -130,8 +124,15 @@ namespace meow::download {
             long lastHttp = 0;
 
             for (int attempt = 0; attempt <= attempts; ++attempt) {
-                out.clear();
-                out.seekp(0);
+                // Fresh truncating handle each attempt so a failed/partial
+                // response (e.g. a 5xx error body) never leaks into the next.
+                std::ofstream out(part, std::ios::binary | std::ios::trunc);
+                if (!out) {
+                    abortDownload(part);
+                    throw error::MeowError(error::ErrorCode::DownloadFailed,
+                        "cannot open download target: " + part.string());
+                }
+                wctx.out = &out;
                 wctx.bytes = 0;
                 wctx.exceeded = false;
                 hctx = HeaderCtx{};

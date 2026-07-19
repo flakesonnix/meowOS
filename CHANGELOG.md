@@ -16,6 +16,13 @@
 
 ### Added
 
+- Parallel package downloads: the dependency closure is resolved from
+  repository metadata (no downloads), then all artifacts are fetched
+  concurrently via a bounded worker pool (`meow/download/queue.hpp`);
+  installation remains strictly serial
+- `download_workers` config option (0 = default `min(hardware_concurrency, 8)`)
+- Dependency closure resolution from repository metadata only
+  (`resolveDependencyNames`), with cycle detection
 - Download robustness: atomic writes (`.part` + rename), HTTP resume,
   retries, timeouts, and ETag `If-None-Match` passthrough
 - `docs/downloads.md` documenting download behavior

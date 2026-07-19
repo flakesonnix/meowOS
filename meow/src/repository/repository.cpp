@@ -8,6 +8,8 @@
 #include <toml++/toml.hpp>
 #include <algorithm>
 #include <cstdlib>
+#include <cctype>
+#include <functional>
 #include <set>
 #include <chrono>
 #include <iomanip>
@@ -218,6 +220,18 @@ namespace meow::repository {
                                     }
                                 }
                             }
+                            auto readNames = [&](const toml::array* arr) {
+                                if (!arr) return;
+                                for (auto&& node : *arr) {
+                                    if (auto val = node.value<std::string>()) {
+                                        pkg.depends.push_back(types::PackageName{*val});
+                                    }
+                                }
+                            };
+                            readNames(pkgTbl["depends"].as_array());
+                            if (auto* meta = pkgTbl["metadata"].as_table()) {
+                                readNames((*meta)["depends"].as_array());
+                            }
                         } catch (...) {
                             log::log(log::LogLevel::Warning,
                                 "failed to parse " + pkgMetaPath.string());
@@ -359,5 +373,45 @@ namespace meow::repository {
         if (std::filesystem::exists(root)) {
             std::filesystem::remove_all(root);
         }
+    }
+
+    std::vector<types::PackageName> resolveDependencyNames(
+        const Repository& repo,
+        const types::PackageName& top
+    ) {
+        // Split "name>=1.0.0" -> "name"
+        auto depName = [](std::string spec) -> types::PackageName {
+            size_t pos = spec.find_first_of("><=~^");
+            if (pos != std::string::npos) spec = spec.substr(0, pos);
+            while (!spec.empty() && std::isspace((unsigned char)spec.back())) spec.pop_back();
+            return types::PackageName{spec};
+        };
+
+        std::vector<types::PackageName> order;
+        std::set<std::string> visited;
+        std::set<std::string> inStack;
+
+        std::function<void(types::PackageName)> visit = [&](types::PackageName name) {
+            if (visited.count(name.value)) return;
+            if (inStack.count(name.value)) {
+                throw error::MeowError(error::ErrorCode::DependencyCycleDetected,
+                    "cycle detected: " + name.value);
+            }
+            inStack.insert(name.value);
+
+            const auto* pkg = findPackage(repo, name);
+            if (pkg) {
+                for (const auto& dep : pkg->depends) {
+                    visit(depName(dep.value));
+                }
+            }
+
+            inStack.erase(name.value);
+            visited.insert(name.value);
+            order.push_back(name);
+        };
+
+        visit(depName(top.value));
+        return order;
     }
 }

@@ -9,6 +9,7 @@
 #include <meow/repository/repository.hpp>
 #include <meow/repository/version.hpp>
 #include <meow/repository/resolver.hpp>
+#include <meow/download/queue.hpp>
 #include <meow/install/installer.hpp>
 #include <meow/dependency/resolver.hpp>
 #include <meow/remove/remove.hpp>
@@ -273,11 +274,38 @@ int main(int argc, char** argv) {
                     toInstall.push_back(std::move(pkg));
                 }
             } else {
-                meta = meow::repository::resolvePackage(repo, meow::types::PackageName{pkgName}).metadata;
-                auto tree = meow::dependency::resolveDependencies(repo, meta, db);
+                // Resolve the dependency closure from repository metadata
+                // only (no downloads yet), then fetch all artifacts in
+                // parallel and finally load/install them serially.
+                meow::log::log(meow::log::LogLevel::Info, "resolving dependency names");
+                auto names = meow::repository::resolveDependencyNames(
+                    repo, meow::types::PackageName{pkgName});
 
-                meow::log::log(meow::log::LogLevel::Info, "resolving dependencies");
-                for (const auto& name : tree.packages) {
+                std::vector<meow::download::DownloadTask> tasks;
+                for (const auto& name : names) {
+                    const auto* rp = meow::repository::findPackage(repo, name);
+                    if (!rp) {
+                        std::cerr << "package not found: " << name.value << "\n";
+                        return 1;
+                    }
+                    if (rp->versions.empty()) {
+                        std::cerr << "no version for: " << name.value << "\n";
+                        return 1;
+                    }
+                    const auto& rv = rp->versions.back();
+                    meow::download::DownloadTask task;
+                    task.artifact = rv.artifact;
+                    tasks.push_back(std::move(task));
+                }
+
+                meow::download::DownloadQueue queue;
+                queue.workers = cfg.downloadWorkers;
+                meow::log::log(meow::log::LogLevel::Info,
+                    "downloading " + std::to_string(tasks.size()) + " artifacts in parallel");
+                meow::download::downloadAll(queue, tasks);
+
+                meow::log::log(meow::log::LogLevel::Info, "resolving packages");
+                for (const auto& name : names) {
                     auto pkg = meow::repository::resolvePackage(repo, name);
                     std::cout << "  " << name.value << " " << pkg.metadata.version.value << "\n";
                     toInstall.push_back(std::move(pkg));

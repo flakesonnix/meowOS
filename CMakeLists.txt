@@ -14,6 +14,7 @@ set(MEOW_SOURCES
     meow/src/repository/resolver.cpp
     meow/src/install/installer.cpp
     meow/src/download/downloader.cpp
+    meow/src/download/queue.cpp
     meow/src/error/printer.cpp
     meow/src/database/database.cpp
     meow/src/dependency/resolver.cpp

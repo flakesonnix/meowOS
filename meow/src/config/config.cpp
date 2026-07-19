@@ -8,6 +8,7 @@ Config defaultConfig() {
     cfg.root = "/";
     cfg.cache = std::filesystem::path(std::getenv("HOME")) / ".cache" / "meow";
     cfg.repositories.push_back("./repo");
+    cfg.downloadWorkers = 0;
     return cfg;
 }
 

@@ -13,6 +13,7 @@ A transactional Linux package manager with signed repositories, dependency resol
 - `.tar.zst` package archives with metadata + scripts
 - Pre/post-install scripts
 - Download abstraction with timeout/TLS options
+- Parallel package downloads (bounded worker pool; serial install)
 - Package download + SHA256 verification
 - Dependency resolution with cycle detection
 - Atomic transactions with rollback

@@ -46,6 +46,27 @@ declared in repository version metadata (`artifact.url`). Transfers use
 | `DownloadInterrupted` | Size cap exceeded (`maxBytes`)                 |
 | `InvalidDownload`     | Unsupported scheme or missing file:// source   |
 
+## Parallel downloads
+
+When you run `meow install <pkg>`, meow first resolves the **entire
+dependency closure** from repository metadata alone (no network access).
+It then fetches every required artifact **concurrently** using a bounded
+worker pool (`meow/download/queue.hpp`):
+
+- Worker count = `download_workers` config (default `0` →
+  `min(hardware_concurrency, 8)`).
+- Downloads are independent of verification and installation; only the
+  artifact bytes are fetched in parallel.
+- **Installation remains strictly serial** — packages are still verified
+  and written to the filesystem one at a time, in dependency order.
+- On any download failure the batch is cancelled: remaining tasks are not
+  started, in-flight transfers are joined, and leftover `.part` files are
+  removed. The first error is reported (`DownloadFailed`,
+  `DownloadHttpError`, `DownloadTimeout`, ...).
+
+This separation keeps the transaction/install path single-threaded and
+deterministic while still parallelizing the slow network step.
+
 ## Checksums
 
 After download, the archive SHA256 is verified against the value in
