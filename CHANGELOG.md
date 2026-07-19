@@ -18,6 +18,16 @@
   server base URL, keeping repositories portable.
 - `--repository <url>` global flag on `meow` to target a specific repository
   (filesystem path, `file://`, or `http(s)://`) without editing config.
+- Multiple repositories: config now supports `[[repositories]]` entries with
+  `id`, `url`, and `priority`. A new `RepositoryManager` loads all configured
+  sources (filesystem and/or HTTP) and presents a merged package space to the
+  resolver/installer. Resolution applies **repository priority, then version**:
+  for a package present in several repos, the highest-priority repo wins; ties
+  break on highest version. Loading is tolerant — one unreachable/expired repo
+  is skipped and reported, not fatal. A `--config <path>` flag selects a TOML
+  config file; the legacy single `repository = "url"` form is still accepted.
+  The cache continues to be keyed by the cryptographic `repository_id`, not the
+  config name.
 
 ## [0.4.0] - 2026-07-19
 

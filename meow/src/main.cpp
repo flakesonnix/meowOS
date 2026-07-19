@@ -9,6 +9,7 @@
 #include <meow/repository/repository.hpp>
 #include <meow/repository/version.hpp>
 #include <meow/repository/resolver.hpp>
+#include <meow/repository/manager.hpp>
 #include <meow/download/queue.hpp>
 #include <meow/install/installer.hpp>
 #include <meow/dependency/resolver.hpp>
@@ -143,6 +144,7 @@ int main(int argc, char** argv) {
     // parse global options
     std::string dbPath;
     std::string repositoryOverride;
+    std::string configPath;
     int argi = 1;
     while (argi < argc) {
         std::string_view a = argv[argi];
@@ -151,6 +153,9 @@ int main(int argc, char** argv) {
             ++argi;
         } else if (a == "--repository" && argi + 1 < argc) {
             repositoryOverride = argv[++argi];
+            ++argi;
+        } else if (a == "--config" && argi + 1 < argc) {
+            configPath = argv[++argi];
             ++argi;
         } else {
             break;
@@ -215,11 +220,28 @@ int main(int argc, char** argv) {
 
     try {
         auto cfg = meow::config::defaultConfig();
+        if (!configPath.empty()) {
+            cfg = meow::config::loadConfig(configPath);
+        }
         if (!repositoryOverride.empty()) {
             cfg.repositories.clear();
-            cfg.repositories.push_back(repositoryOverride);
+            cfg.repositories.push_back(
+                meow::config::RepositoryConfig{"default", repositoryOverride, 0});
         }
+
+        meow::repository::RepositoryManager manager(cfg);
+        meow::repository::Repository repo = manager.mergedRepository();
         auto db = meow::database::openDatabase(dbPath.empty() ? "" : dbPath);
+
+        // If no repository could be loaded, surface the failure for any
+        // command that depends on repository metadata. This keeps a single
+        // broken source a loud error while still tolerating failures when at
+        // least one healthy repository is available.
+        if (manager.repositories().empty() && cmd != "keys" && cmd != "clean") {
+            std::cerr << "error: no repository available: "
+                      << manager.lastError() << "\n";
+            return 1;
+        }
 
         std::string_view cmd = cmdArgv[0];
 
@@ -235,11 +257,9 @@ int main(int argc, char** argv) {
             }
             const meow::repository::Repository* repoPtr = nullptr;
             meow::repository::Repository repoValue;
-            try {
-                repoValue = meow::repository::openRepository(cfg.repositories[0]);
+            if (!manager.repositories().empty()) {
+                repoValue = manager.repositories().front().repository;
                 repoPtr = &repoValue;
-            } catch (const std::exception&) {
-                repoPtr = nullptr;
             }
             if (security) {
                 meow::hooks::HookPolicy policy;
@@ -258,8 +278,6 @@ int main(int argc, char** argv) {
             }
             return diag.healthy() ? 0 : 1;
         }
-
-        auto repo = meow::repository::openRepository(cfg.repositories[0]);
 
         meow::log::log(meow::log::LogLevel::Debug, "config loaded, database opened");
 

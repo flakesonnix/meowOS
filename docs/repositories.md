@@ -90,3 +90,45 @@ used as-is.
 A repository served over HTTP is enumerated via an optional `packages.index`
 file (newline-separated `name version` pairs) at the repository root, since the
 static server performs no directory listing.
+
+## Multiple repositories (config)
+
+`meow` reads a TOML config (via `--config <path>`, or `defaultConfig` for the
+legacy `./repo` default). Multiple sources are declared with `[[repositories]]`:
+
+```toml
+[[repositories]]
+id = "stable"
+url = "https://repo.meowos.org"
+priority = 100
+
+[[repositories]]
+id = "testing"
+url = "file:///srv/meow-testing"
+priority = 50
+```
+
+| Field  | Meaning                                                        |
+|--------|----------------------------------------------------------------|
+| `id`   | User-friendly config name. May be renamed freely; **not** the  |
+|        | cryptographic identity (`repository_id` from `repository.toml`).|
+| `url`  | `file://`, local path, or `http(s)://`. The scheme selects the |
+|        | backend (`FilesystemRepositoryBackend` / `HttpRepositoryBackend`).|
+| `priority` | Higher priority repos win when a package exists in several. |
+
+A `RepositoryManager` opens every configured source (tolerating failures so one
+broken repo never takes down the others) and presents the resolver/installer
+with a single merged `Repository`. The merge rule is **priority, then version**:
+for each package name, the version set comes from the highest-priority repo
+that contains it; ties in priority are broken by the highest latest version.
+The resolver and installer never learn how many repositories exist or which
+transport backs them.
+
+When **no** repository loads successfully, `meow` fails loudly with the
+underlying error (e.g. a missing trusted key or invalid `repository_id`), so a
+single broken source is still a clear failure.
+
+The cache remains keyed by the cryptographic `repository_id` (under
+`~/.cache/meow/repos/<id>` for filesystem and `~/.cache/meow/repos-http/<id>`
+for HTTP), so renaming a config entry or changing its URL does not disturb
+local state.

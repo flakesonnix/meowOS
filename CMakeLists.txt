@@ -12,6 +12,7 @@ set(MEOW_SOURCES
     meow/src/repository/repository.cpp
     meow/src/repository/backend.cpp
     meow/src/repository/http_backend.cpp
+    meow/src/repository/manager.cpp
     meow/src/repository/version.cpp
     meow/src/repository/resolver.cpp
     meow/src/install/installer.cpp
