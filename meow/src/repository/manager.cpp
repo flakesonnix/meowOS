@@ -23,27 +23,40 @@ std::optional<types::PackageVersion> latestOf(const RepositoryPackage& pkg) {
 
 RepositoryManager::RepositoryManager(const config::Config& cfg) : cfg_(cfg) {
     for (const auto& rc : cfg.repositories) {
+        RepositoryState state;
+        state.config = rc;
         try {
             auto backend = createBackend(rc.url);
-            Loaded l;
-            l.config = rc;
-            l.repository = backend->loadRepository();
-            loaded_.push_back(std::move(l));
-        } catch (const std::exception& e) {
-            ++failed_;
-            std::string msg;
-            if (auto* me = dynamic_cast<const error::MeowError*>(&e))
-                msg = error::formatError(*me);
-            else
-                msg = e.what();
-            if (lastError_.empty()) lastError_ = msg;
-            failures_.push_back(Failed{rc.id, rc.url, msg});
+            state.repository = backend->loadRepository();
+            state.status = RepositoryStatus::Available;
+        } catch (const error::MeowError& e) {
+            state.status = classifyRepositoryError(e);
+            state.error = e;
+            if (lastError_.empty()) lastError_ = error::formatError(e);
             log::log(log::LogLevel::Warning,
                      "repository '" + rc.id + "' (" + rc.url +
-                         ") unavailable: " + e.what());
+                          ") unavailable: " + e.what());
+        } catch (const std::exception& e) {
+            state.status = RepositoryStatus::Unavailable;
+            if (lastError_.empty()) lastError_ = e.what();
+            log::log(log::LogLevel::Warning,
+                     "repository '" + rc.id + "' (" + rc.url +
+                          ") unavailable: " + e.what());
         }
+        if (state.status != RepositoryStatus::Available) ++failed_;
+        loaded_.push_back(std::move(state));
     }
     merged_ = buildMerged();
+}
+
+std::vector<RepositoryManager::Failed> RepositoryManager::failures() const {
+    std::vector<Failed> out;
+    for (const auto& s : loaded_) {
+        if (s.status == RepositoryStatus::Available) continue;
+        std::string msg = s.error ? error::formatError(*s.error) : "load failed";
+        out.push_back(Failed{s.config.id, s.config.url, msg});
+    }
+    return out;
 }
 
 Repository RepositoryManager::buildMerged() const {

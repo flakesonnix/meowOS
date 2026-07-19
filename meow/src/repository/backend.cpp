@@ -95,7 +95,14 @@ Repository FilesystemRepositoryBackend::loadRepository() {
 
     auto repoMetaPath = root / "repository.toml";
     if (fs::exists(repoMetaPath)) {
-        auto tbl = toml::parse_file(repoMetaPath.string());
+        toml::table tbl;
+        try {
+            tbl = toml::parse_file(repoMetaPath.string());
+        } catch (const std::exception& e) {
+            throw error::MeowError(error::ErrorCode::InvalidRepository,
+                                   "malformed repository.toml: " +
+                                       std::string(e.what()));
+        }
         auto fmtVer = tbl["format_version"].value_or(1);
         format::requireVersion("repository", fmtVer,
                                format::CurrentRepositoryFormat);
