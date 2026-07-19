@@ -7,7 +7,6 @@ set(CMAKE_CXX_STANDARD 20)
 add_executable(${PROJECT_NAME}
         meow/src/main.cpp
         meow/src/archive/archive.cpp
-        meow/src/cli/command_parser.cpp
         meow/src/package/parser.cpp
         meow/src/package/load.cpp
         meow/src/repository/repository.cpp
@@ -29,6 +28,7 @@ add_executable(${PROJECT_NAME}
         meow/src/update/updater.cpp
         meow/src/log/logger.cpp
         meow/src/config/config.cpp
+        meow/src/crypto/signature.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -38,6 +38,7 @@ target_include_directories(${PROJECT_NAME}
 
 find_package(SQLite3 REQUIRED)
 find_package(LibArchive REQUIRED)
+find_package(OpenSSL REQUIRED)
 find_package(tomlplusplus QUIET)
 if(NOT tomlplusplus_FOUND)
     include(FetchContent)
@@ -52,5 +53,6 @@ target_link_libraries(${PROJECT_NAME}
         PRIVATE
         SQLite::SQLite3
         LibArchive::LibArchive
+        OpenSSL::Crypto
         tomlplusplus::tomlplusplus
 )

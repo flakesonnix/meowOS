@@ -1,6 +1,7 @@
 #include <meow/repository/repository.hpp>
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
+#include <meow/crypto/signature.hpp>
 #include <toml++/toml.hpp>
 #include <algorithm>
 
@@ -16,9 +17,24 @@ namespace meow::repository {
         auto indexPath = root / "index.toml";
         if (std::filesystem::exists(indexPath)) {
             try {
+                auto sigPath = root / "index.toml.sig";
+                auto keyPath = root / "public.pem";
+                if (std::filesystem::exists(sigPath) && std::filesystem::exists(keyPath)) {
+                    if (crypto::verifyIndex(indexPath, sigPath, keyPath)) {
+                        log::log(log::LogLevel::Info, "index signature verified");
+                    } else {
+                        throw error::MeowError(
+                            error::ErrorCode::InvalidSignature,
+                            "index signature verification failed"
+                        );
+                    }
+                } else {
+                    log::log(log::LogLevel::Warning, "index not signed, skipping verification");
+                }
                 repo.index = loadIndex(indexPath);
                 log::log(log::LogLevel::Debug, "loaded repository index");
-            } catch (...) {
+            } catch (const error::MeowError& e) {
+                if (e.code == error::ErrorCode::InvalidSignature) throw;
                 log::log(log::LogLevel::Warning, "failed to load repository index, falling back to directory scan");
             }
         }

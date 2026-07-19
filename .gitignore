@@ -5,3 +5,4 @@ cmake-build-debug/
 *.swo
 *~
 .DS_Store
+meow.lock

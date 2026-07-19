@@ -1,5 +1,5 @@
 {
-  description = "C++ CMake Projekt mit SQLite, libarchive und toml++";
+  description = "meowOS - Linux package manager";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -25,11 +25,11 @@
             sqlite
             libarchive
             tomlplusplus # In nixpkgs heißt das Paket tomlplusplus
+            openssl      # Für Signatur-Verifikation
           ];
 
           shellHook = ''
-            echo "⚡ C++ Entwicklungsumgebung mit CMake geladen! ⚡"
-            echo "Verfügbare Bibliotheken: SQLite, libarchive, toml++"
+            echo "meowOS dev shell: SQLite + libarchive + toml++ + openssl"
           '';
         };
       });

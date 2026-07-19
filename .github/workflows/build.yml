@@ -12,6 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update -qq
-      - run: sudo apt-get install -y cmake libarchive-dev libsqlite3-dev
+      - run: sudo apt-get install -y cmake libarchive-dev libsqlite3-dev libssl-dev
       - run: cmake -B build
       - run: cmake --build build
