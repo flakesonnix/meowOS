@@ -171,6 +171,30 @@ cp /tmp/repo-toml-bak4 repo/repository.toml
 cp /tmp/repo-sig-bak4 repo/repository.toml.sig
 rm -f /tmp/repo-toml-bak4 /tmp/repo-sig-bak4
 
+echo "=== 14. Repository identity ==="
+# 14a. Valid repository_id is accepted
+check "accept repository_id" "app" $MEOW --db-path "$TEST_DB" list
+
+# 14b. Missing repository_id rejected (re-signed so signature passes)
+cp repo/repository.toml /tmp/repo-toml-bak5
+cp repo/repository.toml.sig /tmp/repo-sig-bak5
+sed -i '/^repository_id = /d' repo/repository.toml
+./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+check "reject missing repository_id" "InvalidRepository" $MEOW --db-path "$TEST_DB" list
+cp /tmp/repo-toml-bak5 repo/repository.toml
+cp /tmp/repo-sig-bak5 repo/repository.toml.sig
+rm -f /tmp/repo-toml-bak5 /tmp/repo-sig-bak5
+
+# 14c. Invalid characters in repository_id rejected (re-signed)
+cp repo/repository.toml /tmp/repo-toml-bak6
+cp repo/repository.toml.sig /tmp/repo-sig-bak6
+sed -i 's/^repository_id = .*/repository_id = "bad id!"/' repo/repository.toml
+./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+check "reject invalid repository_id" "InvalidRepository" $MEOW --db-path "$TEST_DB" list
+cp /tmp/repo-toml-bak6 repo/repository.toml
+cp /tmp/repo-sig-bak6 repo/repository.toml.sig
+rm -f /tmp/repo-toml-bak6 /tmp/repo-sig-bak6
+
 echo ""
 echo "Results: $pass passed, $fail failed"
 [ "$fail" -eq 0 ] || exit 1

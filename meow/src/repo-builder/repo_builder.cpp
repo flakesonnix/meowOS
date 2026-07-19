@@ -173,7 +173,8 @@ namespace meow::repo {
 
         std::ostringstream ss;
         ss << "format_version = 1\n";
-        ss << "name = \"" << name << "\"\n\n";
+        ss << "name = \"" << name << "\"\n";
+        ss << "repository_id = \"" << opts.repoId << "\"\n\n";
         ss << "generated = \"" << generatedStr << "\"\n";
         ss << "expires = \"" << expiresStr << "\"\n\n";
         ss << "[[mirror]]\n";

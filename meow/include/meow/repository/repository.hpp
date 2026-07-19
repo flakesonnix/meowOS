@@ -30,6 +30,7 @@ struct RepositoryPackage {
 
 struct Repository {
     std::string name;
+    std::string id;
     std::vector<Mirror> mirrors;
     std::filesystem::path cache;
     std::vector<RepositoryPackage> packages;

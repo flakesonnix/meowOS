@@ -25,6 +25,7 @@ namespace meow::error {
         InvalidSignature,
         TrustedKeyNotFound,
         RepositoryExpired,
+        InvalidRepository,
         Internal
     };
 

@@ -55,8 +55,24 @@ namespace meow::repository {
             return std::chrono::sys_seconds{std::chrono::seconds{t}};
         }
 
-        void checkRepoExpiry(const std::string& repoName, const std::optional<std::string>& expires) {
-            if (!expires) return;
+        void validateRepoId(const std::string& id) {
+            if (id.empty()) {
+                throw error::MeowError(
+                    error::ErrorCode::InvalidRepository,
+                    "repository_id is required");
+            }
+            for (char c : id) {
+                bool ok = std::isalnum(static_cast<unsigned char>(c)) ||
+                          c == '.' || c == '_' || c == '-';
+                if (!ok) {
+                    throw error::MeowError(
+                        error::ErrorCode::InvalidRepository,
+                        "repository_id contains invalid characters: " + id);
+                }
+            }
+        }
+
+        void checkRepoExpiry(const std::string& repoName, const std::optional<std::string>& expires) {            if (!expires) return;
             auto exp = parseRfc3339Z(*expires);
             if (!exp) return;
             auto now = std::chrono::system_clock::now();
@@ -209,6 +225,7 @@ namespace meow::repository {
                 auto fmtVer = tbl["format_version"].value_or(1);
                 format::requireVersion("repository", fmtVer, format::CurrentRepositoryFormat);
                 repo.name = tbl["name"].value_or("unnamed");
+                repo.id = tbl["repository_id"].value_or("");
                 if (auto g = tbl["generated"].value<std::string>()) repo.generated = *g;
                 if (auto x = tbl["expires"].value<std::string>()) repo.expires = *x;
 
@@ -233,6 +250,7 @@ namespace meow::repository {
 
             verifyRepoSig(repoMetaPath, root);
 
+            validateRepoId(repo.id);
             checkRepoExpiry(repo.name, repo.expires);
 
             auto byNameDir = root / "by-name";

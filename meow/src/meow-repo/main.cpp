@@ -29,6 +29,7 @@ int main(int argc, char** argv) {
         if (auto v = getFlag("--repo"); !v.empty()) opts.repoDir = v;
         if (auto v = getFlag("--key"); !v.empty()) opts.signKey = v;
         if (auto v = getFlag("--key-id"); !v.empty()) opts.signKeyId = v;
+        if (auto v = getFlag("--id"); !v.empty()) opts.repoId = v;
 
         if (cmd == "add") {
             if (argc < 3 || argv[2][0] == '-') {

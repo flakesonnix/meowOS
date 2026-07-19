@@ -13,6 +13,7 @@ struct RepoBuildOptions {
     std::string pkgName;
     std::optional<std::filesystem::path> signKey;
     std::string signKeyId = "default";
+    std::string repoId = "main";
 };
 
 void repoAdd(const RepoBuildOptions& opts);
