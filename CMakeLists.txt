@@ -10,6 +10,7 @@ set(MEOW_SOURCES
     meow/src/package/parser.cpp
     meow/src/package/load.cpp
     meow/src/repository/repository.cpp
+    meow/src/repository/backend.cpp
     meow/src/repository/version.cpp
     meow/src/repository/resolver.cpp
     meow/src/install/installer.cpp
