@@ -68,7 +68,7 @@ namespace meow::upgrade {
 
             log::log(log::LogLevel::Info, "installing " + latest->value);
             archive::Archive archive{latestPkg.archivePath};
-            auto newFiles = archive::extractAll(archive, root);
+            auto newFiles = archive::extractPackageContent(archive, root);
             transaction::recordExtractedFiles(tx, newFiles);
 
             transaction::Transaction::PackageEntry entry;

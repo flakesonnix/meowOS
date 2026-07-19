@@ -7,7 +7,7 @@ namespace meow::package {
         auto archive = archive::openArchive(path);
         auto content = archive::readFile(archive, "package.toml");
         auto metadata = parsePackageManifest(content);
-        auto files = archive::listFiles(archive);
+        auto files = archive::listPackageContent(archive);
 
         return PackageFile{path, metadata, files};
     }

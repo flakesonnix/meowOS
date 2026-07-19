@@ -1,6 +1,7 @@
 #include <meow/repository/repository.hpp>
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
+#include <meow/crypto/signature.hpp>
 #include <toml++/toml.hpp>
 #include <algorithm>
 
@@ -12,6 +13,22 @@ namespace meow::repository {
 
         Repository repo;
         repo.root = root;
+
+        auto sigPath = root / "repository.toml.sig";
+        auto keyPath = root / "public.pem";
+        auto repoMetaPath = root / "repository.toml";
+        if (std::filesystem::exists(sigPath) && std::filesystem::exists(keyPath)) {
+            if (crypto::verifyFile(repoMetaPath, sigPath, keyPath)) {
+                log::log(log::LogLevel::Info, "repository signature verified");
+            } else {
+                throw error::MeowError(
+                    error::ErrorCode::InvalidSignature,
+                    "repository signature verification failed"
+                );
+            }
+        } else {
+            log::log(log::LogLevel::Warning, "repository not signed, skipping verification");
+        }
 
         auto byNameDir = root / "by-name";
         if (!std::filesystem::is_directory(byNameDir)) {
@@ -34,10 +51,8 @@ namespace meow::repository {
                 if (std::filesystem::exists(pkgMetaPath)) {
                     try {
                         auto pkgTbl = toml::parse_file(pkgMetaPath.string());
-                        if (auto* meta = pkgTbl["metadata"].as_table()) {
-                            if (auto desc = (*meta)["description"].value<std::string>()) {
-                                pkg.description = types::Description{*desc};
-                            }
+                        if (auto desc = pkgTbl["description"].value<std::string>()) {
+                            pkg.description = types::Description{*desc};
                         }
                     } catch (...) {
                         log::log(log::LogLevel::Warning,

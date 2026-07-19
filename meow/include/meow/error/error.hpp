@@ -22,6 +22,7 @@ namespace meow::error {
         DependencyCycleDetected,
         TransactionFailed,
         RollbackFailed,
+        InvalidSignature,
         Internal
     };
 

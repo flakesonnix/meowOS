@@ -58,7 +58,7 @@ void repairPackage(
         if (relPath.front() == '/') relPath = relPath.substr(1);
 
         archive::Archive archive{pkg.archivePath};
-        archive::extractFile(archive, relPath, root);
+        archive::extractPackageFile(archive, relPath, root);
         database::updateFileHash(db, f);
         std::cout << "  \x1b[32m\u2713 " << relPath << "\x1b[0m\n";
     }
@@ -70,7 +70,7 @@ void repairPackage(
         if (relPath.front() == '/') relPath = relPath.substr(1);
 
         archive::Archive archive{pkg.archivePath};
-        archive::extractFile(archive, relPath, root);
+        archive::extractPackageFile(archive, relPath, root);
         database::updateFileHash(db, f);
         std::cout << "  \x1b[32m\u2713 " << relPath << "\x1b[0m\n";
     }

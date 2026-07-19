@@ -27,6 +27,7 @@ add_executable(${PROJECT_NAME}
         meow/src/update/updater.cpp
         meow/src/log/logger.cpp
         meow/src/config/config.cpp
+        meow/src/crypto/signature.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

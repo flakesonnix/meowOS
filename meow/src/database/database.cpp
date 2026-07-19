@@ -90,7 +90,7 @@ namespace meow::database {
     void registerPackage(Database& db, const package::PackageFile& package, const std::vector<std::filesystem::path>& installedFiles) {
         auto* handle = h(db);
 
-        auto archStr = package.metadata.CpuArch == types::CpuArch::AMD64 ? "amd64" : "aarch64";
+        auto archStr = package.metadata.architecture == types::CpuArch::AMD64 ? "amd64" : "aarch64";
         auto now = std::time(nullptr);
 
         const char* insertPkg = "INSERT OR REPLACE INTO packages (name, version, architecture, install_time) VALUES (?, ?, ?, ?);";

@@ -4,7 +4,11 @@
 #include <cstdio>
 
 namespace meow::download {
-    std::filesystem::path downloadFile(const std::string& url, const std::filesystem::path& destination) {
+    std::filesystem::path downloadFile(
+        const std::string& url,
+        const std::filesystem::path& destination,
+        const DownloadOptions& options
+    ) {
         if (url.starts_with("file://")) {
             auto src = std::filesystem::path(url.substr(7));
             std::filesystem::copy_file(src, destination, std::filesystem::copy_options::overwrite_existing);
@@ -12,7 +16,15 @@ namespace meow::download {
         }
 
         if (url.starts_with("http://") || url.starts_with("https://")) {
-            std::string cmd = "curl -fsSL \"" + url + "\" -o \"" + destination.string() + "\"";
+            std::string cmd = "curl -fsSL";
+            if (options.timeout.count() > 0) {
+                cmd += " --max-time " + std::to_string(options.timeout.count());
+            }
+            if (!options.verifyTls) {
+                cmd += " --insecure";
+            }
+            cmd += " \"" + url + "\" -o \"" + destination.string() + "\"";
+
             int rc = std::system(cmd.c_str());
             if (rc != 0) {
                 throw error::MeowError(error::ErrorCode::DownloadFailed, "download failed: " + url);

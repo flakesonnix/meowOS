@@ -1,7 +1,3 @@
-//
-// Created by lucy on 17.07.26.
-//
-
 #ifndef MEOWOS_PACKAGE_H
 #define MEOWOS_PACKAGE_H
 #include <filesystem>
@@ -14,9 +10,15 @@ namespace meow::package {
     struct PackageMetadata {
         meow::types::PackageName name;
         meow::types::PackageVersion version;
-        meow::types::CpuArch CpuArch;
+        meow::types::CpuArch architecture;
         meow::types::Description description;
+        std::string license;
+        std::string homepage;
+        std::string maintainer;
         meow::types::Dependencies dependencies;
+        meow::types::Dependencies conflicts;
+        meow::types::Dependencies provides;
+        meow::types::Dependencies replaces;
     };
 
     struct PackageFile {
@@ -28,4 +30,4 @@ namespace meow::package {
     PackageFile loadPackage(const std::filesystem::path& path);
 }
 
-#endif //MEOWOS_PACKAGE_H
+#endif

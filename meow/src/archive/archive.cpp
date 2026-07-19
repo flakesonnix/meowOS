@@ -59,6 +59,15 @@ namespace meow::archive {
                 throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error skipping archive data");
             }
         }
+
+        const std::string filesPrefix = "files/";
+
+        std::string norm(const char* raw) {
+            std::string s = raw ? raw : "";
+            if (s.starts_with("./")) s = s.substr(2);
+            if (s.ends_with("/") && s.size() > 1) s.pop_back();
+            return s;
+        }
     }
 
     Archive openArchive(const std::filesystem::path& path) {
@@ -76,8 +85,8 @@ namespace meow::archive {
         types::FileList files;
         struct archive_entry* entry;
         while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
-            const char* name = archive_entry_pathname(entry);
-            if (name) {
+            auto name = norm(archive_entry_pathname(entry));
+            if (!name.empty()) {
                 files.value.emplace_back(name);
             }
             skipData(ah.ptr);
@@ -88,11 +97,12 @@ namespace meow::archive {
 
     std::string readFile(const Archive& archive, const std::filesystem::path& filename) {
         ArchiveHandle ah{archive.path};
+        auto target = filename.lexically_normal().string();
+        if (target.starts_with("./")) target = target.substr(2);
 
         struct archive_entry* entry;
         while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
-            const char* name = archive_entry_pathname(entry);
-            if (name && filename == std::filesystem::path(name)) {
+            if (norm(archive_entry_pathname(entry)) == target) {
                 std::string content;
                 std::array<char, blockSize> buf{};
                 la_ssize_t n;
@@ -116,15 +126,15 @@ namespace meow::archive {
         types::FileList extracted;
         struct archive_entry* entry;
         while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
-            const char* name = archive_entry_pathname(entry);
-            if (!name) continue;
+            auto name = norm(archive_entry_pathname(entry));
+            if (name.empty()) { skipData(ah.ptr); continue; }
 
             auto fullPath = destination / name;
             archive_entry_set_pathname(entry, fullPath.c_str());
 
             int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
             if (r != ARCHIVE_OK) {
-                throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + std::string(name) + ": " + archive_error_string(ah.ptr));
+                throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + name + ": " + archive_error_string(ah.ptr));
             }
             extracted.value.push_back(fullPath);
         }
@@ -133,13 +143,15 @@ namespace meow::archive {
 
     void extractFile(const Archive& archive, const std::filesystem::path& file, const std::filesystem::path& destination) {
         ArchiveHandle ah{archive.path};
+        auto target = file.lexically_normal().string();
+        if (target.starts_with("./")) target = target.substr(2);
 
         struct archive_entry* entry;
         while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
-            const char* name = archive_entry_pathname(entry);
-            if (!name) continue;
+            auto name = norm(archive_entry_pathname(entry));
+            if (name.empty()) { skipData(ah.ptr); continue; }
 
-            if (file == std::filesystem::path(name)) {
+            if (name == target) {
                 auto fullPath = destination / name;
                 archive_entry_set_pathname(entry, fullPath.c_str());
 
@@ -154,5 +166,109 @@ namespace meow::archive {
         }
 
         throw error::MeowError(error::ErrorCode::FileNotFound, "file not found in archive: " + file.string());
+    }
+
+    types::FileList listPackageContent(const Archive& archive) {
+        ArchiveHandle ah{archive.path};
+
+        types::FileList files;
+        struct archive_entry* entry;
+        while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
+            auto spath = norm(archive_entry_pathname(entry));
+
+            if (spath.starts_with(filesPrefix)) {
+                auto rel = spath.substr(filesPrefix.size());
+                if (!rel.empty()) {
+                    files.value.emplace_back(rel);
+                }
+            }
+            skipData(ah.ptr);
+        }
+
+        return files;
+    }
+
+    types::FileList extractPackageContent(const Archive& archive, const std::filesystem::path& destination) {
+        ArchiveHandle ah{archive.path};
+
+        types::FileList extracted;
+        struct archive_entry* entry;
+        while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
+            auto spath = norm(archive_entry_pathname(entry));
+
+            if (!spath.starts_with(filesPrefix)) {
+                skipData(ah.ptr);
+                continue;
+            }
+
+            auto rel = spath.substr(filesPrefix.size());
+            if (rel.empty()) {
+                skipData(ah.ptr);
+                continue;
+            }
+
+            auto fullPath = destination / rel;
+            archive_entry_set_pathname(entry, fullPath.c_str());
+
+            int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
+            if (r != ARCHIVE_OK) {
+                throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + spath + ": " + archive_error_string(ah.ptr));
+            }
+            extracted.value.push_back(fullPath);
+        }
+        return extracted;
+    }
+
+    void extractPackageFile(const Archive& archive, const std::filesystem::path& file, const std::filesystem::path& destination) {
+        ArchiveHandle ah{archive.path};
+
+        auto target = filesPrefix + file.lexically_normal().string();
+        if (target.starts_with("./")) target = target.substr(2);
+
+        struct archive_entry* entry;
+        while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
+            auto name = norm(archive_entry_pathname(entry));
+
+            if (name == target) {
+                auto fullPath = destination / file;
+                archive_entry_set_pathname(entry, fullPath.c_str());
+
+                int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
+                if (r != ARCHIVE_OK) {
+                    throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + file.string() + ": " + archive_error_string(ah.ptr));
+                }
+                return;
+            }
+
+            skipData(ah.ptr);
+        }
+
+        throw error::MeowError(error::ErrorCode::FileNotFound, "file not found in archive: " + file.string());
+    }
+
+    std::string readPackageScript(const Archive& archive, const std::string& scriptName) {
+        ArchiveHandle ah{archive.path};
+
+        auto target = "scripts/" + scriptName;
+        struct archive_entry* entry;
+        while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
+            auto name = norm(archive_entry_pathname(entry));
+
+            if (name == target) {
+                std::string content;
+                std::array<char, blockSize> buf{};
+                la_ssize_t n;
+                while ((n = archive_read_data(ah.ptr, buf.data(), buf.size())) > 0) {
+                    content.append(buf.data(), static_cast<std::size_t>(n));
+                }
+                if (n < 0) {
+                    throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error reading script " + scriptName);
+                }
+                return content;
+            }
+            skipData(ah.ptr);
+        }
+
+        throw error::MeowError(error::ErrorCode::FileNotFound, "script not found in archive: " + scriptName);
     }
 }

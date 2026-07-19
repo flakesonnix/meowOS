@@ -5,6 +5,10 @@ A transactional Linux package manager with signed repositories, dependency resol
 ## Features
 
 - Sharded by-name repository layout (no global index)
+- Signed repositories (Ed25519)
+- `.tar.zst` package archives with metadata + scripts
+- Pre/post-install scripts
+- Download abstraction with timeout/TLS options
 - Package download + SHA256 verification
 - Dependency resolution with cycle detection
 - Atomic transactions with rollback
@@ -22,7 +26,7 @@ A transactional Linux package manager with signed repositories, dependency resol
 Repository (index.toml + packages/)
    │
    ▼
-Signed index verification (Ed25519)
+Repository signature verification (Ed25519)
    │
    ▼
 Dependency resolver (topological, cycle detection)
@@ -37,7 +41,7 @@ SHA256 checksum verification
 Atomic transaction (extract → db commit → rollback on failure)
    │
    ▼
-Archive extraction (libarchive, .tar.xz)
+Archive extraction (libarchive, .tar.zst)
    │
    ▼
 SQLite database (packages + files metadata)
@@ -53,7 +57,7 @@ Verify / Repair / Sync / Update
 | `meow list` | List available packages |
 | `meow search <q>` | Search packages |
 | `meow info <pkg>` | Package details |
-| `meow install <pkg>` | Install package |
+| `meow install <pkg>` | Install package (runs pre/post install scripts) |
 | `meow install --locked <pkg>` | Install from lockfile |
 | `meow remove <pkg>` | Remove package |
 | `meow upgrade <pkg>` | Upgrade package |
@@ -86,12 +90,26 @@ cmake --build build
 A repository contains:
 
 - `repository.toml` — repository metadata (name, schema version)
+- `repository.toml.sig` — Ed25519 signature
+- `public.pem` — Signing public key
 - `by-name/<shard>/<package>/package.toml` — Package metadata
 - `by-name/<shard>/<package>/versions/<version>.toml` — Per-version artifact metadata (url, sha256, filename)
 
 The shard directory is the first two lowercase characters of the package name.
 Single-character names use `<char>_` as the shard. This layout scales to millions
 of packages without a single monolithic index file.
+
+## Package Format
+
+Archives use `.tar.zst` (Zstandard compression) with this internal layout:
+
+```
+package.toml          — Package metadata (name, version, arch, license, homepage, maintainer, depends, conflicts, provides, replaces)
+files/                — Files to install (prefix stripped during extraction)
+scripts/              — Pre/post install/remove scripts
+metadata/licenses/    — License files
+metadata/changelog    — Change history
+```
 
 ## Database
 

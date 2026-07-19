@@ -32,7 +32,7 @@ namespace {
 
         std::cout << "Package      " << pkg.metadata.name.value << "\n"
                   << "Version      " << pkg.metadata.version.value << "\n"
-                  << "Architecture " << (pkg.metadata.CpuArch == meow::types::CpuArch::AMD64 ? "amd64" : "aarch64") << "\n"
+                  << "Architecture " << (pkg.metadata.architecture == meow::types::CpuArch::AMD64 ? "amd64" : "aarch64") << "\n"
                   << "\n"
                   << "Description\n"
                   << "------------\n"
