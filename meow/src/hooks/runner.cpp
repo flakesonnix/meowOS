@@ -137,7 +137,13 @@ HookResult runHook(const std::filesystem::path& script,
         for (auto& ev : env) envp.push_back(const_cast<char*>(ev.c_str()));
         envp.push_back(nullptr);
 
-        execvpe("/bin/sh", argv.data(), envp.data());
+        // When not inheriting, wipe the ambient environment so no variable
+        // from the builder (CI secrets, NIX_*, GITHUB_*, ...) can leak into
+        // the hook. We then exec with the explicitly built envp only.
+        if (!policy.inheritEnvironment) {
+            clearenv();
+        }
+        execve("/bin/sh", argv.data(), envp.data());
         _exit(127); // exec failed
     }
 

@@ -680,6 +680,9 @@ cat > "$HOOK_OK/post_install" << 'EOF'
 echo "PKG=$MEOW_PACKAGE VER=$MEOW_VERSION TYPE=$MEOW_HOOK_TYPE"
 echo "PATH=$PATH"
 echo "CWD=$(pwd)"
+# Dump the exact set of environment variable NAMES present in the hook,
+# so the test can assert nothing from the builder leaked in.
+echo "HOOKDUMP_VARS=$(env | cut -d= -f1 | sort | tr '\n' ' ')"
 EOF
 chmod +x "$HOOK_OK/post_install"
 registerHookPkg hookok 1.0.0 "$HOOK_OK"
@@ -692,13 +695,22 @@ else
     echo "  FAIL: successful hook install failed"
     fail=$((fail + 1))
 fi
+# Isolation: explicit meow vars present, PATH minimal, cwd under the staging
+# tree, and NO ambient variables (CI / GITHUB_ / NIX_ / SSH_ / XDG_) leaked.
 if echo "$out" | grep -q "PKG=hookok VER=1.0.0 TYPE=post_install" && \
    echo "$out" | grep -q "PATH=/usr/bin:/bin" && \
-   echo "$out" | grep -q "CWD=/tmp/nix-shell"; then
+   echo "$out" | grep -q "CWD=.*meow/hooks/hookok/post_install" && \
+   echo "$out" | grep -q "HOOKDUMP_VARS=" && \
+   ! echo "$out" | grep -q "HOOKDUMP_VARS=.* CI " && \
+   ! echo "$out" | grep -q "HOOKDUMP_VARS=.*GITHUB_" && \
+   ! echo "$out" | grep -q "HOOKDUMP_VARS=.*NIX_" && \
+   ! echo "$out" | grep -q "HOOKDUMP_VARS=.*SSH_" && \
+   ! echo "$out" | grep -q "HOOKDUMP_VARS=.*XDG_"; then
     echo "  PASS: hook runs with isolated cwd + minimal env"
     pass=$((pass + 1))
 else
     echo "  FAIL: hook environment not isolated"
+    echo "    got: $(echo "$out" | tr '\n' '|')"
     fail=$((fail + 1))
 fi
 if echo "$out" | grep -q "post_install output:"; then
