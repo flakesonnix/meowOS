@@ -680,9 +680,19 @@ cat > "$HOOK_OK/post_install" << 'EOF'
 echo "PKG=$MEOW_PACKAGE VER=$MEOW_VERSION TYPE=$MEOW_HOOK_TYPE"
 echo "PATH=$PATH"
 echo "CWD=$(pwd)"
-# Dump the exact set of environment variable NAMES present in the hook,
-# so the test can assert nothing from the builder leaked in.
-echo "HOOKDUMP_VARS=$(env | cut -d= -f1 | sort | tr '\n' ' ')"
+# Enumerate the environment variable NAMES using only shell builtins (the
+# hook PATH is minimal, so no coreutils are assumed). Each name is reported
+# as ALLOWED:<name> if it is part of the supported Hook ABI, otherwise
+# UNEXPECTED:<name>. The test asserts every ABI variable is ALLOWED and that
+# no UNEXPECTED variable is present.
+allowed=" HOME PATH TMPDIR MEOW_PACKAGE MEOW_VERSION MEOW_HOOK_TYPE MEOW_HOOK_STAGING PWD SHLVL _ "
+env | while IFS= read -r line; do
+    name=${line%%=*}
+    case "$allowed" in
+        *" $name "*) echo "ALLOWED:$name" ;;
+        *) echo "UNEXPECTED:$name" ;;
+    esac
+done
 EOF
 chmod +x "$HOOK_OK/post_install"
 registerHookPkg hookok 1.0.0 "$HOOK_OK"
@@ -696,21 +706,24 @@ else
     fail=$((fail + 1))
 fi
 # Isolation: explicit meow vars present, PATH minimal, cwd under the staging
-# tree, and NO ambient variables (CI / GITHUB_ / NIX_ / SSH_ / XDG_) leaked.
+# tree, and the environment is EXACTLY the supported Hook ABI set (no ambient
+# variables such as CI / GITHUB_ / NIX_ / SSH_ / XDG_ may leak in).
+abi_ok=yes
+for v in HOME PATH TMPDIR MEOW_PACKAGE MEOW_VERSION MEOW_HOOK_TYPE MEOW_HOOK_STAGING PWD SHLVL _; do
+    echo "$out" | grep -q "ALLOWED:$v" || abi_ok=no
+done
 if echo "$out" | grep -q "PKG=hookok VER=1.0.0 TYPE=post_install" && \
    echo "$out" | grep -q "PATH=/usr/bin:/bin" && \
    echo "$out" | grep -q "CWD=.*meow/hooks/hookok/post_install" && \
-   echo "$out" | grep -q "HOOKDUMP_VARS=" && \
-   ! echo "$out" | grep -q "HOOKDUMP_VARS=.* CI " && \
-   ! echo "$out" | grep -q "HOOKDUMP_VARS=.*GITHUB_" && \
-   ! echo "$out" | grep -q "HOOKDUMP_VARS=.*NIX_" && \
-   ! echo "$out" | grep -q "HOOKDUMP_VARS=.*SSH_" && \
-   ! echo "$out" | grep -q "HOOKDUMP_VARS=.*XDG_"; then
-    echo "  PASS: hook runs with isolated cwd + minimal env"
+   [ "$abi_ok" = "yes" ] && \
+   ! echo "$out" | grep -q "UNEXPECTED:"; then
+    echo "  PASS: hook runs with isolated cwd + minimal env (exact ABI set)"
     pass=$((pass + 1))
 else
     echo "  FAIL: hook environment not isolated"
-    echo "    got: $(echo "$out" | tr '\n' '|')"
+    echo "    abi_ok=$abi_ok"
+    echo "    unexpected: $(echo "$out" | grep -o 'UNEXPECTED:[A-Za-z_]*' | tr '\n' ' ')"
+    echo "    missing: $(for v in HOME PATH TMPDIR MEOW_PACKAGE MEOW_VERSION MEOW_HOOK_TYPE MEOW_HOOK_STAGING PWD SHLVL _; do echo "$out" | grep -q "ALLOWED:$v" || echo -n "$v "; done)"
     fail=$((fail + 1))
 fi
 if echo "$out" | grep -q "post_install output:"; then
