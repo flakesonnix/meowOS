@@ -152,3 +152,30 @@ Priority order:
 
 Note: item 1's server half shipped as `meow-server` in v0.4.0; the client
 HTTP wiring is the first v0.5 feature.
+
+---
+
+## Release cadence
+
+A lightweight versioning policy so contributors know what kind of change
+belongs in each series. The integration suite (`./test/integration.sh`) is a
+**release gate** for every tag: a series is not tagged unless all tests pass.
+
+| Series   | Scope                                                        |
+|----------|-------------------------------------------------------------|
+| v0.4.x   | Bug fixes, documentation, CI, and hardening only            |
+| v0.5.x   | Remote repositories (HTTP backend, end-to-end client)       |
+| v0.6.x   | Mirrors + transport improvements                            |
+| v0.7.x   | SAT solver / advanced dependency resolution                 |
+| v0.8.x   | Package signing & reproducible-build ecosystem improvements |
+| v1.0.0   | Stable package/repository formats and CLI compatibility     |
+
+Rules:
+
+- A `v0.4.x` (and any `.x`) release never introduces format or CLI-breaking
+  changes; it refines what already shipped.
+- Each new capability series starts from the previous stable tag and is
+  merged only when the integration suite is green.
+- Format/CLI compatibility guarantees begin at `v1.0.0`; before that,
+  breaking changes are acceptable within a major-version-less series as long
+  as they are documented in the changelog.
