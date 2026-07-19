@@ -35,11 +35,22 @@ struct RepositoryConfig {
     std::string url;
 };
 
+// A local package group: a named expansion alias over package names. Groups
+// are *user/repository policy* (declared in meow.toml), NOT package identities
+// and NOT repository metadata. Installing a group expands to its members and
+// installs them through the normal resolver/transaction path; the database
+// records the individual packages, not a "group" entity.
+struct PackageGroup {
+    std::string name;
+    std::vector<std::string> packages;  // package names (not versions)
+};
+
 struct Config {
     std::filesystem::path root;
     std::filesystem::path cache;
     std::filesystem::path database;
     std::vector<RepositoryConfig> repositories;
+    std::vector<PackageGroup> groups;
     int downloadWorkers = 0; // 0 = default (min(hardware_concurrency, 8))
     int hookTimeout = 30;    // seconds; max runtime for a package script
     bool hookAllowNetwork = false; // network policy for hooks (advisory)

@@ -1,7 +1,9 @@
 #include <meow/config/config.hpp>
 #include <meow/log/logger.hpp>
+#include <meow/error/error.hpp>
 
 #include <cstdlib>
+#include <set>
 
 #include <toml++/toml.hpp>
 
@@ -87,6 +89,47 @@ Config loadConfig(const std::filesystem::path& path) {
     if (!repos.empty()) {
         cfg.repositories = std::move(repos);
     }
+
+    // Package groups: [[groups]] name = "x" packages = ["a", "b"]. Groups are
+    // local policy aliases, not package identities. Validation is strict: a
+    // group with no name, no members, or a name clashing with a reserved CLI
+    // command (or another group) is rejected so the CLI never becomes ambiguous.
+    if (auto* groupsArr = tbl["groups"].as_array()) {
+        std::set<std::string> seen;
+        static const char* const reserved[] = {
+            "install",  "remove", "update",  "upgrade", "list",    "sync",
+            "search",   "info",   "clean",   "verify",   "repair",  "owns",
+            "required-by", "installed", "keys", "doctor", "group", nullptr};
+        for (const auto& node : *groupsArr) {
+            if (auto* t = node.as_table()) {
+                PackageGroup g;
+                g.name = (*t)["name"].value_or("");
+                if (g.name.empty())
+                    throw error::MeowError(error::ErrorCode::InvalidRepository,
+                                           "group with empty name");
+                for (const auto& r : reserved) {
+                    if (r && g.name == r)
+                        throw error::MeowError(
+                            error::ErrorCode::InvalidRepository,
+                            "group name conflicts with reserved command: " + g.name);
+                }
+                if (!seen.insert(g.name).second)
+                    throw error::MeowError(error::ErrorCode::InvalidRepository,
+                                           "duplicate group name: " + g.name);
+                if (auto* pkgs = (*t)["packages"].as_array()) {
+                    for (const auto& p : *pkgs) {
+                        if (auto s = p.value<std::string>())
+                            if (!s->empty()) g.packages.push_back(*s);
+                    }
+                }
+                if (g.packages.empty())
+                    throw error::MeowError(error::ErrorCode::InvalidRepository,
+                                           "group '" + g.name + "' has no packages");
+                cfg.groups.push_back(std::move(g));
+            }
+        }
+    }
+
     return cfg;
 }
 

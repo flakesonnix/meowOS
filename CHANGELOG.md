@@ -65,6 +65,22 @@
   parallel-vs-serial speedup, broken-repo isolation, failover-under-parallel,
   per-`repository_id` cache isolation, and deterministic selection across repeated
   refreshes.
+- **Package groups** (`meow group list` / `meow group install`): a group is a
+  named local expansion alias over package names, declared as `[[groups]]` in
+  `meow.toml` (`config::PackageGroup`). `meow group install <name>` expands to
+  the members and installs them through the *same* staging path as
+  `meow install` (`resolveAndStage` → parallel download → `installPackages`),
+  so the two commands share identical failure semantics. The install is
+  **atomic**: the whole expansion is one dependency closure committed in a
+  single transaction, so a group either installs completely or changes nothing
+  (it is not a loop of per-package installs). Groups are expansion aliases, not
+  package identities -- the database records the individual packages, never a
+  synthetic group entity. The config loader rejects malformed groups strictly:
+  empty name, duplicate name, empty member list, or a name colliding with a
+  reserved CLI command. `docs/package-groups.md` documents the contract.
+  Integration test section **package groups** covers config parse, list,
+  install, dependency closure, atomicity, missing-group and duplicate-group
+  rejection (plus a reserved-name rejection check).
 - **Mirror groups** (data model): a configured source is now one *repository
   identity* served from one or more *mirrors*. Config accepts
   `mirrors = ["url", ...]`; the legacy single `url = "..."` form is migrated
