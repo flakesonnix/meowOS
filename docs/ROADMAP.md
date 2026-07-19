@@ -139,10 +139,21 @@ Priority order:
    it end-to-end via `HttpRepositoryBackend` (added in the v0.5 line):
    `meow` can `list`/`info`/`install` over `http(s)://` with the same trust
    chain as the filesystem backend. The repository abstraction
-   (`IRepositoryBackend`) is in place.
-2. **Mirror selection + repository federation** — `[[repositories]]` entries
-   with multiple `url`s sharing one `repository_id`; failover between mirrors;
-   mirror priority.
+   (`IRepositoryBackend`) is in place. **Done**: backend abstraction
+   (`FilesystemRepositoryBackend` + `HttpRepositoryBackend` + in-memory test
+   backend), multi-repository config + `RepositoryManager`, dual-backend parity
+   tests, and disk/network-free unit tests. See `docs/repository-selection.md`
+   for the next phase.
+2. **Repository availability & selection (v0.5.1)** — split out from raw mirror
+   work so the behavior is predictable before it is parallel:
+   - repository health state (`RepositoryStatus`: available / unavailable /
+     network error / expired / invalid signature / invalid metadata);
+   - documented priority-then-version selection rule;
+   - mirror groups (`mirrors = [...]` sharing one `repository_id`, signature,
+     metadata, and cache);
+   - failover on transport errors only (never on trust failures);
+   - parallel metadata refresh reusing the download-worker pool.
+   Design contract: `docs/repository-selection.md`.
 3. **Hook sandboxing (real isolation)** — extend the controlled runner with
    Linux namespace isolation (mount namespace, read-only root, seccomp),
    making the hook policy a true security boundary.
@@ -153,7 +164,7 @@ Priority order:
 6. **Build farm** — distributed `meow-build` over the repository service.
 
 Note: item 1's server half shipped as `meow-server` in v0.4.0; the client
-HTTP wiring is the first v0.5 feature.
+HTTP wiring was the first v0.5 feature and is now complete.
 
 ---
 
