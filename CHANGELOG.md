@@ -8,6 +8,9 @@
   repository metadata now support `[[optional_depends]]` with `package` and
   `description`; `meow info` prints an "Optional dependencies" section. No
   resolver or install changes yet — optional deps are metadata, not behavior.
+- `docs/optional-dependencies.md`: specification for optional-dependency
+  behavior. Fixes the rule that a user-requested optional package is recorded
+  as `Explicit` (no new install reason), so future `autoremove` preserves it.
 - Package history: every install/remove records an append-only `package_history`
   row with timestamp, action, version, install reason, and a per-transaction
   UUID; the `packages` table now stores a current `install_reason` (Explicit >
