@@ -24,6 +24,10 @@ namespace meow::error {
             case ErrorCode::TrustedKeyNotFound:      codeStr = "TrustedKeyNotFound";      break;
             case ErrorCode::RepositoryExpired:       codeStr = "RepositoryExpired";       break;
             case ErrorCode::InvalidRepository:        codeStr = "InvalidRepository";        break;
+            case ErrorCode::DownloadTimeout:          codeStr = "DownloadTimeout";          break;
+            case ErrorCode::DownloadHttpError:         codeStr = "DownloadHttpError";        break;
+            case ErrorCode::DownloadInterrupted:       codeStr = "DownloadInterrupted";      break;
+            case ErrorCode::InvalidDownload:           codeStr = "InvalidDownload";          break;
             case ErrorCode::Internal:                codeStr = "Internal";                break;
         }
         if (e.code == ErrorCode::RepositoryExpired) {

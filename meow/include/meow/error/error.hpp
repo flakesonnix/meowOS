@@ -26,6 +26,10 @@ namespace meow::error {
         TrustedKeyNotFound,
         RepositoryExpired,
         InvalidRepository,
+        DownloadTimeout,
+        DownloadHttpError,
+        DownloadInterrupted,
+        InvalidDownload,
         Internal
     };
 

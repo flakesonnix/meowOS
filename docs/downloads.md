@@ -1,29 +1,50 @@
 # Downloads
 
 MeowOS fetches package archives over `file://` and `http(s)://` URLs
-declared in repository version metadata (`artifact.url`).
+declared in repository version metadata (`artifact.url`). Transfers use
+**libcurl** directly (no shell execution).
 
-## Robustness guarantees
+## Transport model
+
+- `file://` sources are copied atomically (no network).
+- `http(s)://` transfers go through libcurl with:
+  - TLS verification on by default (`verifyTls = false` disables it for
+    internal/testing only),
+  - redirect following (up to 10 hops),
+  - configurable connect + total timeout,
+  - retries on transient failures.
+
+## Robustness
 
 - **Atomic downloads** — content is written to `<destination>.part` and
   renamed into place only on success. A failed or interrupted download
-  never leaves a half-written file at the final path.
-- **Resume** — HTTP transfers pass `-C -` to curl, resuming from a partial
-  `.part` when the server supports `Range`.
-- **Retries** — transient HTTP errors are retried (3 attempts, 1s delay).
-- **Timeouts** — `DownloadOptions::timeout` applies to both connect and
-  total transfer time (default 30s).
-- **TLS** — verification is on by default; `--insecure` (or
-  `verifyTls = false`) disables it for internal/testing use only.
-- **ETag passthrough** — an optional `etag` is forwarded as an
-  `If-None-Match` header, ready for `304 Not Modified` caching once
-  repository metadata caching is wired to HTTP transport.
+  never leaves a half-written file at the final path, and any existing
+  valid cache file is left untouched.
+- **Retries** — transient errors are retried `retries` times (default 3)
+  before failing:
+  - *Retry:* connection refused/reset, DNS failure, timeouts,
+    `CURLE_GOT_NOTHING`/`RECV`/`SEND` errors, HTTP `5xx`.
+  - *No retry:* checksum mismatch, invalid URL scheme, HTTP `4xx`
+    (including `404 Not Found`).
+- **Content-Length guard** — when `maxBytes > 0`, the declared
+  `Content-Length` (HTTP) or file size (file://) is checked up front; an
+  oversized response (or one exceeding the cap mid-stream) aborts with
+  `DownloadInterrupted`. This rejects broken or intentionally huge
+  downloads early, before they hit disk — important for GB-scale
+  `.tar.zst` packages.
+- **ETag passthrough** — an optional `etag` is sent as an
+  `If-None-Match` header. A `304 Not Modified` response reuses the
+  existing cached file without re-downloading.
 
-## Failure handling
+## Error codes
 
-Any non-zero transfer result throws `DownloadFailed` with the curl exit
-code and the offending URL. The partial file is removed before the error
-is raised, so retry or clean state is safe.
+| Code                  | Trigger                                        |
+|-----------------------|------------------------------------------------|
+| `DownloadFailed`      | General curl/transport failure after retries   |
+| `DownloadTimeout`     | Transfer exceeded the configured timeout       |
+| `DownloadHttpError`   | Terminal HTTP error (`4xx`/`5xx` after retries) |
+| `DownloadInterrupted` | Size cap exceeded (`maxBytes`)                 |
+| `InvalidDownload`     | Unsupported scheme or missing file:// source   |
 
 ## Checksums
 

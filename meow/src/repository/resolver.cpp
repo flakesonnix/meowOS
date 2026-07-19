@@ -24,9 +24,9 @@ namespace meow::repository {
                 std::filesystem::remove(dest);
             }
 
-            download::downloadFile(artifact.url, dest);
+            auto result = download::downloadFile(artifact.url, dest);
 
-            if (!download::verifyChecksum(dest, artifact.sha256)) {
+            if (!download::verifyChecksum(result.path, artifact.sha256)) {
                 std::filesystem::remove(dest);
                 throw error::MeowError(error::ErrorCode::ChecksumMismatch, "checksum mismatch for " + artifact.filename);
             }

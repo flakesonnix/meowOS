@@ -31,11 +31,70 @@ cleanup() {
     rm -rf /tmp/meow-install
 }
 
+# Build a package archive and print its sha256.
+buildPkg() {
+    local name="$1" version="$2" binpath="$3" extra="${4:-}"
+    local src="/tmp/meow-artifacts/src/$name"
+    rm -rf "$src"
+    mkdir -p "$src/files/$(dirname "$binpath")"
+    cat > "$src/package.toml" << EOF
+name = "$name"
+version = "$version"
+architecture = "AMD64"
+description = "integration fixture"
+$extra
+EOF
+    echo "#!/bin/sh" > "$src/files/$binpath"
+    chmod +x "$src/files/$binpath"
+    ./build/meow-build --output /tmp/meow-artifacts "$src" >/dev/null 2>&1
+    local arch="/tmp/meow-artifacts/$name-$version.pkg.tar.zst"
+    sha256sum "$arch" | cut -d' ' -f1
+}
+
+# Generate the package archives the sample repo references, then rewrite the
+# repo version metadata with the matching sha256 and re-sign. This keeps the
+# suite self-contained (no dependency on pre-existing /tmp artifacts).
+bootstrapArtifacts() {
+    mkdir -p /tmp/meow-artifacts
+    local h10 h11 lf a10
+    h10=$(buildPkg hello 1.0.0 usr/bin/hello)
+    h11=$(buildPkg hello 1.1.0 usr/bin/hello)
+    lf=$(buildPkg libfoo 1.0.0 usr/lib/libfoo.so 'provides = ["foo-lib"]')
+    a10=$(buildPkg app 1.0.0 usr/bin/app 'depends = ["hello>=1.0.0", "libfoo"]')
+
+    cat > repo/by-name/he/hello/versions/1.0.0.toml << EOF
+[artifact]
+filename = "hello-1.0.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/hello-1.0.0.pkg.tar.zst"
+sha256 = "$h10"
+EOF
+    cat > repo/by-name/he/hello/versions/1.1.0.toml << EOF
+[artifact]
+filename = "hello-1.1.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/hello-1.1.0.pkg.tar.zst"
+sha256 = "$h11"
+EOF
+    cat > repo/by-name/li/libfoo/versions/1.0.0.toml << EOF
+[artifact]
+filename = "libfoo-1.0.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/libfoo-1.0.0.pkg.tar.zst"
+sha256 = "$lf"
+EOF
+    cat > repo/by-name/ap/app/versions/1.0.0.toml << EOF
+[artifact]
+filename = "app-1.0.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/app-1.0.0.pkg.tar.zst"
+sha256 = "$a10"
+EOF
+    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+}
+
 # Install trusted key for repo verification
 mkdir -p ~/.config/meow/keys
 cp "$(dirname "$0")/keys/meow-release.pub" ~/.config/meow/keys/meow-release.pem
 
 cleanup
+bootstrapArtifacts
 
 echo "=== 1. Repository queries ==="
 check "list shows all packages" "app" $MEOW --db-path "$TEST_DB" list
@@ -196,10 +255,43 @@ cp /tmp/repo-sig-bak6 repo/repository.toml.sig
 rm -f /tmp/repo-toml-bak6 /tmp/repo-sig-bak6
 
 echo "=== 15. Download robustness ==="
+# Build a real package archive to drive offline download scenarios.
+HELLO_SRC=/tmp/meow-hello-src
+HELLO_ARCHIVE=/tmp/meow-hello-1.1.0.pkg.tar.zst
+rm -rf "$HELLO_SRC" /tmp/meow-test-pkgs
+mkdir -p "$HELLO_SRC/files/usr/bin"
+cat > "$HELLO_SRC/package.toml" << 'EOF'
+name = "hello"
+version = "1.1.0"
+architecture = "AMD64"
+description = "download test fixture"
+EOF
+echo '#!/bin/sh' > "$HELLO_SRC/files/usr/bin/hello"
+chmod +x "$HELLO_SRC/files/usr/bin/hello"
+mkdir -p /tmp/meow-test-pkgs
+./build/meow-build --output /tmp/meow-test-pkgs "$HELLO_SRC" >/dev/null 2>&1 || true
+mv /tmp/meow-test-pkgs/hello-1.1.0.pkg.tar.zst "$HELLO_ARCHIVE" 2>/dev/null || true
+HELLO_SHA=$(sha256sum "$HELLO_ARCHIVE" | cut -d' ' -f1)
+
+HELLO_VER="repo/by-name/he/hello/versions/1.1.0.toml"
+writeHelloVer() {
+    local url="$1" sha="$2"
+    cat > "$HELLO_VER" << EOF
+[artifact]
+filename = "hello-1.1.0.pkg.tar.zst"
+url = "$url"
+sha256 = "$sha"
+EOF
+    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+}
+
 # 15a. Successful install leaves no partial (.part) files (atomic rename)
+cp "$HELLO_VER" /tmp/hello-ver-bak
+writeHelloVer "file://$HELLO_ARCHIVE" "$HELLO_SHA"
 rm -rf /tmp/meow-install
+rm -f ~/.cache/meow/hello-1.1.0.pkg.tar.zst
 check "install hello (atomic)" "done" $MEOW --db-path "$TEST_DB" install hello
-if find /tmp/meow-install -name '*.part' | grep -q .; then
+if find /tmp/meow-install -name '*.part' 2>/dev/null | grep -q .; then
     echo "  FAIL: leftover .part files after install"
     fail=$((fail + 1))
 else
@@ -209,15 +301,7 @@ fi
 $MEOW --db-path "$TEST_DB" remove hello >/dev/null 2>&1 || true
 
 # 15b. HTTP download failure is reported and leaves no partial file
-HELLO_VER="repo/by-name/he/hello/versions/1.1.0.toml"
-cp "$HELLO_VER" /tmp/hello-ver-bak
-cat > "$HELLO_VER" << 'EOF'
-[artifact]
-filename = "hello-1.1.0.pkg.tar.zst"
-url = "http://127.0.0.1:9/missing.tar.zst"
-sha256 = "3abdfcf0c3f41e7309e69c7719e425513a478d456ec98a96cc0168a021dc05ea"
-EOF
-./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+writeHelloVer "http://127.0.0.1:9/missing.tar.zst" "$HELLO_SHA"
 rm -rf /tmp/meow-install
 rm -f ~/.cache/meow/hello-1.1.0.pkg.tar.zst
 check "reject failed download" "DownloadFailed" $MEOW --db-path "$TEST_DB" install hello
@@ -228,10 +312,19 @@ else
     echo "  PASS: no partial file after failed download"
     pass=$((pass + 1))
 fi
+
+# 15c. Checksum mismatch is rejected (offline file:// with wrong sha)
+writeHelloVer "file://$HELLO_ARCHIVE" "0000000000000000000000000000000000000000000000000000000000000000"
+rm -f ~/.cache/meow/hello-1.1.0.pkg.tar.zst
+check "reject checksum mismatch" "ChecksumMismatch" $MEOW --db-path "$TEST_DB" install hello
+
+# restore good version + signature
 cp /tmp/hello-ver-bak "$HELLO_VER"
 rm -f /tmp/hello-ver-bak
 ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+rm -rf "$HELLO_SRC" /tmp/meow-test-pkgs "$HELLO_ARCHIVE"
 
 echo ""
 echo "Results: $pass passed, $fail failed"
+git checkout -- repo 2>/dev/null || true
 [ "$fail" -eq 0 ] || exit 1

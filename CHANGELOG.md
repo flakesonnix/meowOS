@@ -19,6 +19,16 @@
 - Download robustness: atomic writes (`.part` + rename), HTTP resume,
   retries, timeouts, and ETag `If-None-Match` passthrough
 - `docs/downloads.md` documenting download behavior
+- libcurl-based download transport (no shell execution); capture HTTP
+  status codes, headers, and curl errors
+- New download errors: `DownloadTimeout`, `DownloadHttpError`,
+  `DownloadInterrupted`, `InvalidDownload`
+- `DownloadResult` (path, size, etag, last-modified, 304 flag) and
+  `DownloadOptions` (retries, timeout, TLS, etag, maxBytes)
+- `Content-Length` size guard (`maxBytes`) to reject oversized downloads
+  early; `304 Not Modified` reuses the existing cached file
+- Self-contained integration suite: builds its own package fixtures
+  (no dependency on pre-existing `/tmp` artifacts)
 
 ## [0.3.0] - 2026-07-19
 

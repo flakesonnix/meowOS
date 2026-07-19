@@ -55,3 +55,9 @@ and future trust policy. It is validated after signature verification.
 The metadata cache under `~/.cache/meow/repos/<repository_id>/` is refreshed
 after a successful verification chain. It is **never** used as a source of
 trust — cached files are re-verified on every load.
+
+Package archives are fetched over a libcurl-based transport with TLS
+verification, redirect following, timeouts, retries on transient errors,
+and a `Content-Length` size guard. Downloads are atomic (written to a
+`.part` file, then renamed) so a failed or interrupted transfer never
+leaves a corrupt cached archive.

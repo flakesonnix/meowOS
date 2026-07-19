@@ -26,6 +26,7 @@
             libarchive
             tomlplusplus # In nixpkgs heißt das Paket tomlplusplus
             openssl      # Für Signatur-Verifikation
+            curl         # libcurl transport für Downloads
           ];
 
           shellHook = ''

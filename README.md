@@ -72,6 +72,13 @@ Verify / Repair / Sync / Update
 | `meow update [--dry-run]` | Upgrade all packages |
 | `meow clean` | Clear the local repository metadata cache |
 
+## Transport
+
+Downloads use a libcurl-based transport (no shell execution) with TLS
+verification, timeouts, retries on transient failures, atomic
+`.part`+rename writes, checksum verification, and HTTP `ETag`/`304`
+support for caching.
+
 ## Build
 
 Requires: CMake 3.20+, C++20 compiler, SQLite3, libarchive, OpenSSL, tomlplusplus.

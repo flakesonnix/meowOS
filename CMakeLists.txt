@@ -59,6 +59,7 @@ target_include_directories(meow-repo PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 find_package(SQLite3 REQUIRED)
 find_package(LibArchive REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
 find_package(tomlplusplus QUIET)
 if(NOT tomlplusplus_FOUND)
     include(FetchContent)
@@ -75,6 +76,7 @@ foreach(tgt meow meow-build meow-repo)
         SQLite::SQLite3
         LibArchive::LibArchive
         OpenSSL::Crypto
+        CURL::libcurl
         tomlplusplus::tomlplusplus
     )
 endforeach()
