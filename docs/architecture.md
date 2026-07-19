@@ -72,6 +72,52 @@ commit → register in SQLite database
 | Sync/Update     | `sync`, `update`          | upstream diff / bulk upgrade                 |
 | Doctor          | `doctor`                  | system + security diagnostics               |
 
+## Layering
+
+Dependency arrows point from a higher layer to the module it depends on.
+Lower layers must not depend on higher ones (e.g. the database never knows
+about HTTP; the downloader never parses manifests).
+
+```
+CLI (main.cpp)
+    │  config + database open
+    ▼
+Repository  ──── open / verify signature / identity / expiry / cache
+    │
+    ├── FilesystemRepositoryBackend   (local checkout)        [current]
+    └── HttpRepositoryBackend         (remote server)         [v0.5, planned]
+    │
+    ▼
+Resolver  ──── resolveDependencyNames (metadata only) + resolvePackage (download + load)
+    │
+    ▼
+Downloader / Download queue  ──── libcurl transport, atomic writes, retries
+    │
+    ▼
+Transaction  ──── begin / record / commit / rollback
+    │
+    ├── Hooks            (isolated, timed, logged; Hook ABI v1)
+    ├── Archive extract  (libarchive)
+    └── Database         (SQLite package/file registry)
+    │
+    ▼
+Lockfile / Verify / Repair / Sync / Update / Doctor  (operate on DB + cache)
+```
+
+The resolver, dependency solver, install, and sync paths all talk to the
+`Repository` abstraction and must not care whether data came from a local
+checkout or a remote backend. Adding mirrors, object storage, or OCI
+registries later means adding a backend, not branching through the core.
+
+### Layering rules
+
+- `database`, `transaction`, `hooks`, `archive` must not reference
+  `download` or `repository` URL schemes.
+- `download` moves bytes only; it does not parse package/repo manifests.
+- `repository` owns transport selection (backend) and metadata parsing; the
+  rest of the code consumes an in-memory `Repository`.
+- `CLI` is the only place that wires config → db → repo → commands.
+
 ## Design invariants
 
 - **Repository metadata is the source of truth** for resolution; downloads
