@@ -24,6 +24,7 @@ namespace meow::error {
         RollbackFailed,
         InvalidSignature,
         TrustedKeyNotFound,
+        RepositoryExpired,
         Internal
     };
 

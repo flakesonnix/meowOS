@@ -10,6 +10,8 @@
 #include <fstream>
 #include <sstream>
 #include <set>
+#include <chrono>
+#include <iomanip>
 
 namespace meow::repo {
     namespace {
@@ -144,6 +146,15 @@ namespace meow::repo {
         log::log(log::LogLevel::Info, "removed " + opts.pkgName + " from repo");
     }
 
+    std::string utcTimestamp(std::chrono::system_clock::time_point tp) {
+        auto t = std::chrono::system_clock::to_time_t(tp);
+        std::tm tm{};
+        gmtime_r(&t, &tm);
+        char buf[32];
+        std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+        return std::string(buf);
+    }
+
     void repoSync(const RepoBuildOptions& opts) {
         // Re-write repository.toml with correct mirror and name
         auto repoMetaPath = opts.repoDir / "repository.toml";
@@ -155,9 +166,16 @@ namespace meow::repo {
             } catch (...) {}
         }
 
+        auto now = std::chrono::system_clock::now();
+        auto expires = now + std::chrono::hours(24 * 30);
+        auto generatedStr = utcTimestamp(now);
+        auto expiresStr = utcTimestamp(expires);
+
         std::ostringstream ss;
         ss << "format_version = 1\n";
         ss << "name = \"" << name << "\"\n\n";
+        ss << "generated = \"" << generatedStr << "\"\n";
+        ss << "expires = \"" << expiresStr << "\"\n\n";
         ss << "[[mirror]]\n";
         ss << "url = \"./repo\"\n";
         ss << "priority = 10\n";

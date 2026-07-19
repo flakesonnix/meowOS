@@ -146,6 +146,31 @@ check "reject bad repository signature" "repository signature invalid" $MEOW --d
 cp /tmp/repo-toml-bak2 repo/repository.toml
 rm -f /tmp/repo-toml-bak2
 
+echo "=== 13. Repository metadata expiry ==="
+# 13a. Normal repository (freshly synced + signed) is accepted
+check "accept valid repository" "app" $MEOW --db-path "$TEST_DB" list
+
+# 13b. Expired-but-tampered metadata: signature failure happens first
+cp repo/repository.toml /tmp/repo-toml-bak3
+cp repo/repository.toml.sig /tmp/repo-sig-bak3
+yesterday=$(date -u -d 'yesterday' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)
+sed -i "s/expires = \".*\"/expires = \"$yesterday\"/" repo/repository.toml
+check "signature failure precedes expiry" "repository signature invalid" $MEOW --db-path "$TEST_DB" list
+cp /tmp/repo-toml-bak3 repo/repository.toml
+cp /tmp/repo-sig-bak3 repo/repository.toml.sig
+rm -f /tmp/repo-toml-bak3 /tmp/repo-sig-bak3
+
+# 13c. Correctly signed but expired repository is rejected
+cp repo/repository.toml /tmp/repo-toml-bak4
+cp repo/repository.toml.sig /tmp/repo-sig-bak4
+yesterday=$(date -u -d 'yesterday' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)
+sed -i "s/expires = \".*\"/expires = \"$yesterday\"/" repo/repository.toml
+./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+check "reject expired repository" "repository metadata expired" $MEOW --db-path "$TEST_DB" list
+cp /tmp/repo-toml-bak4 repo/repository.toml
+cp /tmp/repo-sig-bak4 repo/repository.toml.sig
+rm -f /tmp/repo-toml-bak4 /tmp/repo-sig-bak4
+
 echo ""
 echo "Results: $pass passed, $fail failed"
 [ "$fail" -eq 0 ] || exit 1

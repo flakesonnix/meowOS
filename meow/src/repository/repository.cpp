@@ -9,6 +9,9 @@
 #include <algorithm>
 #include <cstdlib>
 #include <set>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
 
 namespace meow::repository {
     namespace {
@@ -38,6 +41,32 @@ namespace meow::repository {
             if (url.starts_with("file://")) return true;
             if (!isHttpUrl(url) && url.find("://") == std::string::npos) return true;
             return false;
+        }
+
+        std::optional<std::chrono::sys_seconds> parseRfc3339Z(const std::string& s) {
+            if (s.empty()) return std::nullopt;
+            std::tm tm{};
+            std::istringstream iss(s);
+            iss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+            if (iss.fail()) return std::nullopt;
+            tm.tm_isdst = 0;
+            std::time_t t = timegm(&tm);
+            if (t == -1) return std::nullopt;
+            return std::chrono::sys_seconds{std::chrono::seconds{t}};
+        }
+
+        void checkRepoExpiry(const std::string& repoName, const std::optional<std::string>& expires) {
+            if (!expires) return;
+            auto exp = parseRfc3339Z(*expires);
+            if (!exp) return;
+            auto now = std::chrono::system_clock::now();
+            if (std::chrono::time_point_cast<std::chrono::seconds>(now) >= *exp) {
+                std::ostringstream msg;
+                msg << "meow: repository metadata expired\n\n"
+                    << "  repository:\n      " << repoName << "\n\n"
+                    << "  expires:\n      " << *expires;
+                throw error::MeowError(error::ErrorCode::RepositoryExpired, msg.str());
+            }
         }
 
         std::filesystem::path resolveLocalPath(const std::string& url) {
@@ -180,6 +209,8 @@ namespace meow::repository {
                 auto fmtVer = tbl["format_version"].value_or(1);
                 format::requireVersion("repository", fmtVer, format::CurrentRepositoryFormat);
                 repo.name = tbl["name"].value_or("unnamed");
+                if (auto g = tbl["generated"].value<std::string>()) repo.generated = *g;
+                if (auto x = tbl["expires"].value<std::string>()) repo.expires = *x;
 
                 if (auto* mirrorsArr = tbl["mirror"].as_array()) {
                     for (const auto& elem : *mirrorsArr) {
@@ -201,6 +232,8 @@ namespace meow::repository {
             }
 
             verifyRepoSig(repoMetaPath, root);
+
+            checkRepoExpiry(repo.name, repo.expires);
 
             auto byNameDir = root / "by-name";
             if (std::filesystem::is_directory(byNameDir)) {

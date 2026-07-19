@@ -33,6 +33,8 @@ struct Repository {
     std::vector<Mirror> mirrors;
     std::filesystem::path cache;
     std::vector<RepositoryPackage> packages;
+    std::optional<std::string> generated;
+    std::optional<std::string> expires;
 };
 
 Repository openRepository(const std::string& url);
