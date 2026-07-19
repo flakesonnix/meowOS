@@ -51,6 +51,16 @@ EOF
     sha256sum "$arch" | cut -d' ' -f1
 }
 
+# Build a package into a given output dir and print its sha256.
+# Usage: reproBuild <srcdir> <outdir> <archive-basename> [extra-env...]
+reproBuild() {
+    local src="$1" out="$2" base="$3"; shift 3
+    rm -rf "$out"
+    mkdir -p "$out"
+    env "$@" ./build/meow-build --output "$out" "$src" >/dev/null 2>&1
+    sha256sum "$out/$base" 2>/dev/null | cut -d' ' -f1
+}
+
 # Generate the package archives the sample repo references, then rewrite the
 # repo version metadata with the matching sha256 and re-sign. This keeps the
 # suite self-contained (no dependency on pre-existing /tmp artifacts).
@@ -521,6 +531,101 @@ echo "=== 18. doctor diagnostics ==="
 check "doctor runs" "meow doctor:" $MEOW --db-path "$TEST_DB" doctor
 # JSON variant must contain the checks array.
 check "doctor --json has checks" '"checks": [' $MEOW --db-path "$TEST_DB" doctor --json
+
+echo ""
+echo "=== 19. Reproducible package generation ==="
+REPRO_SRC="/tmp/meow-repro-src"
+rm -rf "$REPRO_SRC"
+mkdir -p "$REPRO_SRC/files/usr/bin" "$REPRO_SRC/files/etc"
+printf "#!/bin/sh\necho hi\n" > "$REPRO_SRC/files/usr/bin/hello"
+chmod +x "$REPRO_SRC/files/usr/bin/hello"
+echo "config" > "$REPRO_SRC/files/etc/hello.conf"
+cat > "$REPRO_SRC/package.toml" << 'EOF'
+name = "hello"
+version = "1.0.0"
+architecture = "AMD64"
+description = "reproducibility fixture"
+
+[build]
+reproducible = true
+source_date_epoch = 1700000000
+EOF
+
+# 19a. Building the same source twice yields the same artifact hash.
+h_a=$(reproBuild "$REPRO_SRC" /tmp/meow-repro-a hello-1.0.0.pkg.tar.zst)
+h_b=$(reproBuild "$REPRO_SRC" /tmp/meow-repro-b hello-1.0.0.pkg.tar.zst)
+if [ "$h_a" = "$h_b" ] && [ -n "$h_a" ]; then
+    echo "  PASS: same source builds identical artifact"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: repeated build differs ($h_a vs $h_b)"
+    fail=$((fail + 1))
+fi
+
+# 19b. Different on-disk mtime does not change the artifact hash.
+touch -d "1999-01-01 00:00:00" "$REPRO_SRC/files/usr/bin/hello" "$REPRO_SRC/files/etc/hello.conf"
+h_m=$(reproBuild "$REPRO_SRC" /tmp/meow-repro-m hello-1.0.0.pkg.tar.zst)
+if [ "$h_m" = "$h_a" ]; then
+    echo "  PASS: source mtime does not affect artifact"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: mtime changed artifact ($h_m vs $h_a)"
+    fail=$((fail + 1))
+fi
+
+# 19c. Different on-disk file order does not change the artifact hash.
+#     Recreate the tree so directory iteration order may differ.
+rm -rf "$REPRO_SRC/files"
+mkdir -p "$REPRO_SRC/files/etc" "$REPRO_SRC/files/usr/bin"
+echo "config" > "$REPRO_SRC/files/etc/hello.conf"
+printf "#!/bin/sh\necho hi\n" > "$REPRO_SRC/files/usr/bin/hello"
+chmod +x "$REPRO_SRC/files/usr/bin/hello"
+h_o=$(reproBuild "$REPRO_SRC" /tmp/meow-repro-o hello-1.0.0.pkg.tar.zst)
+if [ "$h_o" = "$h_a" ]; then
+    echo "  PASS: source file order does not affect artifact"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: file order changed artifact ($h_o vs $h_a)"
+    fail=$((fail + 1))
+fi
+
+# 19d. A different SOURCE_DATE_EPOCH produces a different (but still
+#     deterministic) artifact hash. Use a fixture that does NOT pin
+#     source_date_epoch in [build], so the env var is the active source.
+REPRO_ENV="/tmp/meow-repro-env"
+rm -rf "$REPRO_ENV"
+mkdir -p "$REPRO_ENV/files/usr/bin"
+printf "#!/bin/sh\necho hi\n" > "$REPRO_ENV/files/usr/bin/hello"
+chmod +x "$REPRO_ENV/files/usr/bin/hello"
+cat > "$REPRO_ENV/package.toml" << 'EOF'
+name = "hello"
+version = "1.0.0"
+architecture = "AMD64"
+description = "reproducibility fixture"
+EOF
+h_default=$(reproBuild "$REPRO_ENV" /tmp/meow-repro-d hello-1.0.0.pkg.tar.zst)
+h_e=$(reproBuild "$REPRO_ENV" /tmp/meow-repro-e hello-1.0.0.pkg.tar.zst SOURCE_DATE_EPOCH=1720000000)
+if [ -n "$h_e" ] && [ -n "$h_default" ] && [ "$h_e" != "$h_default" ]; then
+    echo "  PASS: SOURCE_DATE_EPOCH override changes hash deterministically"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: SOURCE_DATE_EPOCH had no effect ($h_e vs $h_default)"
+    fail=$((fail + 1))
+fi
+rm -rf "$REPRO_ENV" /tmp/meow-repro-d
+
+# 19e. build.json metadata is embedded and self-describing.
+if ./build/meow-build --output /tmp/meow-repro-x "$REPRO_SRC" >/dev/null 2>&1 && \
+   tar --zstd -tf /tmp/meow-repro-x/hello-1.0.0.pkg.tar.zst 2>/dev/null | grep -q "metadata/build.json"; then
+    echo "  PASS: metadata/build.json embedded in archive"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: metadata/build.json missing from archive"
+    fail=$((fail + 1))
+fi
+
+rm -rf "$REPRO_SRC" /tmp/meow-repro-a /tmp/meow-repro-b /tmp/meow-repro-m \
+       /tmp/meow-repro-o /tmp/meow-repro-e /tmp/meow-repro-x
 
 echo ""
 echo "Results: $pass passed, $fail failed"

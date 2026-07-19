@@ -41,6 +41,13 @@ namespace meow::package {
         metadata.provides = parseDeps(tbl, "provides");
         metadata.replaces = parseDeps(tbl, "replaces");
 
+        if (auto* build = tbl["build"].as_table()) {
+            metadata.build.reproducible = (*build)["reproducible"].value_or(true);
+            if (auto epoch = (*build)["source_date_epoch"].value<long long>()) {
+                metadata.build.sourceDateEpoch = *epoch;
+            }
+        }
+
         return metadata;
     }
 }

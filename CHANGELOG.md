@@ -10,6 +10,12 @@
 - `meow doctor --json` machine-readable output for bug reports / CI
 - `log::setLevel` / `log::getLevel` to control emitted log verbosity
 - `database::checkSchema` to verify the on-disk schema tables
+- Reproducible package generation: `meow-build` emits byte-identical
+  `.pkg.tar.zst` archives for identical source + metadata + environment
+  (sorted entries, root ownership, `SOURCE_DATE_EPOCH` timestamps,
+  normalized permissions, fixed zstd level/threads)
+- `[build]` table in package.toml (`reproducible`, `source_date_epoch`)
+  and self-describing `metadata/build.json` embedded in every archive
 - Parallel package downloads: the dependency closure is resolved from
   repository metadata (no downloads), then all artifacts are fetched
   concurrently via a bounded worker pool (`meow/download/queue.hpp`);

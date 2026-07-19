@@ -3,10 +3,17 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <optional>
 
 #include <meow/types/types.hpp>
 
 namespace meow::package {
+    // Build-time reproducibility metadata from the [build] table.
+    struct BuildInfo {
+        bool reproducible{true};
+        std::optional<long long> sourceDateEpoch; // SOURCE_DATE_EPOCH override
+    };
+
     struct PackageMetadata {
         meow::types::PackageName name;
         meow::types::PackageVersion version;
@@ -19,6 +26,7 @@ namespace meow::package {
         meow::types::Dependencies conflicts;
         meow::types::Dependencies provides;
         meow::types::Dependencies replaces;
+        BuildInfo build;
     };
 
     struct PackageFile {

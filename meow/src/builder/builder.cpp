@@ -9,9 +9,38 @@
 #include <fstream>
 #include <sstream>
 #include <set>
+#include <vector>
+#include <algorithm>
+#include <ctime>
 
 namespace meow::builder {
     namespace {
+        // Fixed zstd settings so multi-core machines produce identical bytes.
+        constexpr int kZstdLevel = 19;
+        constexpr int kZstdThreads = 1;
+
+        // Deterministic mtime used for every archive entry.
+        long long resolveSourceDateEpoch(const package::BuildInfo& build) {
+            if (build.sourceDateEpoch) return *build.sourceDateEpoch;
+            const char* env = std::getenv("SOURCE_DATE_EPOCH");
+            if (env && *env) {
+                try {
+                    return std::stoll(env);
+                } catch (...) {
+                    // fall through to default
+                }
+            }
+            // Stable fallback: never "now".
+            return 0;
+        }
+
+        struct ArchiveEntry {
+            std::string name;
+            std::string content;
+            bool executable{false};
+            bool isDir{false};
+        };
+
         std::string readFileContent(const std::filesystem::path& path) {
             std::ifstream f(path, std::ios::binary);
             if (!f) {
@@ -23,40 +52,69 @@ namespace meow::builder {
             return ss.str();
         }
 
-        void writeArchiveEntry(struct archive* a, const std::string& name,
-                                const std::string& content) {
-            struct archive_entry* entry = archive_entry_new();
-            archive_entry_set_pathname(entry, name.c_str());
-            archive_entry_set_filetype(entry, AE_IFREG);
-            archive_entry_set_perm(entry, 0644);
-            archive_entry_set_size(entry, static_cast<la_int64_t>(content.size()));
-            archive_write_header(a, entry);
-            archive_write_data(a, content.data(), content.size());
-            archive_entry_free(entry);
-        }
-
-        void writeArchiveDir(struct archive* a, const std::string& name) {
-            struct archive_entry* entry = archive_entry_new();
-            archive_entry_set_pathname(entry, name.c_str());
-            archive_entry_set_filetype(entry, AE_IFDIR);
-            archive_entry_set_perm(entry, 0755);
-            archive_write_header(a, entry);
-            archive_entry_free(entry);
-        }
-
-        void addDirectoryToArchive(struct archive* a,
-                                    const std::filesystem::path& diskDir,
-                                    const std::string& archivePrefix) {
+        // Collect every file (and its parent dirs) under diskDir into entries,
+        // keyed by their archive-relative path. Dirs and files are gathered
+        // separately and re-sorted globally for a stable order.
+        void collectDir(const std::filesystem::path& diskDir,
+                        const std::string& prefix,
+                        std::vector<ArchiveEntry>& dirs,
+                        std::vector<ArchiveEntry>& files) {
             if (!std::filesystem::is_directory(diskDir)) return;
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(diskDir)) {
-                auto rel = std::filesystem::relative(entry.path(), diskDir).string();
-                auto archiveName = archivePrefix + "/" + rel;
-                if (entry.is_directory()) {
-                    writeArchiveDir(a, archiveName + "/");
-                } else if (entry.is_regular_file()) {
-                    writeArchiveEntry(a, archiveName, readFileContent(entry.path()));
+            for (const auto& e : std::filesystem::recursive_directory_iterator(diskDir)) {
+                auto rel = std::filesystem::relative(e.path(), diskDir).string();
+                auto archiveName = prefix + "/" + rel;
+                if (e.is_directory()) {
+                    ArchiveEntry de;
+                    de.name = archiveName + "/";
+                    de.isDir = true;
+                    dirs.push_back(std::move(de));
+                } else if (e.is_regular_file()) {
+                    ArchiveEntry fe;
+                    fe.name = archiveName;
+                    fe.content = readFileContent(e.path());
+                    fe.executable = (std::filesystem::status(e.path()).permissions()
+                                     & std::filesystem::perms::owner_exec) != std::filesystem::perms::none;
+                    files.push_back(std::move(fe));
                 }
             }
+        }
+
+        void writeEntry(struct archive* a, const ArchiveEntry& e, long long mtime) {
+            struct archive_entry* entry = archive_entry_new();
+            archive_entry_set_pathname(entry, e.name.c_str());
+            archive_entry_set_filetype(entry, e.isDir ? AE_IFDIR : AE_IFREG);
+            archive_entry_set_perm(entry, e.isDir ? 0755 : (e.executable ? 0755 : 0644));
+
+            // Deterministic ownership.
+            archive_entry_set_uid(entry, 0);
+            archive_entry_set_gid(entry, 0);
+            archive_entry_set_uname(entry, "root");
+            archive_entry_set_gname(entry, "root");
+
+            // Deterministic timestamp (no sub-second / no "now").
+            archive_entry_set_mtime(entry, static_cast<time_t>(mtime), 0);
+            archive_entry_set_ctime(entry, static_cast<time_t>(mtime), 0);
+            archive_entry_set_atime(entry, static_cast<time_t>(mtime), 0);
+
+            if (!e.isDir) {
+                archive_entry_set_size(entry, static_cast<la_int64_t>(e.content.size()));
+            }
+            archive_write_header(a, entry);
+            if (!e.isDir && !e.content.empty()) {
+                archive_write_data(a, e.content.data(), e.content.size());
+            }
+            archive_entry_free(entry);
+        }
+
+        std::string buildJson(const package::BuildInfo& build, long long epoch) {
+            std::ostringstream os;
+            os << "{\n";
+            os << "  \"format_version\": 1,\n";
+            os << "  \"builder\": \"meow-build\",\n";
+            os << "  \"reproducible\": " << (build.reproducible ? "true" : "false") << ",\n";
+            os << "  \"source_date_epoch\": " << epoch << "\n";
+            os << "}\n";
+            return os.str();
         }
 
         void validateMetadata(const package::PackageMetadata& meta) {
@@ -84,37 +142,47 @@ namespace meow::builder {
         auto metadata = package::parsePackageManifest(content);
         validateMetadata(metadata);
 
+        auto epoch = resolveSourceDateEpoch(metadata.build);
+
         auto archName = metadata.architecture == types::CpuArch::AMD64 ? "amd64" : "aarch64";
         std::string pkgFilename = metadata.name.value + "-" + metadata.version.value + ".pkg.tar.zst";
         auto outPath = opts.outputDir / pkgFilename;
 
         std::filesystem::create_directories(opts.outputDir);
 
+        // Gather all entries first so we can sort them into a stable order.
+        std::vector<ArchiveEntry> dirs;
+        std::vector<ArchiveEntry> files;
+        ArchiveEntry pkgToml;
+        pkgToml.name = "package.toml";
+        pkgToml.content = content;
+        files.push_back(std::move(pkgToml));
+
+        collectDir(opts.sourceDir / "files", "files", dirs, files);
+        collectDir(opts.sourceDir / "scripts", "scripts", dirs, files);
+        collectDir(opts.sourceDir / "metadata", "metadata", dirs, files);
+
+        // Synthetic build metadata (always written, makes builds self-describing).
+        ArchiveEntry buildInfo;
+        buildInfo.name = "metadata/build.json";
+        buildInfo.content = buildJson(metadata.build, epoch);
+        files.push_back(std::move(buildInfo));
+
+        std::sort(dirs.begin(), dirs.end(),
+                  [](const ArchiveEntry& a, const ArchiveEntry& b) { return a.name < b.name; });
+        std::sort(files.begin(), files.end(),
+                  [](const ArchiveEntry& a, const ArchiveEntry& b) { return a.name < b.name; });
+
         struct archive* a = archive_write_new();
         archive_write_add_filter_zstd(a);
         archive_write_set_format_pax_restricted(a);
+        // Pin compression so output bytes are stable across machines.
+        archive_write_set_filter_option(a, "zstd", "compression-level", std::to_string(kZstdLevel).c_str());
+        archive_write_set_filter_option(a, "zstd", "threads", std::to_string(kZstdThreads).c_str());
         archive_write_open_filename(a, outPath.c_str());
 
-        // Write package.toml at root
-        writeArchiveEntry(a, "package.toml", content);
-
-        // Write files/ entries
-        auto filesDir = opts.sourceDir / "files";
-        if (std::filesystem::is_directory(filesDir)) {
-            addDirectoryToArchive(a, filesDir, "files");
-        }
-
-        // Write scripts/ entries
-        auto scriptsDir = opts.sourceDir / "scripts";
-        if (std::filesystem::is_directory(scriptsDir)) {
-            addDirectoryToArchive(a, scriptsDir, "scripts");
-        }
-
-        // Write metadata/ entries
-        auto metaDir = opts.sourceDir / "metadata";
-        if (std::filesystem::is_directory(metaDir)) {
-            addDirectoryToArchive(a, metaDir, "metadata");
-        }
+        for (const auto& d : dirs) writeEntry(a, d, epoch);
+        for (const auto& f : files) writeEntry(a, f, epoch);
 
         archive_write_close(a);
         archive_write_free(a);
@@ -124,11 +192,9 @@ namespace meow::builder {
         result.success = true;
         result.archivePath = outPath;
 
-        // Compute and update sha256 in the manifest
         auto sha256 = download::computeFileHash(outPath);
         log::log(log::LogLevel::Info, "sha256: " + sha256);
 
-        // Optional signing
         if (opts.signKey) {
             auto sigPath = outPath;
             sigPath += ".sig";
