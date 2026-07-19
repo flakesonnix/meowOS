@@ -55,6 +55,10 @@ add_executable(meow-repo
     ${MEOW_SOURCES}
 )
 
+add_executable(meow-server
+    meow/src/meow-server/main.cpp
+)
+
 target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-repo PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
@@ -63,6 +67,7 @@ find_package(SQLite3 REQUIRED)
 find_package(LibArchive REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(CURL REQUIRED)
+find_package(Threads REQUIRED)
 find_package(tomlplusplus QUIET)
 if(NOT tomlplusplus_FOUND)
     include(FetchContent)
@@ -83,3 +88,5 @@ foreach(tgt meow meow-build meow-repo)
         tomlplusplus::tomlplusplus
     )
 endforeach()
+
+target_link_libraries(meow-server PRIVATE Threads::Threads)

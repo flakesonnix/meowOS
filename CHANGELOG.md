@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `meow-server`: minimal dependency-free static HTTP server that hosts a
+  signed repository produced by `meow-repo` (`docs/repository-server.md`).
+  Serves `repository.toml`, `repository.toml.sig`, `by-name/...` manifests, and
+  `packages/...` artifacts with correct content types, byte-range requests
+  (`206 Partial Content`), and ETag/304 caching.
+
 ## [0.4.0] - 2026-07-19
 
 ### Added

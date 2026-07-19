@@ -11,6 +11,7 @@
 
 - [Repository layout & identity](repositories.md)
 - [Signing & trust](security.md)
+- [Hosting a repository (meow-server)](repository-server.md)
 - [Reproducible metadata/builds](reproducible.md)
 - [Package cache](cache.md)
 

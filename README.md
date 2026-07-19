@@ -1,4 +1,4 @@
-# meowOS v0.1 — Package Manager
+# meowOS v0.4.0 — Package Manager
 
 A transactional Linux package manager with signed repositories, dependency resolution, and verify/repair capabilities.
 
@@ -28,6 +28,8 @@ A transactional Linux package manager with signed repositories, dependency resol
 - Update (bulk upgrade)
 - Doctor (system diagnostics: config, db, trust, cache, integrity, disk)
 - `doctor --security` (keys, trust chain, cache, lockfile, hook policy)
+- `meow-server`: minimal static HTTP server to host a signed repository
+  (`docs/repository-server.md`)
 
 ## Architecture
 
@@ -58,6 +60,17 @@ SQLite database (packages + files metadata)
    ▼
 Verify / Repair / Sync / Update
 ```
+
+## Distribution pipeline
+
+```text
+meow-build    ->  package artifact (.pkg.tar.zst, reproducible)
+meow-repo     ->  signed repository (repository.toml + by-name/ + packages/)
+meow-server   ->  serve the repository over HTTP
+meow          ->  sync + install + verify
+```
+
+See `docs/repository-server.md` for hosting a repository with `meow-server`.
 
 ## Commands
 

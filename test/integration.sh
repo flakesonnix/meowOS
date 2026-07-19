@@ -902,6 +902,89 @@ fi
 rm -rf "$REL_SRC"
 
 echo ""
+echo "=== 25. meow-server static repository hosting ==="
+# Start the remote repository server against the existing signed repo/ tree.
+SERVER="$(cd "$(dirname "$0")" && pwd)/../build/meow-server"
+FREE_PORT=$(python3 -c 'import socket
+s=socket.socket()
+s.bind(("",0))
+print(s.getsockname()[1])
+s.close()')
+"$SERVER" serve ./repo --port "$FREE_PORT" >/tmp/meow-server.log 2>&1 &
+SRV_PID=$!
+# Wait for the server to come up.
+for _ in $(seq 1 50); do
+    if curl -s -o /dev/null "http://127.0.0.1:$FREE_PORT/repository.toml"; then
+        break
+    fi
+    sleep 0.1
+done
+BASE="http://127.0.0.1:$FREE_PORT"
+
+# 25a. repository.toml is served with TOML content type.
+ct=$($MEOW --db-path /dev/null 2>/dev/null; curl -s -D - -o /dev/null "$BASE/repository.toml" | grep -i "content-type" | tr -d '\r')
+if echo "$ct" | grep -qi "application/toml"; then
+    echo "  PASS: repository.toml served with application/toml"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: repository.toml wrong content-type: $ct"
+    fail=$((fail + 1))
+fi
+
+# 25b. signature is served.
+if curl -s -o /dev/null -w "%{http_code}" "$BASE/repository.toml.sig" | grep -q 200; then
+    echo "  PASS: repository.toml.sig served"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: repository.toml.sig not served"
+    fail=$((fail + 1))
+fi
+
+# 25c. a package manifest is reachable via the sharded by-name layout.
+if curl -s -o /dev/null -w "%{http_code}" "$BASE/by-name/he/hello/package.toml" | grep -q 200; then
+    echo "  PASS: by-name package manifest served"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: by-name package manifest missing"
+    fail=$((fail + 1))
+fi
+
+# 25d. a package artifact is served from packages/.
+# The fixture repo references artifacts via file:// URLs; stage a copy under
+# repo/packages/ so the server can serve it (cleaned up by `git clean repo`).
+mkdir -p repo/packages
+cp /tmp/meow-artifacts/hello-1.1.0.pkg.tar.zst repo/packages/ 2>/dev/null || true
+ART=$(curl -s "$BASE/by-name/he/hello/versions/1.1.0.toml" | grep -m1 "filename" | sed -E 's/.*= *"([^"]+)".*/\1/')
+if [ -n "$ART" ] && curl -s -o /dev/null -w "%{http_code}" "$BASE/packages/$ART" | grep -q 200; then
+    echo "  PASS: package artifact served from packages/ ($ART)"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: package artifact not served (art=$ART)"
+    fail=$((fail + 1))
+fi
+
+# 25e. range requests return 206 Partial Content for large artifacts.
+if curl -s -r 0-15 -o /dev/null -w "%{http_code}" "$BASE/packages/$ART" | grep -q 206; then
+    echo "  PASS: range request returns 206 Partial Content"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: range request not supported"
+    fail=$((fail + 1))
+fi
+
+# 25f. missing path returns 404.
+if curl -s -o /dev/null -w "%{http_code}" "$BASE/does-not-exist" | grep -q 404; then
+    echo "  PASS: missing path returns 404"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: missing path did not return 404"
+    fail=$((fail + 1))
+fi
+
+kill "$SRV_PID" 2>/dev/null || true
+wait "$SRV_PID" 2>/dev/null || true
+
+echo ""
 echo "Results: $pass passed, $fail failed"
 git checkout -- repo 2>/dev/null || true
 git clean -fdq repo 2>/dev/null || true
