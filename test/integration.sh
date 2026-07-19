@@ -86,7 +86,35 @@ filename = "app-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/app-1.0.0.pkg.tar.zst"
 sha256 = "$a10"
 EOF
+    # Mirror the built archives into the HTTP fixture root.
+    rm -rf /tmp/meow-http-root
+    mkdir -p /tmp/meow-http-root
+    cp /tmp/meow-artifacts/*.pkg.tar.zst /tmp/meow-http-root/
     ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+}
+
+HTTP_PID=""
+HTTP_PORT=""
+startHttp() {
+    python3 "$(dirname "$0")/http_fixture.py" --root /tmp/meow-http-root --port 0 >/tmp/meow-http.log 2>&1 &
+    HTTP_PID=$!
+    for _ in $(seq 1 50); do
+        if [ -s /tmp/meow-http.log ]; then
+            HTTP_PORT=$(grep -oP 'LISTENING_ON=\K[0-9]+' /tmp/meow-http.log || true)
+            [ -n "$HTTP_PORT" ] && break
+        fi
+        sleep 0.1
+    done
+    if [ -z "$HTTP_PORT" ]; then
+        echo "  FAIL: http fixture server did not start"
+        fail=$((fail + 1))
+    fi
+}
+
+stopHttp() {
+    [ -n "$HTTP_PID" ] && kill "$HTTP_PID" 2>/dev/null || true
+    wait "$HTTP_PID" 2>/dev/null || true
+    HTTP_PID=""
 }
 
 # Install trusted key for repo verification
@@ -323,6 +351,72 @@ cp /tmp/hello-ver-bak "$HELLO_VER"
 rm -f /tmp/hello-ver-bak
 ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
 rm -rf "$HELLO_SRC" /tmp/meow-test-pkgs "$HELLO_ARCHIVE"
+
+echo "=== 16. HTTP transport paths (local fixture server) ==="
+startHttp
+if [ -n "$HTTP_PORT" ]; then
+    HTTP_BASE="http://127.0.0.1:${HTTP_PORT}"
+    APP_VER="repo/by-name/ap/app/versions/1.0.0.toml"
+    LIB_VER="repo/by-name/li/libfoo/versions/1.0.0.toml"
+
+    # 16a. Successful HTTP download (transport exercises libcurl).
+    cp "$APP_VER" /tmp/app-ver-bak
+    a10=$(sha256sum /tmp/meow-http-root/app-1.0.0.pkg.tar.zst | cut -d' ' -f1)
+    cat > "$APP_VER" << EOF
+[artifact]
+filename = "app-1.0.0.pkg.tar.zst"
+url = "$HTTP_BASE/app-1.0.0.pkg.tar.zst"
+sha256 = "$a10"
+EOF
+    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    rm -rf /tmp/meow-install
+    rm -f ~/.cache/meow/app-1.0.0.pkg.tar.zst
+    check "http download success" "done" $MEOW --db-path "$TEST_DB" install app
+    $MEOW --db-path "$TEST_DB" remove app >/dev/null 2>&1 || true
+
+    # 16b. HTTP 404 is reported as DownloadHttpError.
+    cat > "$APP_VER" << EOF
+[artifact]
+filename = "app-1.0.0.pkg.tar.zst"
+url = "$HTTP_BASE/missing.pkg.tar.zst"
+sha256 = "$a10"
+EOF
+    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    rm -rf /tmp/meow-install
+    rm -f ~/.cache/meow/app-1.0.0.pkg.tar.zst
+    check "http 404 rejected" "DownloadHttpError" $MEOW --db-path "$TEST_DB" install app
+
+    # 16c. Retry on transient 5xx: /flaky returns 500 twice then 200.
+    cat > "$APP_VER" << EOF
+[artifact]
+filename = "app-1.0.0.pkg.tar.zst"
+url = "$HTTP_BASE/flaky/app-1.0.0.pkg.tar.zst"
+sha256 = "$a10"
+EOF
+    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    rm -rf /tmp/meow-install
+    rm -f ~/.cache/meow/app-1.0.0.pkg.tar.zst
+    check "http retry on 5xx" "done" $MEOW --db-path "$TEST_DB" install app
+    $MEOW --db-path "$TEST_DB" remove app >/dev/null 2>&1 || true
+
+    # 16d. Timeout: /slow sleeps longer than the default 30s timeout.
+    cat > "$APP_VER" << EOF
+[artifact]
+filename = "app-1.0.0.pkg.tar.zst"
+url = "$HTTP_BASE/slow/app-1.0.0.pkg.tar.zst"
+sha256 = "$a10"
+EOF
+    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    rm -rf /tmp/meow-install
+    rm -f ~/.cache/meow/app-1.0.0.pkg.tar.zst
+    check "http timeout" "DownloadTimeout" $MEOW --db-path "$TEST_DB" install app
+
+    # restore good version + signature
+    cp /tmp/app-ver-bak "$APP_VER"
+    rm -f /tmp/app-ver-bak
+    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    stopHttp
+fi
 
 echo ""
 echo "Results: $pass passed, $fail failed"

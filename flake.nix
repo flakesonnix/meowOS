@@ -27,6 +27,7 @@
             tomlplusplus # In nixpkgs heißt das Paket tomlplusplus
             openssl      # Für Signatur-Verifikation
             curl         # libcurl transport für Downloads
+            python3     # nur für den Integrationstest-Fixture-Server
           ];
 
           shellHook = ''
