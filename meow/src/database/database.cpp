@@ -1,5 +1,7 @@
 #include <meow/database/database.hpp>
+#include <meow/database/migration.hpp>
 #include <meow/error/error.hpp>
+#include <meow/format/version.hpp>
 #include <meow/download/downloader.hpp>
 #include <sqlite3.h>
 #include <cstdlib>
@@ -87,6 +89,10 @@ namespace meow::database {
             "  package_id INTEGER NOT NULL,"
             "  provide_name TEXT NOT NULL,"
             "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+            ");"
+            "CREATE TABLE IF NOT EXISTS metadata ("
+            "  key TEXT PRIMARY KEY,"
+            "  value TEXT NOT NULL"
             ");";
 
         char* err = nullptr;
@@ -97,6 +103,35 @@ namespace meow::database {
         }
 
         migrateFilesTable(handle);
+
+        // Initialize or verify schema version
+        const char* getVer = "SELECT value FROM metadata WHERE key = 'schema_version';";
+        sqlite3_stmt* vstmt;
+        int schemaVersion = 0;
+        if (sqlite3_prepare_v2(handle, getVer, -1, &vstmt, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(vstmt) == SQLITE_ROW) {
+                auto text = reinterpret_cast<const char*>(sqlite3_column_text(vstmt, 0));
+                if (text) schemaVersion = std::stoi(text);
+            }
+            sqlite3_finalize(vstmt);
+        }
+
+        if (schemaVersion == 0) {
+            // Fresh database or unversioned — set to current
+            const char* setVer = "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', ?);";
+            if (sqlite3_prepare_v2(handle, setVer, -1, &vstmt, nullptr) == SQLITE_OK) {
+                auto verStr = std::to_string(format::CurrentDatabaseSchema);
+                sqlite3_bind_text(vstmt, 1, verStr.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_step(vstmt);
+                sqlite3_finalize(vstmt);
+            }
+            schemaVersion = format::CurrentDatabaseSchema;
+        }
+
+        if (schemaVersion != format::CurrentDatabaseSchema) {
+            throw error::MeowError(error::ErrorCode::DatabaseMigrationFailed,
+                "unsupported database schema version: " + std::to_string(schemaVersion));
+        }
     }
 
     void registerPackage(Database& db, const package::PackageFile& package, const std::vector<std::filesystem::path>& installedFiles) {

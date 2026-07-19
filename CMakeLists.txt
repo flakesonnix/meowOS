@@ -31,6 +31,8 @@ set(MEOW_SOURCES
     meow/src/crypto/signature.cpp
     meow/src/builder/builder.cpp
     meow/src/repo-builder/repo_builder.cpp
+    meow/src/format/version.cpp
+    meow/src/database/migration.cpp
 )
 
 # CLI tools

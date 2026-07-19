@@ -1,3 +1,5 @@
+format_version = 1
+
 [metadata]
 name = "libfoo"
 version = "1.0.0"
@@ -5,4 +7,3 @@ architecture = "AMD64"
 description = "Test library with provides"
 provides = ["foo-lib"]
 conflicts = []
-dependencies = []

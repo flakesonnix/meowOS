@@ -1,4 +1,4 @@
 [artifact]
 filename = "libfoo-1.0.0.pkg.tar.zst"
 url = "file:///tmp/libfoo-1.0.0.pkg.tar.zst"
-sha256 = "7cf4d5a1086f2e20c8d9d4cbb58ce213d79667943700a0693e70ba346b21e569"
+sha256 = "79094b951dfd8e1c99bdedfa1412f9b9e3794c1c9cdc2c0eba45467e350c2224"

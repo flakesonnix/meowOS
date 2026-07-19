@@ -3,7 +3,7 @@
 # Run from repo root: nix develop --command ./test/integration.sh
 set -euo pipefail
 
-MEOW="$(dirname "$0")/../build/meowOS"
+MEOW="$(dirname "$0")/../build/meow"
 TEST_DB="/tmp/meow-test-$$.db"
 export MEOW TEST_DB
 
@@ -76,6 +76,50 @@ check "re-install hello" "done" $MEOW --db-path "$TEST_DB" install hello
 check "verify after reinstall" "all files intact" $MEOW --db-path "$TEST_DB" verify
 
 cleanup
+
+echo "=== 11. Format version rejection ==="
+# 11a. Repository metadata format_version rejection
+# Temporarily add format_version = 99 to a metadata package.toml
+cp repo/by-name/he/hello/package.toml /tmp/hello-pkg-toml-bak
+cat > repo/by-name/he/hello/package.toml << 'EOF'
+format_version = 99
+
+[metadata]
+name = "hello"
+version = "1.1.0"
+architecture = "AMD64"
+description = "bad"
+EOF
+check "reject bad repo metadata format" "unsupported package metadata format" $MEOW --db-path "$TEST_DB" list
+cp /tmp/hello-pkg-toml-bak repo/by-name/he/hello/package.toml
+rm -f /tmp/hello-pkg-toml-bak
+
+# 11b. Repository.toml format_version rejection
+cp repo/repository.toml /tmp/repo-toml-bak
+cat > repo/repository.toml << 'EOF'
+format_version = 99
+name = "local"
+EOF
+check "reject bad repository format" "unsupported repository format" $MEOW --db-path "$TEST_DB" list
+cp /tmp/repo-toml-bak repo/repository.toml
+rm -f /tmp/repo-toml-bak
+
+# 11c. Lockfile format rejection
+cat > /tmp/meow.lock << 'EOF'
+lockfile_version = 99
+EOF
+ln -sf "$PWD/repo" /tmp/repo
+OLDPWD=$PWD
+cd /tmp
+check "reject bad lockfile format" "unsupported lockfile format" $MEOW --db-path /tmp/lock-test.db install --locked hello
+cd "$OLDPWD"
+rm -f /tmp/meow.lock /tmp/lock-test.db /tmp/repo
+
+# 11d. Database schema version rejection
+rm -f /tmp/bad-schema.db
+sqlite3 /tmp/bad-schema.db "CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL); INSERT INTO metadata (key, value) VALUES ('schema_version', '99');"
+check "reject bad database schema" "unsupported database schema version" $MEOW --db-path /tmp/bad-schema.db list
+rm -f /tmp/bad-schema.db
 
 echo ""
 echo "Results: $pass passed, $fail failed"

@@ -1,5 +1,6 @@
 #include <meow/lock/lockfile.hpp>
 #include <meow/error/error.hpp>
+#include <meow/format/version.hpp>
 #include <toml++/toml.hpp>
 #include <sstream>
 #include <fstream>
@@ -16,8 +17,12 @@ Lockfile loadLockfile(const std::filesystem::path& path) {
 
     auto tbl = toml::parse_file(path.string());
 
+    int lfVersion = tbl["lockfile_version"].value_or(0);
+    if (lfVersion == 0) lfVersion = tbl["version"].value_or(1);
+    format::requireVersion("lockfile", lfVersion, format::CurrentLockfileFormat);
+
     Lockfile lock;
-    lock.version = tbl["version"].value_or(1);
+    lock.version = lfVersion;
     lock.repositoryHash = tbl["repository_hash"].value_or("");
 
     auto* packagesArr = tbl["package"].as_array();
@@ -46,7 +51,7 @@ Lockfile loadLockfile(const std::filesystem::path& path) {
 void saveLockfile(const Lockfile& lock, const std::filesystem::path& path) {
     std::ostringstream ss;
 
-    ss << "version = " << lock.version << "\n";
+    ss << "lockfile_version = " << lock.version << "\n";
     ss << "repository_hash = \"" << lock.repositoryHash << "\"\n\n";
 
     for (const auto& lp : lock.packages) {

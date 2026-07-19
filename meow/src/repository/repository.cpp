@@ -3,6 +3,7 @@
 #include <meow/log/logger.hpp>
 #include <meow/crypto/signature.hpp>
 #include <meow/download/downloader.hpp>
+#include <meow/format/version.hpp>
 #include <toml++/toml.hpp>
 #include <algorithm>
 #include <cstdlib>
@@ -83,8 +84,10 @@ namespace meow::repository {
 
                     auto pkgMetaPath = pkgDir.path() / "package.toml";
                     if (std::filesystem::exists(pkgMetaPath)) {
+                        auto pkgTbl = toml::parse_file(pkgMetaPath.string());
+                        auto fmtVer = pkgTbl["format_version"].value_or(1);
+                        format::requireVersion("package metadata", fmtVer, format::CurrentPackageFormat);
                         try {
-                            auto pkgTbl = toml::parse_file(pkgMetaPath.string());
                             if (auto desc = pkgTbl["description"].value<std::string>()) {
                                 pkg.description = types::Description{*desc};
                             }
@@ -159,22 +162,20 @@ namespace meow::repository {
 
             auto repoMetaPath = root / "repository.toml";
             if (std::filesystem::exists(repoMetaPath)) {
-                try {
-                    auto tbl = toml::parse_file(repoMetaPath.string());
-                    repo.name = tbl["name"].value_or("unnamed");
+                auto tbl = toml::parse_file(repoMetaPath.string());
+                auto fmtVer = tbl["format_version"].value_or(1);
+                format::requireVersion("repository", fmtVer, format::CurrentRepositoryFormat);
+                repo.name = tbl["name"].value_or("unnamed");
 
-                    if (auto* mirrorsArr = tbl["mirror"].as_array()) {
-                        for (const auto& elem : *mirrorsArr) {
-                            if (auto* mtbl = elem.as_table()) {
-                                Mirror m;
-                                m.url = (*mtbl)["url"].value_or("");
-                                m.priority = (*mtbl)["priority"].value_or(10);
-                                repo.mirrors.push_back(std::move(m));
-                            }
+                if (auto* mirrorsArr = tbl["mirror"].as_array()) {
+                    for (const auto& elem : *mirrorsArr) {
+                        if (auto* mtbl = elem.as_table()) {
+                            Mirror m;
+                            m.url = (*mtbl)["url"].value_or("");
+                            m.priority = (*mtbl)["priority"].value_or(10);
+                            repo.mirrors.push_back(std::move(m));
                         }
                     }
-                } catch (const std::exception& e) {
-                    log::log(log::LogLevel::Warning, std::string("failed to parse repository.toml: ") + e.what());
                 }
             }
 

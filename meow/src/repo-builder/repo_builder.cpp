@@ -36,8 +36,9 @@ namespace meow::repo {
         }
 
         std::string pkgMetadataToml(const package::PackageMetadata& meta, const std::string& sha256,
-                                     const std::filesystem::path& archivePath) {
+                                      const std::filesystem::path& archivePath) {
             std::ostringstream ss;
+            ss << "format_version = 1\n";
             ss << "[metadata]\n";
             ss << "name = \"" << meta.name.value << "\"\n";
             ss << "version = \"" << meta.version.value << "\"\n";
@@ -155,7 +156,7 @@ namespace meow::repo {
         }
 
         std::ostringstream ss;
-        ss << "schema = 1\n";
+        ss << "format_version = 1\n";
         ss << "name = \"" << name << "\"\n\n";
         ss << "[[mirror]]\n";
         ss << "url = \"./repo\"\n";

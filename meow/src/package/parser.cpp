@@ -2,6 +2,7 @@
 #include <meow/package/parser.hpp>
 #include <meow/package/package.hpp>
 #include <meow/dependency/constraint.hpp>
+#include <meow/format/version.hpp>
 
 namespace meow::package {
     static types::Dependencies parseDeps(const toml::table& tbl, const std::string& key) {
@@ -18,6 +19,9 @@ namespace meow::package {
 
     PackageMetadata parsePackageManifest(const std::string& tomlContent) {
         toml::table tbl = toml::parse(tomlContent);
+
+        auto formatVersion = tbl["format_version"].value_or(1);
+        format::requireVersion("package", formatVersion, format::CurrentPackageFormat);
 
         PackageMetadata metadata;
         metadata.name = types::PackageName{tbl["name"].value_or("")};

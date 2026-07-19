@@ -1,4 +1,4 @@
 [artifact]
 filename = "app-1.0.0.pkg.tar.zst"
 url = "file:///tmp/app-1.0.0.pkg.tar.zst"
-sha256 = "ce3f3c304f7dab59886c406911ef04acf588297e41be8f1af7f8691666209e7f"
+sha256 = "be3eb8831d91767f9d6cf091caea371ca860db74055d59cf45cd53d41ce49689"

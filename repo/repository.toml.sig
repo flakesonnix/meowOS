@@ -1,3 +1,3 @@
 algorithm = "ed25519"
-keyId = "local-dev"
-signature = "BLuCQ50olovx44Y+QFiBmj0rcQTyuLE7uZL6oWMNXE1zFUgM/te1iJ4T6fsMOfIfzWQEcw4Z+bXG53N4aTxKCg=="
+keyId = "meow-release-2026"
+signature = "J8NalvmY4sW6+b13fDdxaquo8bwjNKBQItOPCMwXK1pMsBfVYb18peAzQ/EzcTjbdBilUy4GokAYbQ49KvghAA=="
