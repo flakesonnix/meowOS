@@ -28,6 +28,9 @@ namespace meow::error {
             case ErrorCode::DownloadHttpError:         codeStr = "DownloadHttpError";        break;
             case ErrorCode::DownloadInterrupted:       codeStr = "DownloadInterrupted";      break;
             case ErrorCode::InvalidDownload:           codeStr = "InvalidDownload";          break;
+            case ErrorCode::HookFailed:                codeStr = "HookFailed";               break;
+            case ErrorCode::HookTimeout:               codeStr = "HookTimeout";              break;
+            case ErrorCode::HookDenied:                codeStr = "HookDenied";               break;
             case ErrorCode::Internal:                codeStr = "Internal";                break;
         }
         if (e.code == ErrorCode::RepositoryExpired) {

@@ -61,6 +61,45 @@ reproBuild() {
     sha256sum "$out/$base" 2>/dev/null | cut -d' ' -f1
 }
 
+# Build a package with the given scripts/ content, register it in the
+# sample repo under <name>/<version>, and re-sign. Prints nothing.
+# Usage: registerHookPkg <name> <version> <scripts-dir>
+registerHookPkg() {
+    local name="$1" version="$2" scriptsDir="$3"
+    local src="/tmp/meow-hook-src-$name"
+    rm -rf "$src"
+    mkdir -p "$src/files/usr/bin" "$src/scripts"
+    printf "#!/bin/sh\necho hi\n" > "$src/files/usr/bin/$name"
+    chmod +x "$src/files/usr/bin/$name"
+    cp "$scriptsDir"/* "$src/scripts/" 2>/dev/null || true
+    cat > "$src/package.toml" << EOF
+name = "$name"
+version = "$version"
+architecture = "AMD64"
+description = "hook fixture"
+EOF
+    ./build/meow-build --output /tmp/meow-artifacts "$src" >/dev/null 2>&1
+    local arch="/tmp/meow-artifacts/$name-$version.pkg.tar.zst"
+    local sha
+    sha=$(sha256sum "$arch" | cut -d' ' -f1)
+    mkdir -p "repo/by-name/${name:0:2}/$name/versions"
+    cat > "repo/by-name/${name:0:2}/$name/package.toml" << EOF
+format_version = 1
+[metadata]
+name = "$name"
+version = "$version"
+architecture = "AMD64"
+description = "hook fixture"
+EOF
+    cat > "repo/by-name/${name:0:2}/$name/versions/$version.toml" << EOF
+[artifact]
+filename = "$name-$version.pkg.tar.zst"
+url = "file://$arch"
+sha256 = "$sha"
+EOF
+    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+}
+
 # Generate the package archives the sample repo references, then rewrite the
 # repo version metadata with the matching sha256 and re-sign. This keeps the
 # suite self-contained (no dependency on pre-existing /tmp artifacts).
@@ -628,6 +667,105 @@ rm -rf "$REPRO_SRC" /tmp/meow-repro-a /tmp/meow-repro-b /tmp/meow-repro-m \
        /tmp/meow-repro-o /tmp/meow-repro-e /tmp/meow-repro-x
 
 echo ""
+echo "=== 20. Restricted hook runner ==="
+KEY="$(dirname "$0")/keys/meow-release.pem"
+
+# 20a. Successful hook runs in an isolated cwd with a minimal environment,
+#     and its output is captured.
+HOOK_OK="/tmp/meow-hook-ok"
+rm -rf "$HOOK_OK"
+mkdir -p "$HOOK_OK"
+cat > "$HOOK_OK/post_install" << 'EOF'
+#!/bin/sh
+echo "PKG=$MEOW_PACKAGE VER=$MEOW_VERSION TYPE=$MEOW_HOOK_TYPE"
+echo "PATH=$PATH"
+echo "CWD=$(pwd)"
+EOF
+chmod +x "$HOOK_OK/post_install"
+registerHookPkg hookok 1.0.0 "$HOOK_OK"
+rm -rf /tmp/meow-hook-install
+out=$(MEOW_HOOK_TIMEOUT=30 $MEOW --db-path "$TEST_DB" install hookok 2>&1)
+if echo "$out" | grep -q "done"; then
+    echo "  PASS: successful hook install completes"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: successful hook install failed"
+    fail=$((fail + 1))
+fi
+if echo "$out" | grep -q "PKG=hookok VER=1.0.0 TYPE=post_install" && \
+   echo "$out" | grep -q "PATH=/usr/bin:/bin" && \
+   echo "$out" | grep -q "CWD=/tmp/nix-shell"; then
+    echo "  PASS: hook runs with isolated cwd + minimal env"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: hook environment not isolated"
+    fail=$((fail + 1))
+fi
+if echo "$out" | grep -q "post_install output:"; then
+    echo "  PASS: hook output captured"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: hook output not captured"
+    fail=$((fail + 1))
+fi
+$MEOW --db-path "$TEST_DB" remove hookok >/dev/null 2>&1 || true
+
+# 20b. A failing hook aborts the install and rolls back (package absent).
+HOOK_BAD="/tmp/meow-hook-bad"
+rm -rf "$HOOK_BAD"
+mkdir -p "$HOOK_BAD"
+cat > "$HOOK_BAD/post_install" << 'EOF'
+#!/bin/sh
+echo "boom"
+exit 3
+EOF
+chmod +x "$HOOK_BAD/post_install"
+registerHookPkg hookbad 1.0.0 "$HOOK_BAD"
+rm -rf /tmp/meow-hook-install
+out=$($MEOW --db-path "$TEST_DB" install hookbad 2>&1 || true)
+if echo "$out" | grep -q "HookFailed"; then
+    echo "  PASS: failing hook reported as HookFailed"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: failing hook not reported"
+    fail=$((fail + 1))
+fi
+if ! $MEOW --db-path "$TEST_DB" installed 2>/dev/null | grep -q "hookbad"; then
+    echo "  PASS: failed hook rolled back install"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: hookbad present after failed hook"
+    fail=$((fail + 1))
+fi
+$MEOW --db-path "$TEST_DB" remove hookbad >/dev/null 2>&1 || true
+
+# 20c. A long-running hook is killed by the timeout (SIGTERM then SIGKILL).
+HOOK_SLOW="/tmp/meow-hook-slow"
+rm -rf "$HOOK_SLOW"
+mkdir -p "$HOOK_SLOW"
+cat > "$HOOK_SLOW/post_install" << 'EOF'
+#!/bin/sh
+# Busy-loop (PATH-independent) so it outlives the timeout without relying
+# on any external binary in the minimal hook PATH.
+while true; do :; done
+EOF
+chmod +x "$HOOK_SLOW/post_install"
+registerHookPkg hookslow 1.0.0 "$HOOK_SLOW"
+rm -rf /tmp/meow-hook-install
+out=$(MEOW_HOOK_TIMEOUT=1 $MEOW --db-path "$TEST_DB" install hookslow 2>&1 || true)
+if echo "$out" | grep -q "HookTimeout"; then
+    echo "  PASS: runaway hook killed by timeout"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: runaway hook not timed out"
+    fail=$((fail + 1))
+fi
+$MEOW --db-path "$TEST_DB" remove hookslow >/dev/null 2>&1 || true
+
+rm -rf "$HOOK_OK" "$HOOK_BAD" "$HOOK_SLOW" /tmp/meow-hook-src-* 
+
+echo ""
 echo "Results: $pass passed, $fail failed"
 git checkout -- repo 2>/dev/null || true
+git clean -fdq repo 2>/dev/null || true
 [ "$fail" -eq 0 ] || exit 1

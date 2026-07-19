@@ -30,6 +30,9 @@ namespace meow::error {
         DownloadHttpError,
         DownloadInterrupted,
         InvalidDownload,
+        HookFailed,
+        HookTimeout,
+        HookDenied,
         Internal
     };
 

@@ -12,6 +12,7 @@ A transactional Linux package manager with signed repositories, dependency resol
 - Verified metadata cache (`~/.cache/meow/repos/`)
 - `.tar.zst` package archives with metadata + scripts
 - Reproducible builds (deterministic archives, `metadata/build.json`)
+- Restricted hook runner (isolated cwd, minimal env, timeout, logged output)
 - Pre/post-install scripts
 - Download abstraction with timeout/TLS options
 - Parallel package downloads (bounded worker pool; serial install)

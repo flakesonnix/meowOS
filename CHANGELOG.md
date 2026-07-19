@@ -16,6 +16,11 @@
   normalized permissions, fixed zstd level/threads)
 - `[build]` table in package.toml (`reproducible`, `source_date_epoch`)
   and self-describing `metadata/build.json` embedded in every archive
+- Restricted hook runner (`meow/hooks`): package scripts run in an isolated
+  staging cwd with a minimal environment, captured logging, and a timeout
+  (SIGTERM → SIGKILL). New error codes `HookFailed`, `HookTimeout`,
+  `HookDenied`. A failed hook rolls back the install transaction.
+- `[hooks]` config: `timeout`, `network` (advisory), `inheritEnvironment`
 - Parallel package downloads: the dependency closure is resolved from
   repository metadata (no downloads), then all artifacts are fetched
   concurrently via a bounded worker pool (`meow/download/queue.hpp`);

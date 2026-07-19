@@ -9,6 +9,8 @@ Config defaultConfig() {
     cfg.cache = std::filesystem::path(std::getenv("HOME")) / ".cache" / "meow";
     cfg.repositories.push_back("./repo");
     cfg.downloadWorkers = 0;
+    cfg.hookTimeout = 30;
+    cfg.hookAllowNetwork = false;
     return cfg;
 }
 

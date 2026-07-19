@@ -6,3 +6,7 @@ cmake-build-debug/
 *~
 .DS_Store
 meow.lock
+
+# test-generated sample repo packages
+repo/by-name/ho/
+repo/by-name/hs/
