@@ -58,9 +58,18 @@ transaction is rolled back (extracted files are removed).
 
 ## Hook ABI (v1)
 
-The hook environment is a **stable, documented contract**. Package authors
-and contributors may rely on exactly the following; anything not listed here
-is intentionally absent and must not be used.
+The hook environment is a **stable, versioned contract**. Package authors
+may rely on exactly the variables listed below; anything not listed here is
+intentionally absent and must not be used. The current version is **v1**.
+
+**Versioning policy.** The ABI version is incremented whenever a *new
+guaranteed* variable, working-directory rule, or stdio behavior is added, or
+when an existing guarantee changes. Existing guarantees are never changed
+silently: a behavioral change is always a new ABI version, not an in-place
+edit of v1. When the runner supports more than one version, it advertises
+the highest version it implements so package authors can target a known
+contract. A future `meow` may emit a warning if a hook script relies on an
+unversioned assumption that the running ABI does not guarantee.
 
 ### Environment
 
