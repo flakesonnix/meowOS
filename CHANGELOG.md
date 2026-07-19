@@ -14,6 +14,12 @@
 - Repository cache layout keyed by `repository_id` instead of URL
 - `meow-repo sync` now writes `repository_id` (configurable via `--id`)
 
+### Added
+
+- Download robustness: atomic writes (`.part` + rename), HTTP resume,
+  retries, timeouts, and ETag `If-None-Match` passthrough
+- `docs/downloads.md` documenting download behavior
+
 ## [0.3.0] - 2026-07-19
 
 ### Added

@@ -195,6 +195,43 @@ cp /tmp/repo-toml-bak6 repo/repository.toml
 cp /tmp/repo-sig-bak6 repo/repository.toml.sig
 rm -f /tmp/repo-toml-bak6 /tmp/repo-sig-bak6
 
+echo "=== 15. Download robustness ==="
+# 15a. Successful install leaves no partial (.part) files (atomic rename)
+rm -rf /tmp/meow-install
+check "install hello (atomic)" "done" $MEOW --db-path "$TEST_DB" install hello
+if find /tmp/meow-install -name '*.part' | grep -q .; then
+    echo "  FAIL: leftover .part files after install"
+    fail=$((fail + 1))
+else
+    echo "  PASS: no partial files after install"
+    pass=$((pass + 1))
+fi
+$MEOW --db-path "$TEST_DB" remove hello >/dev/null 2>&1 || true
+
+# 15b. HTTP download failure is reported and leaves no partial file
+HELLO_VER="repo/by-name/he/hello/versions/1.1.0.toml"
+cp "$HELLO_VER" /tmp/hello-ver-bak
+cat > "$HELLO_VER" << 'EOF'
+[artifact]
+filename = "hello-1.1.0.pkg.tar.zst"
+url = "http://127.0.0.1:9/missing.tar.zst"
+sha256 = "3abdfcf0c3f41e7309e69c7719e425513a478d456ec98a96cc0168a021dc05ea"
+EOF
+./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+rm -rf /tmp/meow-install
+rm -f ~/.cache/meow/hello-1.1.0.pkg.tar.zst
+check "reject failed download" "DownloadFailed" $MEOW --db-path "$TEST_DB" install hello
+if find /tmp/meow-install -name '*.part' 2>/dev/null | grep -q .; then
+    echo "  FAIL: leftover .part file after failed download"
+    fail=$((fail + 1))
+else
+    echo "  PASS: no partial file after failed download"
+    pass=$((pass + 1))
+fi
+cp /tmp/hello-ver-bak "$HELLO_VER"
+rm -f /tmp/hello-ver-bak
+./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+
 echo ""
 echo "Results: $pass passed, $fail failed"
 [ "$fail" -eq 0 ] || exit 1

@@ -4,32 +4,66 @@
 #include <cstdio>
 
 namespace meow::download {
+    namespace {
+        std::filesystem::path finalizeDownload(
+            const std::filesystem::path& part,
+            const std::filesystem::path& destination
+        ) {
+            std::error_code ec;
+            std::filesystem::rename(part, destination, ec);
+            if (ec) {
+                std::filesystem::remove(part, ec);
+                throw error::MeowError(
+                    error::ErrorCode::DownloadFailed,
+                    "cannot finalize download: " + destination.string());
+            }
+            return destination;
+        }
+
+        void abortDownload(const std::filesystem::path& part) {
+            std::error_code ec;
+            std::filesystem::remove(part, ec);
+        }
+    }
+
     std::filesystem::path downloadFile(
         const std::string& url,
         const std::filesystem::path& destination,
         const DownloadOptions& options
     ) {
+        auto part = destination;
+        part += ".part";
+
         if (url.starts_with("file://")) {
             auto src = std::filesystem::path(url.substr(7));
-            std::filesystem::copy_file(src, destination, std::filesystem::copy_options::overwrite_existing);
-            return destination;
+            if (!std::filesystem::exists(src)) {
+                throw error::MeowError(error::ErrorCode::DownloadFailed, "source not found: " + src.string());
+            }
+            std::filesystem::copy_file(src, part, std::filesystem::copy_options::overwrite_existing);
+            return finalizeDownload(part, destination);
         }
 
         if (url.starts_with("http://") || url.starts_with("https://")) {
-            std::string cmd = "curl -fsSL";
-            if (options.timeout.count() > 0) {
-                cmd += " --max-time " + std::to_string(options.timeout.count());
-            }
+            long secs = options.timeout.count() > 0 ? options.timeout.count() : 30;
+            std::string cmd = "curl -fsSL --fail --retry 3 --retry-delay 1 -C -";
+            cmd += " --connect-timeout " + std::to_string(secs);
+            cmd += " --max-time " + std::to_string(secs);
             if (!options.verifyTls) {
                 cmd += " --insecure";
             }
-            cmd += " \"" + url + "\" -o \"" + destination.string() + "\"";
+            if (options.etag) {
+                cmd += " -H \"If-None-Match: " + *options.etag + "\"";
+            }
+            cmd += " \"" + url + "\" -o \"" + part.string() + "\"";
 
             int rc = std::system(cmd.c_str());
             if (rc != 0) {
-                throw error::MeowError(error::ErrorCode::DownloadFailed, "download failed: " + url);
+                abortDownload(part);
+                throw error::MeowError(
+                    error::ErrorCode::DownloadFailed,
+                    "download failed (curl rc=" + std::to_string(rc) + "): " + url);
             }
-            return destination;
+            return finalizeDownload(part, destination);
         }
 
         throw error::MeowError(error::ErrorCode::DownloadFailed, "unsupported URL scheme: " + url);
