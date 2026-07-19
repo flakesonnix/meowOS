@@ -112,6 +112,32 @@ Selection across configured sources uses **priority first, then version**:
    provides) enters the merged view. The other sources contribute nothing for
    that name.
 
+## Selection algorithm
+
+The merged view is built deterministically by `RepositoryManager::buildMerged()`
+using the rule above. The exact procedure is fixed by contract and covered by the
+integration tests in `test/integration.sh` (section 32. Repository priority
+selection):
+
+1. Filter repositories with **usable** metadata — sources whose load status is
+   `Available`. Unavailable sources (network error, expired, bad signature,
+   malformed metadata) are excluded from the merged view but remain visible in
+   the health table.
+2. **Order repositories by priority descending.** This is the primary key; it is
+   independent of config order.
+3. **Search candidates in repository order.** For each package name, the first
+   repository (highest priority) that provides the package supplies the merged
+   record for that name.
+4. **Inside the selected repository, choose the highest satisfying version** of
+   that package. Version is only ever a tie-breaker, never a reason to override
+   priority.
+5. **Never downgrade trust failures into fallback silently.** An
+   `Expired` / `InvalidSignature` / `InvalidMetadata` source is a hard trust
+   failure for that source; it is not retried and never used as a fallback, even
+   when a lower-priority healthy source exists. Health state and resolver
+   behavior stay strictly separate: a broken source is reported, not hidden, and
+   the resolver simply does not see it.
+
 This rule is stable and independent of config order. It is already implemented;
 this section fixes it as the documented contract so future changes (mirror
 groups, failover) cannot silently reorder it.

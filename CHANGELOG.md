@@ -44,6 +44,13 @@
   target builds `test/unit/backend_test.cpp`, covering metadata load,
   single-package load (incl. `PackageNotFound`), artifact fetch (present and
   `FileNotFound`), dependency closure, and conflicting-package metadata.
+- Integration test section **32. Repository priority selection** locks the
+  documented selection contract: higher priority wins over a newer version,
+  equal priority breaks on highest version, lower-priority repos fill packages
+  missing from higher-priority ones, an unavailable high-priority repo does not
+  hide a healthy fallback (and stays visible in the health table), and distinct
+  `repository_id`s keep separate caches. `docs/repository-selection.md` gained a
+  **Selection algorithm** section stating the procedure as a fixed contract.
 
 ## [0.4.0] - 2026-07-19
 

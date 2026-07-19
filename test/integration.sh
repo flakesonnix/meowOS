@@ -1501,6 +1501,334 @@ wait "$SRV_PID" 2>/dev/null || true
 git clean -fdq repo-dual 2>/dev/null || true
 
 echo ""
+echo "=== 31. Repository health state ==="
+# Proves RepositoryManager tracks a runtime status per configured source
+# (available vs unavailable/untrusted) instead of silently dropping failures.
+# Five sources exercise every classified status: a healthy fs repo, a dead
+# HTTP endpoint (network error), an expired repo, a tampered-signature repo,
+# and a malformed-metadata repo.
+
+# --- expired fixture: valid signature, expiry in the past ---
+rm -rf repo-expired
+mkdir -p repo-expired/by-name/ex/example/versions
+cat > repo-expired/by-name/ex/example/package.toml << EOF
+format_version = 1
+[metadata]
+name = "example"
+version = "1.0.0"
+architecture = "AMD64"
+description = "expired fixture"
+EOF
+cat > repo-expired/by-name/ex/example/versions/1.0.0.toml << EOF
+[artifact]
+filename = "example-1.0.0.pkg.tar.zst"
+url = "packages/example-1.0.0.pkg.tar.zst"
+sha256 = "deadbeef"
+EOF
+cat > repo-expired/repository.toml << EOF
+format_version = 1
+name = "expired"
+repository_id = "expired-fixture"
+generated = "2020-01-01T00:00:00Z"
+expires = "2020-01-02T00:00:00Z"
+EOF
+./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo-expired >/dev/null 2>&1 || true
+
+# --- bad-signature fixture: valid repo, then invalidate the signature ---
+rm -rf repo-badsig
+mkdir -p repo-badsig/by-name/ex/example/versions
+cp repo-expired/by-name/ex/example/package.toml repo-badsig/by-name/ex/example/
+cp repo-expired/by-name/ex/example/versions/1.0.0.toml repo-badsig/by-name/ex/example/versions/
+cat > repo-badsig/repository.toml << EOF
+format_version = 1
+name = "badsig"
+repository_id = "badsig-fixture"
+generated = "2024-01-01T00:00:00Z"
+expires = "2099-01-01T00:00:00Z"
+EOF
+./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo-badsig >/dev/null 2>&1 || true
+# Tamper with the signed content so the signature no longer verifies.
+echo "# tampered" >> repo-badsig/repository.toml
+
+# --- malformed-metadata fixture: repository.toml is invalid TOML ---
+rm -rf repo-badmeta
+mkdir -p repo-badmeta/by-name/ex/example/versions
+printf 'this is not valid toml [[[' > repo-badmeta/repository.toml
+
+cat > meow-health.toml << EOF
+[[repositories]]
+id = "core"
+url = "./repo"
+priority = 100
+
+[[repositories]]
+id = "testing"
+url = "http://127.0.0.1:1/"
+priority = 50
+
+[[repositories]]
+id = "unstable"
+url = "./repo-expired"
+priority = 40
+
+[[repositories]]
+id = "badsig"
+url = "./repo-badsig"
+priority = 30
+
+[[repositories]]
+id = "badmeta"
+url = "./repo-badmeta"
+priority = 20
+EOF
+
+HEALTH_DB="/tmp/meow-health-$$.db"
+HEALTH_OUT=$($MEOW --db-path "$HEALTH_DB" --config meow-health.toml sync 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+
+if echo "$HEALTH_OUT" | grep -q "core.*Available"; then
+    echo "  PASS: valid repository is Available"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: valid repository not reported Available"
+    fail=$((fail + 1))
+fi
+
+if echo "$HEALTH_OUT" | grep -q "testing.*NetworkError"; then
+    echo "  PASS: timeout becomes NetworkError"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: dead endpoint not reported as NetworkError"
+    fail=$((fail + 1))
+fi
+
+if echo "$HEALTH_OUT" | grep -q "unstable.*Expired"; then
+    echo "  PASS: expired metadata becomes Expired"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: expired repo not reported as Expired"
+    fail=$((fail + 1))
+fi
+
+if echo "$HEALTH_OUT" | grep -q "badsig.*InvalidSignature"; then
+    echo "  PASS: bad signature becomes InvalidSignature"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: bad signature not reported as InvalidSignature"
+    fail=$((fail + 1))
+fi
+
+if echo "$HEALTH_OUT" | grep -q "badmeta.*InvalidMetadata"; then
+    echo "  PASS: malformed metadata becomes InvalidMetadata"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: malformed metadata not reported as InvalidMetadata"
+    fail=$((fail + 1))
+fi
+
+# A failed repository must not remove healthy ones: the merged view must still
+# expose packages from ./repo (hello), proving core stayed in the manager.
+if $MEOW --db-path "$HEALTH_DB" --config meow-health.toml list 2>/dev/null | grep -q "hello"; then
+    echo "  PASS: failed repository does not remove healthy repositories"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: healthy repository dropped when others failed"
+    fail=$((fail + 1))
+fi
+
+rm -f meow-health.toml
+git clean -fdq repo-expired repo-badsig repo-badmeta 2>/dev/null || true
+
+echo ""
+echo "=== 32. Repository priority selection ==="
+# Locks the documented selection contract: "priority first, then version".
+# If the resolver ever regresses to "newest version wins regardless of
+# priority", these cases fail. Fixtures are real signed repositories so the
+# manager loads them through the normal backend path.
+
+# Build a minimal signed repository with a single package at one version.
+# The artifact is a real archive produced by meow-build so `meow info`
+# (which loads the full PackageFile) works offline.
+# Usage: makePrioRepo <dir> <repo-name> <repo-id> <pkg> <ver>
+makePrioRepo() {
+    local dir="$1" name="$2" rid="$3" pkg="$4" ver="$5"
+    rm -rf "$dir" "/tmp/prio-src-$pkg"
+    mkdir -p "/tmp/prio-src-$pkg/files/usr/bin"
+    cat > "/tmp/prio-src-$pkg/package.toml" << EOF
+name = "$pkg"
+version = "$ver"
+architecture = "AMD64"
+description = "priority fixture"
+EOF
+    printf '#!/bin/sh\necho %s\n' "$pkg" > "/tmp/prio-src-$pkg/files/usr/bin/$pkg"
+    chmod +x "/tmp/prio-src-$pkg/files/usr/bin/$pkg"
+    ./build/meow-build --output "/tmp/prio-artifacts" "/tmp/prio-src-$pkg" >/dev/null 2>&1 || true
+    local arch="/tmp/prio-artifacts/$pkg-$ver.pkg.tar.zst"
+    local sha
+    sha=$(sha256sum "$arch" 2>/dev/null | cut -d' ' -f1)
+
+    mkdir -p "$dir/by-name/${pkg:0:2}/$pkg/versions"
+    cat > "$dir/by-name/${pkg:0:2}/$pkg/package.toml" << EOF
+format_version = 1
+[metadata]
+name = "$pkg"
+version = "$ver"
+architecture = "AMD64"
+description = "priority fixture"
+EOF
+    cat > "$dir/by-name/${pkg:0:2}/$pkg/versions/$ver.toml" << EOF
+[artifact]
+filename = "$pkg-$ver.pkg.tar.zst"
+url = "file://$arch"
+sha256 = "$sha"
+EOF
+    cat > "$dir/repository.toml" << EOF
+format_version = 1
+name = "$name"
+repository_id = "$rid"
+generated = "2024-01-01T00:00:00Z"
+expires = "2099-01-01T00:00:00Z"
+EOF
+    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo "$dir" >/dev/null 2>&1 || true
+}
+
+makePrioRepo prio-core "core" "prio-core-fixture" "hello" "1.0.0"
+makePrioRepo prio-testing "testing" "prio-testing-fixture" "hello" "2.0.0"
+
+# Case A: higher priority wins over newer version.
+cat > meow-prio-a.toml << EOF
+[[repositories]]
+id = "core"
+url = "./prio-core"
+priority = 100
+
+[[repositories]]
+id = "testing"
+url = "./prio-testing"
+priority = 50
+EOF
+
+PRIO_DB="/tmp/meow-prio-a-$$.db"
+if $MEOW --db-path "$PRIO_DB" --config meow-prio-a.toml info hello 2>/dev/null | grep -q "Version      1.0.0"; then
+    echo "  PASS: higher priority repository wins over newer version"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: priority not honored over version"
+    fail=$((fail + 1))
+fi
+
+# Case B: same priority chooses highest version.
+makePrioRepo prio-core-b "core" "prio-core-b-fixture" "hello" "1.0.0"
+makePrioRepo prio-testing-b "testing" "prio-testing-b-fixture" "hello" "2.0.0"
+cat > meow-prio-b.toml << EOF
+[[repositories]]
+id = "core"
+url = "./prio-core-b"
+priority = 100
+
+[[repositories]]
+id = "testing"
+url = "./prio-testing-b"
+priority = 100
+EOF
+
+PRIO_DB_B="/tmp/meow-prio-b-$$.db"
+if $MEOW --db-path "$PRIO_DB_B" --config meow-prio-b.toml info hello 2>/dev/null | grep -q "Version      2.0.0"; then
+    echo "  PASS: same priority chooses highest version"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: tie not broken on newest version"
+    fail=$((fail + 1))
+fi
+
+# Case C: lower priority repository used when higher priority lacks package.
+makePrioRepo prio-core-c "core" "prio-core-c-fixture" "hello" "1.0.0"
+makePrioRepo prio-testing-c "testing" "prio-testing-c-fixture" "world" "3.0.0"
+cat > meow-prio-c.toml << EOF
+[[repositories]]
+id = "core"
+url = "./prio-core-c"
+priority = 100
+
+[[repositories]]
+id = "testing"
+url = "./prio-testing-c"
+priority = 50
+EOF
+
+PRIO_DB_C="/tmp/meow-prio-c-$$.db"
+if $MEOW --db-path "$PRIO_DB_C" --config meow-prio-c.toml info world 2>/dev/null | grep -q "Version      3.0.0"; then
+    echo "  PASS: lower priority repository used when higher priority lacks package"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: missing package not filled from lower priority"
+    fail=$((fail + 1))
+fi
+
+# Case D: unavailable high priority repository does not hide healthy fallback.
+# core is the highest priority but unreachable (dead HTTP endpoint); the
+# healthy lower-priority community repo must still provide hello. The broken
+# core must also remain visible in the sync health table.
+makePrioRepo prio-community "community" "prio-community-fixture" "hello" "1.0.0"
+cat > meow-prio-d.toml << EOF
+[[repositories]]
+id = "core"
+url = "http://127.0.0.1:1/"
+priority = 100
+
+[[repositories]]
+id = "community"
+url = "./prio-community"
+priority = 50
+EOF
+
+PRIO_DB_D="/tmp/meow-prio-d-$$.db"
+PRIO_D_OUT=$($MEOW --db-path "$PRIO_DB_D" --config meow-prio-d.toml sync 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+if $MEOW --db-path "$PRIO_DB_D" --config meow-prio-d.toml info hello 2>/dev/null | grep -q "Version      1.0.0"; then
+    echo "  PASS: unavailable high priority repository does not hide healthy fallback"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: healthy fallback hidden by unavailable high priority"
+    fail=$((fail + 1))
+fi
+if echo "$PRIO_D_OUT" | grep -q "core.*NetworkError"; then
+    echo "  PASS: unavailable high priority repository remains visible"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: unavailable core not reported in health table"
+    fail=$((fail + 1))
+fi
+
+# Case E: repository_id cache separation remains intact. Two distinct repos
+# with distinct repository_id (and distinct packages) share no cache; both
+# contribute their packages to the merged view.
+makePrioRepo prio-alpha "alpha" "prio-alpha-fixture" "alpha-pkg" "1.0.0"
+makePrioRepo prio-beta "beta" "prio-beta-fixture" "beta-pkg" "2.0.0"
+cat > meow-prio-e.toml << EOF
+[[repositories]]
+id = "alpha"
+url = "./prio-alpha"
+priority = 100
+
+[[repositories]]
+id = "beta"
+url = "./prio-beta"
+priority = 50
+EOF
+
+PRIO_DB_E="/tmp/meow-prio-e-$$.db"
+PRIO_E_OUT=$($MEOW --db-path "$PRIO_DB_E" --config meow-prio-e.toml list 2>/dev/null)
+if echo "$PRIO_E_OUT" | grep -q "alpha-pkg" && echo "$PRIO_E_OUT" | grep -q "beta-pkg"; then
+    echo "  PASS: repository_id cache separation remains intact"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: cache separation lost; merged view incomplete"
+    fail=$((fail + 1))
+fi
+
+rm -f meow-prio-a.toml meow-prio-b.toml meow-prio-c.toml meow-prio-d.toml meow-prio-e.toml
+git clean -fdq prio-core prio-testing prio-core-b prio-testing-b prio-core-c prio-testing-c prio-community prio-alpha prio-beta 2>/dev/null || true
+
+echo ""
 echo "=== 30. In-memory backend unit tests (disk/network-free) ==="
 UNIT_BIN="$(cd "$(dirname "$0")" && pwd)/../build/meow-unit-backend"
 if [ ! -x "$UNIT_BIN" ]; then
