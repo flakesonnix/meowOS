@@ -418,16 +418,20 @@ int main(int argc, char** argv) {
         } else if (cmd == "sync") {
             std::cout << "Synchronizing repositories...\n";
             for (const auto& s : manager.repositories()) {
+                std::cout << "  " << s.config.id << "  "
+                          << statusLabel(s.status) << "\n";
                 if (s.status == meow::repository::RepositoryStatus::Available) {
-                    std::cout << "  " << s.config.id << "       "
-                              << "\x1b[32m\u2713 " << statusLabel(s.status)
-                              << "\x1b[0m\n";
+                    std::cout << "    \x1b[32m\u2713 " << s.attempts.back().url
+                              << " Available\x1b[0m\n";
                 } else {
-                    std::string detail =
-                        s.error ? meow::error::formatError(*s.error) : "load failed";
-                    std::cout << "  " << s.config.id << "    "
-                              << "\x1b[31m\u2717 " << statusLabel(s.status)
-                              << ": " << detail << "\x1b[0m\n";
+                    for (const auto& a : s.attempts) {
+                        std::string detail =
+                            a.error != meow::error::ErrorCode::Internal
+                                ? (" " + std::string(statusLabel(a.status)))
+                                : "";
+                        std::cout << "    \x1b[31m\u2717 " << a.url
+                                  << detail << "\x1b[0m\n";
+                    }
                 }
             }
 

@@ -28,6 +28,7 @@ namespace meow::error {
         InvalidRepository,
         DownloadTimeout,
         DownloadHttpError,
+        DownloadHttp5xx,
         DownloadInterrupted,
         InvalidDownload,
         HookFailed,

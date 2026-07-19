@@ -217,29 +217,39 @@ The merged view is built per group: a group contributes a package only if its
 priority beats other groups (or ties and wins on version), exactly as today's
 per-source rule, just operating on groups instead of bare URLs.
 
-## Failover
+## Mirror failover
+
+Mirrors are transport alternatives only.
+
+- A mirror cannot provide different metadata.
+- A mirror cannot override trust decisions.
+- A failed verification stops selection.
 
 Failover applies to *artifact downloads* (and, for mirror groups, to metadata
-refresh) **within a group**. It is driven by transport-level problems only.
+refresh) **within a group**. It is driven by transport-level problems only. The
+policy is now implemented in `loadRepositoryWithFailover()`
+(`meow/src/repository/failover.cpp`): for a configured source, mirrors are tried
+in listed order; the first that loads and verifies wins. The decision of whether
+to move to the next mirror is centralized in `isFailoverAllowed()`:
 
-Attempt order for an artifact from a group with mirrors `[A, B, C]`:
+Attempt order for a metadata refresh from a group with mirrors `[A, B, C]`:
 
 ```
-artifact request
-      |
-      v
+metadata refresh
+       |
+       v
 mirror A --(ok)--> done
-      |
-   (transient failure)
-      v
+       |
+    (transport failure)
+       v
 mirror B --(ok)--> done
-      |
-   (transient failure)
-      v
+       |
+    (transport failure)
+       v
 mirror C --(ok)--> done
-      |
-   (transient failure)
-      v
+       |
+    (transport failure)
+       v
 FAIL
 ```
 
@@ -252,17 +262,22 @@ Fail over (try the next mirror) **only** on:
 
 Do **not** fail over on:
 
-- HTTP `404` for an artifact that the metadata explicitly lists — this means the
-  repository is internally inconsistent; surface it.
+- HTTP `404` for `repository.toml` (or any metadata) — this means the mirror is
+  missing expected data; surface it as a failure for the source.
 - invalid signature
+- expired metadata
+- invalid `repository_id` / malformed metadata
 - invalid checksum (`ChecksumMismatch`)
 
-Those last two indicate a bad or compromised mirror; failing over would only
+Those last ones indicate a bad or compromised mirror; failing over would only
 land on another copy of the same (untrusted) data, and crucially must **never**
-relax the trust check. The error is reported for the group as
-`InvalidSignature` / `InvalidMetadata` and is not retried.
+relax the trust check. A trust failure aborts the chain immediately (the next
+mirror is **not** tried), and the source is reported with its trust status
+(`InvalidSignature` / `Expired` / `InvalidMetadata`). The full attempt history is
+preserved in `RepositoryState::attempts` so the health table can show every
+mirror that was tried, never silently dropping a failed one.
 
-Failover must be bounded: try each mirror at most once per request (no unbounded
+Failover must be bounded: try each mirror at most once per refresh (no unbounded
 fan-out), and respect the existing `downloadWorkers`/`hookTimeout`-style limits
 where they apply. A per-mirror attempt timeout keeps a single dead mirror from
 hanging the whole operation.

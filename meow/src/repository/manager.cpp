@@ -26,53 +26,28 @@ RepositoryManager::RepositoryManager(const config::Config& cfg) : cfg_(cfg) {
         RepositoryState state;
         state.config = rc;
 
-        const auto endpoints = rc.urls();
         // Mirrors are alternate transport locations for the *same* repository
-        // identity. Try them in listed order; the first that loads and verifies
-        // wins. Trust failures (bad signature, expired, invalid id) are not
-        // "mirror retries" -- they are fatal for the whole source and must not
-        // be papered over by trying another mirror, so we stop on those.
-        bool loaded = false;
-        for (const auto& endpoint : endpoints) {
-            try {
-                auto backend = createBackend(endpoint);
-                state.repository = backend->loadRepository();
-                state.status = RepositoryStatus::Available;
-                state.error.reset();
-                loaded = true;
-                break;
-            } catch (const error::MeowError& e) {
-                if (e.code == error::ErrorCode::InvalidSignature ||
-                    e.code == error::ErrorCode::TrustedKeyNotFound ||
-                    e.code == error::ErrorCode::RepositoryExpired ||
-                    e.code == error::ErrorCode::InvalidRepository ||
-                    e.code == error::ErrorCode::InvalidManifest) {
-                    // Trust failure: do not fall through to another mirror.
-                    state.status = classifyRepositoryError(e);
-                    state.error = e;
-                    log::log(log::LogLevel::Warning,
-                             "repository '" + rc.id + "' (" + endpoint +
-                                 ") trust failure: " + e.what());
-                    loaded = true;  // stop trying further mirrors
-                    break;
-                }
-                state.status = classifyRepositoryError(e);
-                state.error = e;
-                if (lastError_.empty()) lastError_ = error::formatError(e);
-                log::log(log::LogLevel::Warning,
-                         "repository '" + rc.id + "' (" + endpoint +
-                             ") unavailable, trying next mirror: " + e.what());
-            } catch (const std::exception& e) {
-                state.status = RepositoryStatus::Unavailable;
-                state.error = error::MeowError(error::ErrorCode::Internal, e.what());
-                if (lastError_.empty()) lastError_ = e.what();
-                log::log(log::LogLevel::Warning,
-                         "repository '" + rc.id + "' (" + endpoint +
-                             ") unavailable, trying next mirror: " + e.what());
-            }
-        }
-        if (!loaded && state.status == RepositoryStatus::Available) {
-            state.status = RepositoryStatus::Unavailable;
+        // identity. The failover policy decides when to move to the next mirror:
+        // transport failures (timeout, DNS/connection refused, HTTP 5xx) are
+        // retried; trust failures (bad signature, expired, invalid metadata/id)
+        // abort the chain immediately so a bad mirror is never papered over by
+        // another copy of the same untrusted data. The backend layer stays the
+        // single owner of transport.
+        auto result = loadRepositoryWithFailover(
+            rc.urls(), [](const std::string& url) {
+                return createBackend(url)->loadRepository();
+            });
+
+        state.attempts = std::move(result.attempts);
+        state.status = result.status;
+        if (result.success) {
+            state.repository = std::move(result.repository);
+        } else if (!state.attempts.empty()) {
+            const auto& last = state.attempts.back();
+            state.error =
+                error::MeowError(last.error, "all mirrors failed for '" + rc.id + "'");
+            if (lastError_.empty() && state.error)
+                lastError_ = error::formatError(*state.error);
         }
         if (state.status != RepositoryStatus::Available) ++failed_;
         loaded_.push_back(std::move(state));

@@ -59,10 +59,23 @@
   keyed by `repository_id` (never by mirror path). Priority is per source (group),
   not per mirror. Transport-level load failures fall through to the next mirror;
   trust failures (bad signature, expired, invalid id) stop the group rather than
-  being papered over by another mirror. The runtime failover *policy* remains a
-  separate later step. Integration test section **33. Repository mirror groups**
-  covers single-mirror, shared `repository_id`, cache keying, priority
-  preservation, and legacy `url` migration.
+   being papered over by another mirror. Integration test section
+   **33. Repository mirror groups** covers single-mirror, shared `repository_id`,
+   cache keying, priority preservation, and legacy `url` migration.
+- **Mirror failover policy**: `RepositoryManager` now fails over across a
+  source's mirrors using `loadRepositoryWithFailover()` /
+  `isFailoverAllowed()` (`meow/src/repository/failover.cpp`). Only *transport*
+  failures are retried on the next mirror: timeout, DNS/connection refused/reset,
+  and HTTP `5xx` (new `DownloadHttp5xx` error code). *Trust* failures are NOT
+  failed over -- bad signature, expired metadata, invalid `repository_id` /
+  metadata, checksum mismatch, and HTTP `4xx` (incl. `404`) abort the chain
+  immediately so a bad mirror is never papered over by another copy of the same
+  untrusted data. Every attempted mirror is recorded in
+  `RepositoryState::attempts` and surfaced in the `meow sync` health table; a
+  failed mirror is never silently dropped. Config is unchanged (`mirrors = [...]`).
+  Integration test section **34. Repository mirror failover** covers offline
+  fallback, timeout fallback, bad-signature abort (no fallback), HTTP 404 abort
+  (no fallback), and both-mirrors-down -> `NetworkError` with preserved attempts.
 
 ## [0.4.0] - 2026-07-19
 

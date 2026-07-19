@@ -1962,6 +1962,160 @@ rm -f meow-mir-a.toml meow-mir-b.toml meow-mir-c.toml meow-mir-d.toml meow-mir-e
 git clean -fdq mir-a mir-a2 mir-b mir-cache mir-cache2 mir-prio-hi mir-prio-lo mir-legacy 2>/dev/null || true
 
 echo ""
+echo "=== 34. Repository mirror failover ==="
+# Locks the failover policy: a *transport* failure (timeout, DNS/connection
+# refused, HTTP 5xx) on one mirror is retried on the next mirror; a *trust*
+# failure (bad signature, expired, invalid metadata) or HTTP 4xx aborts the
+# chain immediately and must NOT fall through to another mirror.
+
+# Stand up a fixture HTTP server (timeout via /slow, 404 for missing files) for
+# the transport-failure cases, plus meow-server instances for good/bad-signature
+# mirrors.
+rm -rf /tmp/fo-fixture
+mkdir -p /tmp/fo-fixture
+FO_FIX_PORT=$(python3 -c 'import socket;s=socket.socket();s.bind(("",0));print(s.getsockname()[1]);s.close()')
+python3 "$(dirname "$0")/http_fixture.py" --root /tmp/fo-fixture --port "$FO_FIX_PORT" >/tmp/fo-fixture.log 2>&1 &
+FO_FIX_PID=$!
+for _ in $(seq 1 50); do
+    if curl -s -o /dev/null "http://127.0.0.1:$FO_FIX_PORT/"; then break; fi
+    sleep 0.1
+done
+FO_FIX="http://127.0.0.1:$FO_FIX_PORT"
+
+# A valid HTTP-served repository.
+makePrioRepo fo-good "fogood" "fo-good-fixture" "hello" "1.0.0"
+# The HTTP backend discovers packages via packages.index; the repo builder does
+# not emit it, so we add it for the served fixture.
+echo "hello 1.0.0" > fo-good/packages.index
+FO_GOOD_PORT=$(python3 -c 'import socket;s=socket.socket();s.bind(("",0));print(s.getsockname()[1]);s.close()')
+"$(cd "$(dirname "$0")" && pwd)/../build/meow-server" serve ./fo-good --port "$FO_GOOD_PORT" >/tmp/fo-good.log 2>&1 &
+FO_GOOD_PID=$!
+for _ in $(seq 1 50); do
+    if curl -s -o /dev/null "http://127.0.0.1:$FO_GOOD_PORT/repository.toml"; then break; fi
+    sleep 0.1
+done
+FO_GOOD="http://127.0.0.1:$FO_GOOD_PORT"
+
+# A mirror whose signature no longer matches its content -> InvalidSignature
+# (trust failure). We keep the real signature but tamper repository.toml so
+# verification fails (the same technique the existing rejection tests use).
+rm -rf fo-bad
+cp -r fo-good fo-bad
+echo "# tampered" >> fo-bad/repository.toml
+FO_BAD_PORT=$(python3 -c 'import socket;s=socket.socket();s.bind(("",0));print(s.getsockname()[1]);s.close()')
+"$(cd "$(dirname "$0")" && pwd)/../build/meow-server" serve ./fo-bad --port "$FO_BAD_PORT" >/tmp/fo-bad.log 2>&1 &
+FO_BAD_PID=$!
+for _ in $(seq 1 50); do
+    if curl -s -o /dev/null "http://127.0.0.1:$FO_BAD_PORT/repository.toml"; then break; fi
+    sleep 0.1
+done
+FO_BAD="http://127.0.0.1:$FO_BAD_PORT"
+
+# Case 1: first mirror offline (connection refused), second valid.
+cat > meow-fo1.toml << EOF
+[[repositories]]
+id = "main"
+priority = 100
+mirrors = ["http://127.0.0.1:1/", "$FO_GOOD"]
+EOF
+FO_DB_1="/tmp/meow-fo1-$$.db"
+if $MEOW --db-path "$FO_DB_1" --config meow-fo1.toml info hello 2>/dev/null | grep -q "Version      1.0.0"; then
+    echo "  PASS: first mirror offline falls back to valid mirror"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: offline first mirror not failed over"
+    fail=$((fail + 1))
+fi
+
+# Case 2: first mirror timeout (the fixture /slow path sleeps past the default
+# 30s download timeout), second valid.
+cat > meow-fo2.toml << EOF
+[[repositories]]
+id = "main"
+priority = 100
+mirrors = ["$FO_FIX/slow/repository.toml", "$FO_GOOD"]
+EOF
+FO_DB_2="/tmp/meow-fo2-$$.db"
+if $MEOW --db-path "$FO_DB_2" --config meow-fo2.toml info hello 2>/dev/null | grep -q "Version      1.0.0"; then
+    echo "  PASS: first mirror timeout falls back to valid mirror"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: timed-out first mirror not failed over"
+    fail=$((fail + 1))
+fi
+
+# Case 3: first mirror bad signature -> trust failure, NO fallback.
+cat > meow-fo3.toml << EOF
+[[repositories]]
+id = "main"
+priority = 100
+mirrors = ["$FO_BAD", "$FO_GOOD"]
+EOF
+FO_DB_3="/tmp/meow-fo3-$$.db"
+FO_OUT_3=$($MEOW --db-path "$FO_DB_3" --config meow-fo3.toml sync 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+if echo "$FO_OUT_3" | grep -q "InvalidSignature"; then
+    echo "  PASS: bad signature aborts chain without fallback"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: bad signature fell through to next mirror"
+    fail=$((fail + 1))
+fi
+# The good mirror must NOT have been selected (no Available line for main).
+if echo "$FO_OUT_3" | grep -q "main.*Available"; then
+    echo "  FAIL: trust failure incorrectly fell back to healthy mirror"
+    fail=$((fail + 1))
+else
+    echo "  PASS: healthy mirror not used after trust failure"
+    pass=$((pass + 1))
+fi
+
+# Case 4: first mirror HTTP 404 -> forbidden, NO fallback.
+cat > meow-fo4.toml << EOF
+[[repositories]]
+id = "main"
+priority = 100
+mirrors = ["$FO_FIX/does-not-exist/repository.toml", "$FO_GOOD"]
+EOF
+FO_DB_4="/tmp/meow-fo4-$$.db"
+FO_OUT_4=$($MEOW --db-path "$FO_DB_4" --config meow-fo4.toml sync 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+if echo "$FO_OUT_4" | grep -q "main.*Available"; then
+    echo "  FAIL: HTTP 404 incorrectly fell back to healthy mirror"
+    fail=$((fail + 1))
+else
+    echo "  PASS: HTTP 404 does not fall back"
+    pass=$((pass + 1))
+fi
+
+# Case 5: both mirrors unavailable -> NetworkError, attempt list preserved.
+cat > meow-fo5.toml << EOF
+[[repositories]]
+id = "main"
+priority = 100
+mirrors = ["http://127.0.0.1:1/", "http://127.0.0.1:2/"]
+EOF
+FO_DB_5="/tmp/meow-fo5-$$.db"
+FO_OUT_5=$($MEOW --db-path "$FO_DB_5" --config meow-fo5.toml sync 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+if echo "$FO_OUT_5" | grep -q "NetworkError"; then
+    echo "  PASS: both mirrors unavailable -> NetworkError"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: both mirrors unavailable not reported NetworkError"
+    fail=$((fail + 1))
+fi
+# Both attempted mirrors must be visible (attempt list preserved, not dropped).
+if echo "$FO_OUT_5" | grep -q "127.0.0.1:1" && echo "$FO_OUT_5" | grep -q "127.0.0.1:2"; then
+    echo "  PASS: attempt list preserved across mirrors"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: attempt history not preserved"
+    fail=$((fail + 1))
+fi
+
+kill "$FO_GOOD_PID" "$FO_BAD_PID" "$FO_FIX_PID" 2>/dev/null || true
+rm -f meow-fo1.toml meow-fo2.toml meow-fo3.toml meow-fo4.toml meow-fo5.toml
+git clean -fdq fo-good fo-bad 2>/dev/null || true
+
+echo ""
 echo "=== 30. In-memory backend unit tests (disk/network-free) ==="
 UNIT_BIN="$(cd "$(dirname "$0")" && pwd)/../build/meow-unit-backend"
 if [ ! -x "$UNIT_BIN" ]; then

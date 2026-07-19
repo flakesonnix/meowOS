@@ -218,7 +218,7 @@ namespace meow::download {
                     }
                     if (!isRetryableHttp(lastHttp)) {
                         abortDownload(part);
-                        throw error::MeowError(error::ErrorCode::DownloadHttpError,
+                        throw error::MeowError(error::ErrorCode::DownloadHttp5xx,
                             "download failed (HTTP " + std::to_string(lastHttp) + "): " + url);
                     }
                 } else if (rc == CURLE_WRITE_ERROR && abortSize) {
