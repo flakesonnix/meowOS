@@ -11,6 +11,12 @@
 - `docs/optional-dependencies.md`: specification for optional-dependency
   behavior. Fixes the rule that a user-requested optional package is recorded
   as `Explicit` (no new install reason), so future `autoremove` preserves it.
+- Optional dependencies (phase 2 — install): `meow install <pkg> --with-optional`
+  and `meow install <pkg> --optional <name>` (repeatable) promote selected
+  optional packages to additional requested roots before dependency
+  resolution; the resolver stays unaware of "optionalness". User-chosen
+  optionals are recorded as `Explicit`. An `--optional` name not declared by the
+  package is rejected before resolution.
 - Package history: every install/remove records an append-only `package_history`
   row with timestamp, action, version, install reason, and a per-transaction
   UUID; the `packages` table now stores a current `install_reason` (Explicit >

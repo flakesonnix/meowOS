@@ -2598,6 +2598,117 @@ fi
 rm -f meow-hist.toml
 
 echo ""
+echo "=== 37. Optional dependency installation ==="
+# Locks the optional-install contract: optional packages are promoted to
+# requested roots before resolution and recorded as Explicit.
+
+# Build the optional fixture packages so resolution/install can fetch them.
+buildPkg gtk4 1.0.0 usr/bin/gtk4 >/dev/null 2>&1 || true
+buildPkg qt6 1.0.0 usr/bin/qt6 >/dev/null 2>&1 || true
+
+cat > meow-opt.toml << EOF
+[[repositories]]
+id = "main"
+url = "./repo"
+priority = 100
+EOF
+
+ODB="/tmp/meow-opt-$$.db"
+
+# Case: metadata only doesn't install optional (app's optionals untouched).
+if $MEOW --db-path "$ODB" --config meow-opt.toml install app >/dev/null 2>&1; then
+    if OUT=$($MEOW --db-path "$ODB" installed 2>/dev/null); \
+       echo "$OUT" | grep -q "^app" && ! echo "$OUT" | grep -q "gtk4" && ! echo "$OUT" | grep -q "qt6"; then
+        echo "  PASS: metadata only doesn't install optional"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: optional installed without flag"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  FAIL: app install failed"
+    fail=$((fail + 1))
+fi
+
+# Case: --with-optional installs every optional.
+ODB2="/tmp/meow-opt2-$$.db"
+if $MEOW --db-path "$ODB2" --config meow-opt.toml install app --with-optional >/dev/null 2>&1; then
+    if OUT=$($MEOW --db-path "$ODB2" installed 2>/dev/null); \
+       echo "$OUT" | grep -q "^gtk4" && echo "$OUT" | grep -q "^qt6"; then
+        echo "  PASS: --with-optional installs all optional"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: --with-optional did not install optionals"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  FAIL: --with-optional install failed"
+    fail=$((fail + 1))
+fi
+
+# Case: --optional installs only the selected package.
+ODB3="/tmp/meow-opt3-$$.db"
+if $MEOW --db-path "$ODB3" --config meow-opt.toml install app --optional gtk4 >/dev/null 2>&1; then
+    if OUT=$($MEOW --db-path "$ODB3" installed 2>/dev/null); \
+       echo "$OUT" | grep -q "^gtk4" && ! echo "$OUT" | grep -q "qt6"; then
+        echo "  PASS: --optional installs selected package"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: --optional did not install only selected"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  FAIL: --optional install failed"
+    fail=$((fail + 1))
+fi
+
+# Case: multiple --optional flags.
+ODB4="/tmp/meow-opt4-$$.db"
+if $MEOW --db-path "$ODB4" --config meow-opt.toml install app --optional gtk4 --optional qt6 >/dev/null 2>&1; then
+    if OUT=$($MEOW --db-path "$ODB4" installed 2>/dev/null); \
+       echo "$OUT" | grep -q "^gtk4" && echo "$OUT" | grep -q "^qt6"; then
+        echo "  PASS: multiple --optional flags"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: multiple --optional did not install all"
+        fail=$((fail + 1))
+    fi
+else
+    echo "  FAIL: multiple --optional install failed"
+    fail=$((fail + 1))
+fi
+
+# Case: invalid optional rejected before resolution.
+if OUT=$($MEOW --db-path "$ODB" --config meow-opt.toml install app --optional nonexistent 2>&1); \
+   echo "$OUT" | grep -qi "not an optional dependency"; then
+    echo "  PASS: invalid optional rejected"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: invalid optional not rejected"
+    fail=$((fail + 1))
+fi
+
+# Case: optional recorded as Explicit.
+if OUT=$($MEOW --db-path "$ODB2" why gtk4 2>/dev/null); echo "$OUT" | grep -qi "reason: explicit"; then
+    echo "  PASS: optional recorded as Explicit"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: optional not recorded as Explicit"
+    fail=$((fail + 1))
+fi
+
+# Case: history preserved for optional install.
+if OUT=$($MEOW --db-path "$ODB2" history gtk4 2>/dev/null); echo "$OUT" | grep -qi "install gtk4"; then
+    echo "  PASS: history preserved"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: history missing optional install"
+    fail=$((fail + 1))
+fi
+
+rm -f meow-opt.toml
+
+echo ""
 echo "=== 30. In-memory backend unit tests (disk/network-free) ==="
 UNIT_BIN="$(cd "$(dirname "$0")" && pwd)/../build/meow-unit-backend"
 if [ ! -x "$UNIT_BIN" ]; then
@@ -2629,6 +2740,24 @@ else
         pass=$((pass + 1))
     else
         echo "  FAIL: $HIST_FAIL package history checks failed"
+        fail=$((fail + 1))
+    fi
+fi
+
+echo ""
+echo "=== 32. Optional dependency expansion unit tests (disk/network-free) ==="
+OPT_BIN="$(cd "$(dirname "$0")" && pwd)/../build/meow-unit-optional"
+if [ ! -x "$OPT_BIN" ]; then
+    echo "  SKIP: optional unit test binary not built ($OPT_BIN)"
+else
+    OPT_OUT=$("$OPT_BIN" 2>&1)
+    OPT_FAIL=$(printf '%s\n' "$OPT_OUT" | grep -c '^  FAIL:' || true)
+    OPT_PASS=$(printf '%s\n' "$OPT_OUT" | grep -c '^  PASS:' || true)
+    if [ "$OPT_FAIL" -eq 0 ]; then
+        echo "  PASS: $OPT_PASS optional expansion checks passed"
+        pass=$((pass + 1))
+    else
+        echo "  FAIL: $OPT_FAIL optional expansion checks failed"
         fail=$((fail + 1))
     fi
 fi

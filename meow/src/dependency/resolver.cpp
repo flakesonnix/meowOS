@@ -164,4 +164,48 @@ namespace meow::dependency {
 
         return tree;
     }
+
+    std::vector<types::PackageName> expandInstallRequest(
+        const repository::Repository& repo,
+        const InstallRequest& req) {
+        // Gather every package in scope: the requested roots plus their
+        // required dependency closure. Optional packages are declared on these.
+        std::set<std::string> inScope;
+        for (const auto& name : req.packages) {
+            auto closure = repository::resolveDependencyNames(repo, name);
+            for (const auto& c : closure) inScope.insert(c.value);
+        }
+
+        // Collect all declared optional dependencies across in-scope packages.
+        std::set<std::string> declared;
+        for (const auto& name : inScope) {
+            const auto* pkg = repository::findPackage(repo, types::PackageName{name});
+            if (!pkg) continue;
+            for (const auto& od : pkg->optionalDepends) {
+                declared.insert(od.package.value);
+            }
+        }
+
+        // Determine which optionals become additional roots.
+        std::set<std::string> chosen;
+        if (req.includeAllOptional) {
+            chosen = declared;
+        } else {
+            for (const auto& sel : req.selectedOptional) {
+                if (declared.find(sel.value) == declared.end()) {
+                    throw error::MeowError(
+                        error::ErrorCode::DependencyNotFound,
+                        "not an optional dependency: " + sel.value);
+                }
+                chosen.insert(sel.value);
+            }
+        }
+
+        // Roots = requested packages + chosen optionals (no duplicates).
+        std::vector<types::PackageName> roots = req.packages;
+        for (const auto& c : chosen) {
+            roots.push_back(types::PackageName{c});
+        }
+        return roots;
+    }
 }

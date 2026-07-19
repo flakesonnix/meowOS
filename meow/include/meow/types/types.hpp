@@ -13,6 +13,13 @@ namespace meow::types {
 
     struct PackageName {
         std::string value;
+
+        bool operator<(const PackageName& other) const {
+            return value < other.value;
+        }
+        bool operator==(const PackageName& other) const {
+            return value == other.value;
+        }
     };
 
     struct PackageVersion {

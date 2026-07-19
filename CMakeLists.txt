@@ -82,6 +82,12 @@ target_include_directories(meow-unit-history
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-history PRIVATE meow_core)
 
+# Disk/network-free unit tests for optional-dependency expansion (phase 2).
+add_executable(meow-unit-optional test/unit/optional_test.cpp)
+target_include_directories(meow-unit-optional
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-optional PRIVATE meow_core)
+
 target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-repo PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)

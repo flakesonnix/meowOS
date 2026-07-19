@@ -310,7 +310,7 @@ int main(int argc, char** argv) {
               << "  info   <package>\n"
               << "  list\n"
               << "  search <query>\n"
-              << "  install [--locked] <package>\n"
+              << "  install [--with-optional] [--optional <name>]... [--locked] <package>\n"
               << "  group <list|install> [name]\n"
               << "  upgrade <package>\n"
               << "  remove <package>\n"
@@ -439,28 +439,39 @@ int main(int argc, char** argv) {
             }
             cmdSearch(repo, cmdArgv[1]);
         } else if (cmd == "install") {
-            if (cmdArgc < 2) {
-                std::cerr << "usage: meow install [--locked] <package>\n";
-                return 1;
-            }
-
+            // Flags (any order, before the package name):
+            //   --with-optional      install every declared optional dependency
+            //   --optional <name>    install a named optional (repeatable)
+            //   --locked             install from the lockfile
+            bool withOptional = false;
             bool locked = false;
+            std::set<meow::types::PackageName> selectedOptional;
             std::string pkgName;
-
-            if (cmdArgv[1] == std::string_view("--locked")) {
-                if (cmdArgc < 3) {
-                    std::cerr << "usage: meow install --locked <package>\n";
-                    return 1;
+            for (int i = 1; i < cmdArgc; ++i) {
+                std::string_view a = cmdArgv[i];
+                if (a == "--with-optional") {
+                    withOptional = true;
+                } else if (a == "--optional") {
+                    if (i + 1 >= cmdArgc) {
+                        std::cerr << "usage: meow install <package> --optional <name>\n";
+                        return 1;
+                    }
+                    selectedOptional.insert(meow::types::PackageName{std::string(cmdArgv[++i])});
+                } else if (a == "--locked") {
+                    locked = true;
+                } else {
+                    pkgName = std::string(a);
                 }
-                locked = true;
-                pkgName = cmdArgv[2];
-            } else {
-                pkgName = cmdArgv[1];
+            }
+            if (pkgName.empty()) {
+                std::cerr << "usage: meow install [--with-optional] [--optional <name>]... [--locked] <package>\n";
+                return 1;
             }
 
             meow::package::PackageMetadata meta;
             std::vector<meow::package::PackageFile> toInstall;
             meow::lock::Lockfile lock;
+            std::set<std::string> requested;
 
             if (locked) {
                 meow::log::log(meow::log::LogLevel::Info, "using lockfile");
@@ -479,15 +490,23 @@ int main(int argc, char** argv) {
                     auto pkg = meow::repository::resolveLockedPackage(lock, name);
                     std::cout << "  " << name.value << " " << pkg.metadata.version.value << "\n";
                     toInstall.push_back(std::move(pkg));
+                    requested.insert(name.value);
                 }
             } else {
+                // Expand optional dependencies into additional explicit roots
+                // before resolution. The resolver stays unaware of "optional".
+                meow::dependency::InstallRequest req;
+                req.packages.push_back(meow::types::PackageName{pkgName});
+                req.includeAllOptional = withOptional;
+                req.selectedOptional = selectedOptional;
+                auto roots = meow::dependency::expandInstallRequest(repo, req);
+
                 meow::log::log(meow::log::LogLevel::Info, "resolving dependency names");
-                toInstall = resolveAndStage(
-                    repo, cfg, {meow::types::PackageName{pkgName}});
+                toInstall = resolveAndStage(repo, cfg, roots);
+                for (const auto& r : roots) requested.insert(r.value);
             }
 
             meow::log::log(meow::log::LogLevel::Info, "installing packages");
-            std::set<std::string> requested{meow::types::PackageName{pkgName}.value};
             meow::install::installPackages(toInstall, requested,
                                            meow::database::InstallReason::Explicit,
                                            installRoot, db);
