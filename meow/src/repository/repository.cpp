@@ -2,6 +2,7 @@
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
 #include <meow/crypto/signature.hpp>
+#include <meow/crypto/keystore.hpp>
 #include <meow/download/downloader.hpp>
 #include <meow/format/version.hpp>
 #include <toml++/toml.hpp>
@@ -49,24 +50,37 @@ namespace meow::repository {
         void verifyRepoSig(const std::filesystem::path& repoMetaPath,
                            const std::filesystem::path& cacheDir) {
             auto sigPath = cacheDir / "repository.toml.sig";
-            auto keyPath = cacheDir / "public.pem";
 
             if (!std::filesystem::exists(sigPath) && std::filesystem::exists(repoMetaPath.parent_path() / "repository.toml.sig")) {
                 sigPath = repoMetaPath.parent_path() / "repository.toml.sig";
-                keyPath = repoMetaPath.parent_path() / "public.pem";
             }
 
-            if (std::filesystem::exists(sigPath) && std::filesystem::exists(keyPath)) {
-                if (crypto::verifyFile(repoMetaPath, sigPath, keyPath)) {
-                    log::log(log::LogLevel::Info, "repository signature verified");
+            if (!std::filesystem::exists(sigPath)) {
+                log::log(log::LogLevel::Warning, "repository not signed, skipping verification");
+                return;
+            }
+
+            auto sig = crypto::loadSignature(sigPath);
+            if (sig.keyId.empty()) {
+                log::log(log::LogLevel::Warning, "signature has no keyId, skipping verification");
+                return;
+            }
+
+            try {
+                auto key = crypto::loadTrustedKey(sig.keyId);
+                if (crypto::verifyFile(repoMetaPath, sigPath, key.path)) {
+                    log::log(log::LogLevel::Info, "repository signature verified (key: " + sig.keyId + ")");
                 } else {
                     throw error::MeowError(
                         error::ErrorCode::InvalidSignature,
-                        "repository signature verification failed"
+                        "repository signature invalid"
                     );
                 }
-            } else {
-                log::log(log::LogLevel::Warning, "repository not signed, skipping verification");
+            } catch (const error::MeowError& e) {
+                if (e.code == error::ErrorCode::TrustedKeyNotFound) {
+                    throw;
+                }
+                throw;
             }
         }
 

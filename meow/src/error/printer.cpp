@@ -21,6 +21,7 @@ namespace meow::error {
             case ErrorCode::TransactionFailed:       codeStr = "TransactionFailed";       break;
             case ErrorCode::RollbackFailed:          codeStr = "RollbackFailed";          break;
             case ErrorCode::InvalidSignature:        codeStr = "InvalidSignature";        break;
+            case ErrorCode::TrustedKeyNotFound:      codeStr = "TrustedKeyNotFound";      break;
             case ErrorCode::Internal:                codeStr = "Internal";                break;
         }
         return "error: " + std::string(e.what()) + "\ncode: " + codeStr;

@@ -23,6 +23,7 @@ namespace meow::error {
         TransactionFailed,
         RollbackFailed,
         InvalidSignature,
+        TrustedKeyNotFound,
         Internal
     };
 

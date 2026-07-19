@@ -31,6 +31,10 @@ cleanup() {
     rm -rf /tmp/meow-install
 }
 
+# Install trusted key for repo verification
+mkdir -p ~/.config/meow/keys
+cp "$(dirname "$0")/keys/meow-release.pub" ~/.config/meow/keys/meow-release.pem
+
 cleanup
 
 echo "=== 1. Repository queries ==="
@@ -120,6 +124,27 @@ rm -f /tmp/bad-schema.db
 sqlite3 /tmp/bad-schema.db "CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL); INSERT INTO metadata (key, value) VALUES ('schema_version', '99');"
 check "reject bad database schema" "unsupported database schema version" $MEOW --db-path /tmp/bad-schema.db list
 rm -f /tmp/bad-schema.db
+
+echo "=== 12. Key trust ==="
+# 12a. keys list
+check "keys list shows meow-release" "meow-release" $MEOW keys list
+
+# 12b. keys add (round-trip)
+cp "$(dirname "$0")/keys/meow-release.pub" /tmp/test-add-key.pub
+check "keys add works" "added key" $MEOW keys add /tmp/test-add-key.pub
+rm -f /tmp/test-add-key.pub /tmp/meow-release.pub
+
+# 12c. Missing key rejection
+mv ~/.config/meow/keys/meow-release.pem /tmp/meow-key-bak
+check "reject missing trusted key" "TrustedKeyNotFound" $MEOW --db-path "$TEST_DB" list
+mv /tmp/meow-key-bak ~/.config/meow/keys/meow-release.pem
+
+# 12d. Bad signature rejection
+cp repo/repository.toml /tmp/repo-toml-bak2
+echo "# tamper" >> repo/repository.toml
+check "reject bad repository signature" "repository signature invalid" $MEOW --db-path "$TEST_DB" list
+cp /tmp/repo-toml-bak2 repo/repository.toml
+rm -f /tmp/repo-toml-bak2
 
 echo ""
 echo "Results: $pass passed, $fail failed"

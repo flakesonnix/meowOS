@@ -18,6 +18,7 @@
 #include <meow/repair/repair.hpp>
 #include <meow/sync/sync.hpp>
 #include <meow/update/updater.hpp>
+#include <meow/crypto/keystore.hpp>
 
 namespace {
     const auto lockfilePath = std::filesystem::path("meow.lock");
@@ -164,13 +165,46 @@ int main(int argc, char** argv) {
               << "  sync\n"
               << "  update [--dry-run]\n"
               << "  owns <file>\n"
-              << "  required-by <package>\n";
+              << "  required-by <package>\n"
+              << "  keys list\n"
+              << "  keys add <file>\n";
         return 1;
     }
 
     auto cmd = argv[argi];
     int cmdArgc = argc - argi;
     char** cmdArgv = argv + argi;
+
+    // Handle keys commands early (no repo/db needed)
+    if (cmd == std::string_view("keys")) {
+        if (cmdArgc < 2) {
+            std::cerr << "usage: meow keys list|add <file>\n";
+            return 1;
+        }
+        if (cmdArgv[1] == std::string_view("list")) {
+            auto keys = meow::crypto::listTrustedKeys();
+            if (keys.empty()) {
+                std::cout << "(no trusted keys)\n";
+                return 0;
+            }
+            std::cout << "Trusted keys:\n";
+            for (const auto& k : keys) {
+                std::cout << "  " << k.id << "\n    " << k.path.string() << "\n";
+            }
+            return 0;
+        }
+        if (cmdArgv[1] == std::string_view("add")) {
+            if (cmdArgc < 3) {
+                std::cerr << "usage: meow keys add <file>\n";
+                return 1;
+            }
+            meow::crypto::addTrustedKey(cmdArgv[2]);
+            std::cout << "added key: " << std::filesystem::path(cmdArgv[2]).filename().string() << "\n";
+            return 0;
+        }
+        std::cerr << "unknown keys command: " << cmdArgv[1] << "\n";
+        return 1;
+    }
 
     try {
         auto cfg = meow::config::defaultConfig();

@@ -29,6 +29,7 @@ set(MEOW_SOURCES
     meow/src/log/logger.cpp
     meow/src/config/config.cpp
     meow/src/crypto/signature.cpp
+    meow/src/crypto/keystore.cpp
     meow/src/builder/builder.cpp
     meow/src/repo-builder/repo_builder.cpp
     meow/src/format/version.cpp
