@@ -516,6 +516,13 @@ EOF
 fi
 
 echo ""
+echo "=== 18. doctor diagnostics ==="
+# doctor must run and emit its category sections regardless of environment.
+check "doctor runs" "meow doctor:" $MEOW --db-path "$TEST_DB" doctor
+# JSON variant must contain the checks array.
+check "doctor --json has checks" '"checks": [' $MEOW --db-path "$TEST_DB" doctor --json
+
+echo ""
 echo "Results: $pass passed, $fail failed"
 git checkout -- repo 2>/dev/null || true
 [ "$fail" -eq 0 ] || exit 1

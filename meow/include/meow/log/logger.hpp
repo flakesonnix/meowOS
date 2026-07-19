@@ -14,6 +14,10 @@ enum class LogLevel {
 
 void log(LogLevel level, const std::string& message);
 
+// Minimum level that is emitted. Defaults to Debug (everything printed).
+void setLevel(LogLevel level);
+LogLevel getLevel();
+
 }
 
 #endif

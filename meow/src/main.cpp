@@ -16,6 +16,7 @@
 #include <meow/upgrade/upgrade.hpp>
 #include <meow/lock/lockfile.hpp>
 #include <meow/verify/verifier.hpp>
+#include <meow/doctor/doctor.hpp>
 #include <meow/repair/repair.hpp>
 #include <meow/sync/sync.hpp>
 #include <meow/update/updater.hpp>
@@ -210,12 +211,35 @@ int main(int argc, char** argv) {
 
     try {
         auto cfg = meow::config::defaultConfig();
-        auto repo = meow::repository::openRepository(cfg.repositories[0]);
         auto db = meow::database::openDatabase(dbPath.empty() ? "" : dbPath);
 
-        meow::log::log(meow::log::LogLevel::Debug, "config loaded, database opened");
-
         std::string_view cmd = cmdArgv[0];
+
+        // doctor tolerates a broken repository: it reports the failure as a
+        // check rather than aborting, so it can diagnose trust/expiry issues.
+        if (cmd == "doctor") {
+            meow::log::setLevel(meow::log::LogLevel::Error);
+            const meow::repository::Repository* repoPtr = nullptr;
+            meow::repository::Repository repoValue;
+            try {
+                repoValue = meow::repository::openRepository(cfg.repositories[0]);
+                repoPtr = &repoValue;
+            } catch (const std::exception&) {
+                repoPtr = nullptr;
+            }
+            auto diag = meow::doctor::diagnose(cfg, db, repoPtr);
+            bool asJson = (cmdArgc >= 2 && std::string_view(cmdArgv[1]) == "--json");
+            if (asJson) {
+                meow::doctor::printJson(diag, std::cout);
+            } else {
+                meow::doctor::printReport(diag, std::cout);
+            }
+            return diag.healthy() ? 0 : 1;
+        }
+
+        auto repo = meow::repository::openRepository(cfg.repositories[0]);
+
+        meow::log::log(meow::log::LogLevel::Debug, "config loaded, database opened");
 
         if (cmd == "info") {
             if (cmdArgc < 2) {

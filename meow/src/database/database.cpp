@@ -19,6 +19,8 @@ namespace meow::database {
 
         sqlite3* h(Database& db) { return static_cast<sqlite3*>(db.handle); }
 
+    } // anonymous namespace
+
         void migrateFilesTable(sqlite3* handle) {
             const char* check = "SELECT COUNT(*) FROM pragma_table_info('files') WHERE name='sha256';";
             sqlite3_stmt* stmt;
@@ -26,17 +28,13 @@ namespace meow::database {
             sqlite3_step(stmt);
             int count = sqlite3_column_int(stmt, 0);
             sqlite3_finalize(stmt);
-
             if (count == 0) {
+                const char* alter = "ALTER TABLE files ADD COLUMN sha256 TEXT DEFAULT '';";
                 char* err = nullptr;
-                sqlite3_exec(handle, "ALTER TABLE files ADD COLUMN sha256 TEXT DEFAULT '';", nullptr, nullptr, &err);
-                if (err) sqlite3_free(err);
-                err = nullptr;
-                sqlite3_exec(handle, "ALTER TABLE files ADD COLUMN size INTEGER DEFAULT 0;", nullptr, nullptr, &err);
+                sqlite3_exec(handle, alter, nullptr, nullptr, &err);
                 if (err) sqlite3_free(err);
             }
         }
-    }
 
     Database openDatabase(const std::filesystem::path& path) {
         auto dbPath = path.empty() ? defaultDbPath() : path;
@@ -53,10 +51,27 @@ namespace meow::database {
     }
 
     void closeDatabase(Database& db) {
-        if (db.handle) {
+        if (h(db)) {
             sqlite3_close(h(db));
             db.handle = nullptr;
         }
+    }
+
+    bool checkSchema(Database& db) {
+        auto* handle = h(db);
+        if (!handle) return false;
+        const char* sql =
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name IN "
+            "('packages','files','package_deps','package_provides','metadata');";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            return false;
+        }
+        int found = 0;
+        while (sqlite3_step(stmt) == SQLITE_ROW) ++found;
+        sqlite3_finalize(stmt);
+        return found == 5;
     }
 
     void initializeDatabase(Database& db) {

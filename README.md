@@ -24,6 +24,7 @@ A transactional Linux package manager with signed repositories, dependency resol
 - Repair (restore individual files)
 - Sync (check for upstream updates)
 - Update (bulk upgrade)
+- Doctor (system diagnostics: config, db, trust, cache, integrity, disk)
 
 ## Architecture
 

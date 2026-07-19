@@ -23,6 +23,8 @@ struct Database {
 Database openDatabase(const std::filesystem::path& path);
 void closeDatabase(Database& db);
 void initializeDatabase(Database& db);
+// Returns true if all expected schema tables are present.
+bool checkSchema(Database& db);
 
     void registerPackage(Database& db, const package::PackageFile& package, const std::vector<std::filesystem::path>& installedFiles);
     void updateFileHash(Database& db, const std::filesystem::path& path);

@@ -4,18 +4,12 @@
 
 ### Added
 
-- Verified repository metadata cache (`~/.cache/meow/repos/<repository_id>/`)
-- `meow clean` command to clear the metadata cache
-- `repository_id` repository identity metadata (validated after signature)
-- `InvalidRepository` error for missing/invalid repository identity
-
-### Changed
-
-- Repository cache layout keyed by `repository_id` instead of URL
-- `meow-repo sync` now writes `repository_id` (configurable via `--id`)
-
-### Added
-
+- `meow doctor` system diagnostics command (config, database schema,
+  repository trust/identity/expiry, cache, lockfile consistency, installed
+  file integrity summary, disk space, permissions)
+- `meow doctor --json` machine-readable output for bug reports / CI
+- `log::setLevel` / `log::getLevel` to control emitted log verbosity
+- `database::checkSchema` to verify the on-disk schema tables
 - Parallel package downloads: the dependency closure is resolved from
   repository metadata (no downloads), then all artifacts are fetched
   concurrently via a bounded worker pool (`meow/download/queue.hpp`);

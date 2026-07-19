@@ -17,6 +17,7 @@ set(MEOW_SOURCES
     meow/src/download/queue.cpp
     meow/src/error/printer.cpp
     meow/src/database/database.cpp
+    meow/src/doctor/doctor.cpp
     meow/src/dependency/resolver.cpp
     meow/src/dependency/constraint.cpp
     meow/src/transaction/transaction.cpp
