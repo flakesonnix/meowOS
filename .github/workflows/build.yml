@@ -1,4 +1,4 @@
-name: build
+name: CI
 
 on:
   push:
@@ -7,11 +7,39 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: meow-build-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt', 'meow/src/**/*', 'flake.nix') }}
+          restore-keys: |
+            meow-build-${{ runner.os }}-
+
+      - name: Build
+        run: nix develop --command bash -c 'cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j"$(nproc)"'
+
+      - name: Integration tests
+        run: nix develop --command bash -c './test/integration.sh'
+
+  portable-build:
+    # A non-Nix fallback build to confirm the project still compiles with
+    # plain system packages. tomlplusplus is fetched via CMake FetchContent.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update -qq
-      - run: sudo apt-get install -y cmake libarchive-dev libsqlite3-dev libssl-dev
-      - run: cmake -B build
-      - run: cmake --build build
+      - run: sudo apt-get install -y cmake ninja-build pkg-config libarchive-dev libsqlite3-dev libssl-dev libcurl4-openssl-dev
+      - run: cmake -B build -G Ninja
+      - run: cmake --build build -j"$(nproc)"
+      - run: ./build/meow --help || true
