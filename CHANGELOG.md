@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Verified repository metadata cache (`~/.cache/meow/repos/<repository_id>/`)
+- `meow clean` command to clear the metadata cache
+- `repository_id` repository identity metadata (validated after signature)
+- `InvalidRepository` error for missing/invalid repository identity
+
+### Changed
+
+- Repository cache layout keyed by `repository_id` instead of URL
+- `meow-repo sync` now writes `repository_id` (configurable via `--id`)
+
 ## [0.3.0] - 2026-07-19
 
 ### Added

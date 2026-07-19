@@ -6,6 +6,10 @@ A transactional Linux package manager with signed repositories, dependency resol
 
 - Sharded by-name repository layout (no global index)
 - Signed repositories (Ed25519)
+- Trusted local key store (`~/.config/meow/keys/`)
+- Repository metadata expiry (`generated` / `expires`)
+- Stable `repository_id` for cache and trust anchoring
+- Verified metadata cache (`~/.cache/meow/repos/`)
 - `.tar.zst` package archives with metadata + scripts
 - Pre/post-install scripts
 - Download abstraction with timeout/TLS options
@@ -66,6 +70,7 @@ Verify / Repair / Sync / Update
 | `meow repair [pkg]` | Restore missing/modified files |
 | `meow sync` | Check for updates |
 | `meow update [--dry-run]` | Upgrade all packages |
+| `meow clean` | Clear the local repository metadata cache |
 
 ## Build
 

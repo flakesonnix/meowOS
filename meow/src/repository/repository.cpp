@@ -12,6 +12,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <fstream>
 
 namespace meow::repository {
     namespace {
@@ -43,6 +44,60 @@ namespace meow::repository {
             return false;
         }
 
+        std::filesystem::path cacheRoot() {
+            const char* home = std::getenv("HOME");
+            if (!home) throw error::MeowError(error::ErrorCode::Internal, "HOME not set");
+            return std::filesystem::path(home) / ".cache" / "meow" / "repos";
+        }
+
+        std::filesystem::path cacheDirFor(const std::string& id) {
+            return cacheRoot() / id;
+        }
+
+        void atomicWrite(const std::filesystem::path& dest, const std::string& content) {
+            auto tmp = dest;
+            tmp += ".part";
+            {
+                std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+                if (!out) throw error::MeowError(error::ErrorCode::Internal,
+                    "cannot write cache file: " + tmp.string());
+                out << content;
+            }
+            std::filesystem::rename(tmp, dest);
+        }
+
+        std::string readFileForCache(const std::filesystem::path& path) {
+            std::ifstream f(path, std::ios::binary);
+            std::ostringstream ss;
+            ss << f.rdbuf();
+            return ss.str();
+        }
+
+        void refreshRepoCache(const std::string& id, const std::filesystem::path& metaPath) {
+            auto dir = cacheDirFor(id);
+            std::filesystem::create_directories(dir);
+
+            auto sigPath = metaPath.parent_path() / "repository.toml.sig";
+            atomicWrite(dir / "repository.toml", readFileForCache(metaPath));
+            if (std::filesystem::exists(sigPath)) {
+                atomicWrite(dir / "repository.toml.sig", readFileForCache(sigPath));
+            }
+
+            auto now = std::chrono::system_clock::now();
+            auto t = std::chrono::system_clock::to_time_t(now);
+            std::tm tm{};
+            gmtime_r(&t, &tm);
+            char buf[32];
+            std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+
+            std::ostringstream meta;
+            meta << "{\n";
+            meta << "  \"etag\": \"\",\n";
+            meta << "  \"last_checked\": \"" << buf << "\"\n";
+            meta << "}\n";
+            atomicWrite(dir / "metadata.json", meta.str());
+        }
+
         std::optional<std::chrono::sys_seconds> parseRfc3339Z(const std::string& s) {
             if (s.empty()) return std::nullopt;
             std::tm tm{};
@@ -55,8 +110,7 @@ namespace meow::repository {
             return std::chrono::sys_seconds{std::chrono::seconds{t}};
         }
 
-        void validateRepoId(const std::string& id) {
-            if (id.empty()) {
+        void validateRepoId(const std::string& id) {            if (id.empty()) {
                 throw error::MeowError(
                     error::ErrorCode::InvalidRepository,
                     "repository_id is required");
@@ -253,6 +307,8 @@ namespace meow::repository {
             validateRepoId(repo.id);
             checkRepoExpiry(repo.name, repo.expires);
 
+            refreshRepoCache(repo.id, repoMetaPath);
+
             auto byNameDir = root / "by-name";
             if (std::filesystem::is_directory(byNameDir)) {
                 repo.packages = scanByNameDir(byNameDir);
@@ -292,5 +348,16 @@ namespace meow::repository {
             versions.push_back(v.version);
         }
         return versions;
+    }
+
+    std::filesystem::path repositoryCacheRoot() {
+        return cacheRoot();
+    }
+
+    void clearRepositoryCache() {
+        auto root = cacheRoot();
+        if (std::filesystem::exists(root)) {
+            std::filesystem::remove_all(root);
+        }
     }
 }

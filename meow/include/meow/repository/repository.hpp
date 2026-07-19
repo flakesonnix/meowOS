@@ -43,6 +43,9 @@ const RepositoryPackage* findPackage(const Repository& repo, const types::Packag
 std::vector<types::PackageName> listPackages(const Repository& repo);
 std::vector<types::PackageVersion> listVersions(const RepositoryPackage& package);
 
+std::filesystem::path repositoryCacheRoot();
+void clearRepositoryCache();
+
 }
 
 #endif

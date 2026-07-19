@@ -164,10 +164,11 @@ int main(int argc, char** argv) {
               << "  repair [<package>]\n"
               << "  sync\n"
               << "  update [--dry-run]\n"
-              << "  owns <file>\n"
-              << "  required-by <package>\n"
-              << "  keys list\n"
-              << "  keys add <file>\n";
+               << "  owns <file>\n"
+               << "  required-by <package>\n"
+               << "  keys list\n"
+               << "  keys add <file>\n"
+               << "  clean\n";
         return 1;
     }
 
@@ -400,6 +401,9 @@ int main(int argc, char** argv) {
             }
         } else if (cmd == "installed") {
             cmdInstalled(db);
+        } else if (cmd == "clean") {
+            meow::repository::clearRepositoryCache();
+            std::cout << "cache cleared\n";
         } else {
             std::cerr << "unknown command: " << cmd << "\n";
             return 1;

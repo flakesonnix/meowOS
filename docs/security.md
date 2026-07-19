@@ -1,0 +1,57 @@
+# Repository trust chain
+
+MeowOS treats repository metadata as untrusted until proven otherwise.
+Acceptance follows a strict chain; each step must pass before the next:
+
+```
+repository.toml
+        |
+        v
+Ed25519 signature  (repository.toml.sig)
+        |
+        v
+trusted key store  (~/.config/meow/keys/)
+        |
+        v
+repository_id validation  ([a-zA-Z0-9._-])
+        |
+        v
+expiry validation  (expires >= now)
+```
+
+## Signature
+
+Repositories are signed with Ed25519. The detached signature
+(`repository.toml.sig`) carries a `key_id`. Verification looks up the
+matching trusted public key by `key_id`. An unknown `key_id` fails with
+`TrustedKeyNotFound`; a bad signature fails with `InvalidSignature`.
+
+Unsigned repositories are accepted only with a warning and should never be
+used for production.
+
+## Trusted keys
+
+Trusted public keys live in `~/.config/meow/keys/`. Manage them with:
+
+```
+meow keys list
+meow keys add <public.pem>
+```
+
+## Expiry
+
+`repository.toml` may declare `generated` and `expires` as RFC3339 UTC
+timestamps. Once `expires` is in the past, the repository is rejected with
+`RepositoryExpired`. Expiry is checked only after the signature is verified,
+so an attacker cannot forge an expiry state without a valid signature.
+
+## Identity
+
+`repository_id` is the stable anchor for cache directories, mirror selection,
+and future trust policy. It is validated after signature verification.
+
+## Caching
+
+The metadata cache under `~/.cache/meow/repos/<repository_id>/` is refreshed
+after a successful verification chain. It is **never** used as a source of
+trust — cached files are re-verified on every load.
