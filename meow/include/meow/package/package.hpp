@@ -26,6 +26,7 @@ namespace meow::package {
         meow::types::Dependencies conflicts;
         meow::types::Dependencies provides;
         meow::types::Dependencies replaces;
+        std::vector<meow::types::OptionalDependency> optionalDependencies;
         BuildInfo build;
     };
 

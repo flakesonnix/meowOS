@@ -8,3 +8,11 @@ description = "Test app with dependencies"
 depends = ["hello>=1.0.0", "libfoo"]
 conflicts = []
 provides = []
+
+[[optional_depends]]
+package = "gtk4"
+description = "GUI support"
+
+[[optional_depends]]
+package = "qt6"
+description = "Qt frontend"

@@ -10,6 +10,7 @@
 
 #include <meow/error/error.hpp>
 #include <meow/package/package.hpp>
+#include <meow/package/parser.hpp>
 #include <meow/repository/backend.hpp>
 #include <meow/repository/memory_backend.hpp>
 #include <meow/repository/repository.hpp>
@@ -173,6 +174,34 @@ void testConflictingPackages() {
                    pb->conflicts[0].value == "editor-a");
 }
 
+void testOptionalDependsMetadata() {
+    // Optional dependencies are parsed from the manifest into repository
+    // metadata but must not affect dependency resolution (metadata only).
+    const char* toml =
+        "format_version = 1\n"
+        "name = \"app\"\n"
+        "version = \"1.0.0\"\n"
+        "architecture = \"AMD64\"\n"
+        "depends = [\"libfoo\"]\n"
+        "[[optional_depends]]\n"
+        "package = \"gtk4\"\n"
+        "description = \"GUI support\"\n"
+        "[[optional_depends]]\n"
+        "package = \"qt6\"\n"
+        "description = \"Qt frontend\"\n";
+    auto meta = meow::package::parsePackageManifest(toml);
+    expectPass("optional_depends parsed into metadata",
+               meta.optionalDependencies.size() == 2 &&
+               meta.optionalDependencies[0].package.value == "gtk4" &&
+               meta.optionalDependencies[0].description == "GUI support" &&
+               meta.optionalDependencies[1].package.value == "qt6" &&
+               meta.optionalDependencies[1].description == "Qt frontend");
+    // Sanity: required depends still parsed alongside optional ones.
+    expectPass("depends still parsed alongside optional_depends",
+               meta.dependencies.value.size() == 1 &&
+               meta.dependencies.value[0].name.value == "libfoo");
+}
+
 }  // namespace
 
 int main() {
@@ -180,6 +209,7 @@ int main() {
     testLoadAndResolve();
     testArtifactFetch();
     testConflictingPackages();
+    testOptionalDependsMetadata();
     std::cout << (failures == 0 ? "all passed\n" : "FAILURES present\n");
     return failures == 0 ? 0 : 1;
 }

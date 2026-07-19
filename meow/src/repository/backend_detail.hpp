@@ -206,6 +206,19 @@ inline RepositoryPackage parsePackageManifest(const std::string& tomlText,
         if (auto* meta = pkgTbl["metadata"].as_table()) {
             readNames((*meta)["depends"].as_array());
         }
+        // Optional dependencies are metadata only (not yet resolver input).
+        if (auto* optArr = pkgTbl["optional_depends"].as_array()) {
+            for (auto&& node : *optArr) {
+                if (auto* t = node.as_table()) {
+                    types::OptionalDependency od;
+                    if (auto pkg = (*t)["package"].value<std::string>())
+                        od.package = types::PackageName{*pkg};
+                    od.description = (*t)["description"].value_or("");
+                    if (!od.package.value.empty())
+                        pkg.optionalDepends.push_back(std::move(od));
+                }
+            }
+        }
     } catch (...) {
         log::log(log::LogLevel::Warning, "failed to parse package " + name);
     }

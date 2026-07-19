@@ -4,6 +4,10 @@
 
 ### Added
 
+- Optional dependencies (phase 1 — metadata only): package manifests and
+  repository metadata now support `[[optional_depends]]` with `package` and
+  `description`; `meow info` prints an "Optional dependencies" section. No
+  resolver or install changes yet — optional deps are metadata, not behavior.
 - Package history: every install/remove records an append-only `package_history`
   row with timestamp, action, version, install reason, and a per-transaction
   UUID; the `packages` table now stores a current `install_reason` (Explicit >

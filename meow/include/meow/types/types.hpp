@@ -39,6 +39,13 @@ namespace meow::types {
         std::vector<VersionConstraint> constraints;
     };
 
+    // A non-binding suggested dependency. Metadata only until the resolver
+    // learns to install it; never participates in closure resolution.
+    struct OptionalDependency {
+        PackageName package;
+        std::string description;
+    };
+
     struct Dependencies {
         std::vector<Dependency> value;
     };

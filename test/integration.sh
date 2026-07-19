@@ -1496,6 +1496,17 @@ else
     fail=$((fail + 1))
 fi
 
+# 29d. info shows optional dependencies as metadata (phase 1: no install).
+if OUT=$($MEOW --db-path "$DUAL_DB" info app 2>/dev/null); \
+   echo "$OUT" | grep -qi "Optional dependencies" && \
+   echo "$OUT" | grep -q "gtk4" && echo "$OUT" | grep -q "qt6"; then
+    echo "  PASS: info shows optional dependencies"
+    pass=$((pass + 1))
+else
+    echo "  FAIL: info missing optional dependencies"
+    fail=$((fail + 1))
+fi
+
     echo "  FAIL: info differs across backends (fs='$FS_INFO' http='$HTTP_INFO')"
     fail=$((fail + 1))
 fi

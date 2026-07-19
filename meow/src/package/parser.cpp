@@ -41,6 +41,23 @@ namespace meow::package {
         metadata.provides = parseDeps(tbl, "provides");
         metadata.replaces = parseDeps(tbl, "replaces");
 
+        // Optional dependencies: metadata only. Each entry is a [[optional_depends]]
+        // table with `package` (name) and an optional `description`.
+        if (auto* arr = tbl["optional_depends"].as_array()) {
+            for (auto&& node : *arr) {
+                if (auto* t = node.as_table()) {
+                    types::OptionalDependency od;
+                    if (auto pkg = (*t)["package"].value<std::string>()) {
+                        od.package = types::PackageName{*pkg};
+                    }
+                    od.description = (*t)["description"].value_or("");
+                    if (!od.package.value.empty()) {
+                        metadata.optionalDependencies.push_back(std::move(od));
+                    }
+                }
+            }
+        }
+
         if (auto* build = tbl["build"].as_table()) {
             metadata.build.reproducible = (*build)["reproducible"].value_or(true);
             if (auto epoch = (*build)["source_date_epoch"].value<long long>()) {

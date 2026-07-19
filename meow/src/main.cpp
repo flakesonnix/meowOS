@@ -56,6 +56,20 @@ namespace {
         }
 
         std::cout << "\n"
+                  << "Optional dependencies\n"
+                  << "--------------------\n";
+
+        if (pkg.metadata.optionalDependencies.empty()) {
+            std::cout << "(none)\n";
+        } else {
+            for (const auto& od : pkg.metadata.optionalDependencies) {
+                std::cout << "  " << od.package.value;
+                if (!od.description.empty()) std::cout << "  " << od.description;
+                std::cout << "\n";
+            }
+        }
+
+        std::cout << "\n"
                   << "License: " << pkg.metadata.license << "\n"
                   << "Homepage: " << pkg.metadata.homepage << "\n"
                   << "Maintainer: " << pkg.metadata.maintainer << "\n"
