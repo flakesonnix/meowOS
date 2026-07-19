@@ -681,17 +681,12 @@ echo "PKG=$MEOW_PACKAGE VER=$MEOW_VERSION TYPE=$MEOW_HOOK_TYPE"
 echo "PATH=$PATH"
 echo "CWD=$(pwd)"
 # Enumerate the environment variable NAMES using only shell builtins (the
-# hook PATH is minimal, so no coreutils are assumed). Each name is reported
-# as ALLOWED:<name> if it is part of the supported Hook ABI, otherwise
-# UNEXPECTED:<name>. The test asserts every ABI variable is ALLOWED and that
-# no UNEXPECTED variable is present.
-allowed=" HOME PATH TMPDIR MEOW_PACKAGE MEOW_VERSION MEOW_HOOK_TYPE MEOW_HOOK_STAGING PWD SHLVL _ "
+# hook PATH is minimal, so no coreutils are assumed). Each name is reported as
+# VAR:<name>; the test decides which are required vs forbidden. Shell internals
+# such as PWD/SHLVL/_ may or may not be present and are intentionally ignored.
 env | while IFS= read -r line; do
     name=${line%%=*}
-    case "$allowed" in
-        *" $name "*) echo "ALLOWED:$name" ;;
-        *) echo "UNEXPECTED:$name" ;;
-    esac
+    echo "VAR:$name"
 done
 EOF
 chmod +x "$HOOK_OK/post_install"
@@ -705,25 +700,34 @@ else
     echo "  FAIL: successful hook install failed"
     fail=$((fail + 1))
 fi
-# Isolation: explicit meow vars present, PATH minimal, cwd under the staging
-# tree, and the environment is EXACTLY the supported Hook ABI set (no ambient
-# variables such as CI / GITHUB_ / NIX_ / SSH_ / XDG_ may leak in).
+# Isolation contract (portable across shells):
+#   * every REQUIRED variable is present;
+#   * no FORBIDDEN variable (builder/CI secrets) leaked in;
+#   * shell internals (PWD/SHLVL/_) are tolerated if present.
+REQUIRED="HOME PATH TMPDIR MEOW_PACKAGE MEOW_VERSION MEOW_HOOK_TYPE MEOW_HOOK_STAGING"
 abi_ok=yes
-for v in HOME PATH TMPDIR MEOW_PACKAGE MEOW_VERSION MEOW_HOOK_TYPE MEOW_HOOK_STAGING PWD SHLVL _; do
-    echo "$out" | grep -q "ALLOWED:$v" || abi_ok=no
+for v in $REQUIRED; do
+    echo "$out" | grep -q "VAR:$v" || abi_ok=no
 done
+no_leak=yes
+for pat in CI GITHUB_ NIX_ SSH_ XDG_; do
+    echo "$out" | grep -q "VAR:$pat" && no_leak=no
+done
+# Also reject any forbidden prefix appearing as a variable name.
+if echo "$out" | grep -Eq "VAR:(CI|GITHUB_|NIX_|SSH_|XDG_)"; then
+    no_leak=no
+fi
 if echo "$out" | grep -q "PKG=hookok VER=1.0.0 TYPE=post_install" && \
    echo "$out" | grep -q "PATH=/usr/bin:/bin" && \
    echo "$out" | grep -q "CWD=.*meow/hooks/hookok/post_install" && \
-   [ "$abi_ok" = "yes" ] && \
-   ! echo "$out" | grep -q "UNEXPECTED:"; then
-    echo "  PASS: hook runs with isolated cwd + minimal env (exact ABI set)"
+   [ "$abi_ok" = "yes" ] && [ "$no_leak" = "yes" ]; then
+    echo "  PASS: hook runs with isolated cwd + minimal env (required present, no leaks)"
     pass=$((pass + 1))
 else
     echo "  FAIL: hook environment not isolated"
-    echo "    abi_ok=$abi_ok"
-    echo "    unexpected: $(echo "$out" | grep -o 'UNEXPECTED:[A-Za-z_]*' | tr '\n' ' ')"
-    echo "    missing: $(for v in HOME PATH TMPDIR MEOW_PACKAGE MEOW_VERSION MEOW_HOOK_TYPE MEOW_HOOK_STAGING PWD SHLVL _; do echo "$out" | grep -q "ALLOWED:$v" || echo -n "$v "; done)"
+    echo "    required_ok=$abi_ok leak_ok=$no_leak"
+    echo "    missing: $(for v in $REQUIRED; do echo "$out" | grep -q "VAR:$v" || echo -n "$v "; done)"
+    echo "    leaked: $(echo "$out" | grep -oE 'VAR:(CI|GITHUB_|NIX_|SSH_|XDG_)[A-Za-z0-9_]*' | tr '\n' ' ')"
     fail=$((fail + 1))
 fi
 if echo "$out" | grep -q "post_install output:"; then

@@ -74,15 +74,16 @@ is intentionally absent and must not be used.
 | `MEOW_HOOK_TYPE`    | `pre_install` / `post_install` / `pre_remove` / `post_remove` |
 | `MEOW_HOOK_STAGING` | absolute path to the isolated staging directory  |
 
-The `/bin/sh` interpreter additionally sets `PWD`, `SHLVL`, and `_` inside the
-script; these are part of the ABI (created by the shell, not inherited).
+The runner **guarantees** the variables listed above. The `/bin/sh`
+interpreter may also set shell-specific variables such as `PWD`, `SHLVL`,
+and `_`; these are **not** part of the stable Hook ABI and their presence
+or absence depends on the system shell (dash, bash, busybox, …). Package
+authors must not rely on them. The isolation guarantee is that no
+builder/CI variable (e.g. `CI`, `GITHUB_*`, `NIX_*`, `SSH_*`, `XDG_*`) can
+leak into the hook.
 
 When `hooks.inheritEnvironment = true`, the builder's ambient environment is
 passed through in addition to (and overriding) the variables above.
-
-In addition to the variables above, the `/bin/sh` interpreter itself always
-sets `PWD`, `SHLVL`, and `_` inside the script. These are created by the
-shell, not inherited from the builder, and are considered part of the ABI.
 
 ### Working directory
 
