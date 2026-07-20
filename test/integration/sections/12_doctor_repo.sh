@@ -3,6 +3,7 @@
 set -euo pipefail
 
 run_section() {
+    require_tools python3 curl || return 0
 
 echo "=== 28. Doctor reports per-repository status ==="
 rm -rf repo-http

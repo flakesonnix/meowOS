@@ -3,6 +3,7 @@
 set -euo pipefail
 
 run_section() {
+    require_tools python3 || return 0
 
 echo "=== 16. HTTP transport paths (local fixture server) ==="
 startHttp

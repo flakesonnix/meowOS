@@ -106,8 +106,51 @@ local filesystems. `rsync -a` is not worth the dependency or the 3× cost. The
 Behavior of isolated sections is identical to the prior serial run; only the
 location of mutable state changed (canonical tree → per-run fixtures).
 
-## 6. Constraints honored
+## 6. Environment-dependent failure removal (follow-up)
+
+Goal: no section should FAIL merely because a tool is missing. Each external
+dependency is now detected explicitly and the affected section emits a clear
+`SKIP` instead of aborting with a cryptic `command not found` under `set -e`.
+
+Helpers added to `common.sh`:
+
+- `skip` counter (reported in the `Results:` line alongside pass/fail).
+- `require_tools python3 curl ...` — prints
+  `SKIP: missing required tool(s): ...` and returns non-zero so a section can
+  `require_tools python3 || return 0` at its start.
+- `startHttp` now SKIPs (instead of FAILs) when `python3` is absent or the
+  server fails to bind. Also dropped the non-portable `grep -oP` in favor of
+  `grep -oE ... | cut -d= -f2`.
+
+Sections guarded at `run_section` entry:
+
+| Section | Guard |
+|--------|-------|
+| 02 repo metadata | `require_tools python3` (sqlite3 schema fixture via python3) |
+| 04 http | `require_tools python3` (`startHttp`) |
+| 08 fresh install | `require_tools python3` (sqlite3 upgrade fixture) |
+| 09/10/11/12/13/18/19 | `require_tools python3 curl` (fixture server + curl assertions) |
+
+Classification of the previously-failing sections:
+
+| Section | Symptom | Class | Action |
+|--------:|---------|-------|--------|
+| 04 (×2) | http fixture server did not start | missing `python3` | SKIP (was FAIL) |
+| 09,10,11,12,13,18,19 | need `python3`+`curl` for ports/asserts | missing `python3`/`curl` | SKIP (was silent `set -e` abort) |
+| 02, 08 | sqlite3 schema fixtures | missing `python3` | SKIP (was silent abort) |
+| 14 resolver | `libbar not installed` | **actual regression** (product/resolver) | leave as FAIL |
+| 21 optionals | `optional not recorded as Explicit` | **actual regression** (product) | leave as FAIL |
+
+The two remaining FAILs (14, 21) are genuine product-behavior failures — not
+environment-dependent — and are intentionally left as FAIL; fixing them is out
+of scope (package-manager / resolver code must not change here). They were
+previously masked because the `python3` `set -e` abort terminated the run
+before those sections were reached.
+
+## 7. Constraints honored
 
 No scheduler, no parallel execution, no resolver/package-manager changes, no
 CTest/CI changes, no `CMakeLists.txt` / `test/integration.sh` registration
 changes. This commit only prepares the suite for future parallel execution.
+
+

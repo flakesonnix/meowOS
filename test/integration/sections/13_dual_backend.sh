@@ -3,6 +3,7 @@
 set -euo pipefail
 
 run_section() {
+    require_tools python3 curl || return 0
 
 echo "=== 29. Dual-backend parity (filesystem vs HTTP) ==="
 rm -rf repo-dual

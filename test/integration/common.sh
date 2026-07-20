@@ -81,24 +81,13 @@ create_home_fixture() {
 
 # Return an isolated keys directory containing a copy of the trusted PUBLIC key.
 # Use this when a section needs to mutate ~/.config/meow/keys without adopting a
-# full isolated HOME (e.g. to drop or re-add a trusted key).
+# full isolated HOME (e.g. to drop or re-add a trusted key). meow loads
+# verification keys by matching *.pem, so the public key is copied under a .pem
+# name.
 create_keys_fixture() {
     FIXTURE_SEQ=$((FIXTURE_SEQ + 1))
     local keys="$FIXTURE_ROOT/keys-$FIXTURE_SEQ"
     mkdir -p "$keys"
-    cp "$KEYS_DIR/meow-release.pub" "$keys/meow-release.pem" 2>/dev/null || true
-    echo "$keys"
-}
-
-# Return an isolated keys directory containing a copy of the trusted keys.
-# Use this when a section needs to mutate ~/.config/meow/keys without adopting a
-# full isolated HOME (e.g. to drop or re-add a trusted key).
-create_keys_fixture() {
-    FIXTURE_SEQ=$((FIXTURE_SEQ + 1))
-    local keys="$FIXTURE_ROOT/keys-$FIXTURE_SEQ"
-    mkdir -p "$keys"
-    # meow loads verification keys by matching *.pem, so copy the
-    # public key under a .pem name.
     cp "$KEYS_DIR/meow-release.pub" "$keys/meow-release.pem" 2>/dev/null || true
     echo "$keys"
 }
@@ -126,6 +115,31 @@ export MEOW TEST_DB
 
 pass=0
 fail=0
+skip=0
+
+# Report a skipped check (environment dependency not available).
+skip_check() {
+    local name="$1" reason="${2:-dependency missing}"
+    echo "  SKIP: $name ($reason)"
+    skip=$((skip + 1))
+}
+
+# Check that every named tool is present. Emit a single SKIP line per missing
+# tool and return non-zero if any are missing, so a section can bail out with a
+# clear reason instead of aborting with a cryptic "command not found" under
+# `set -e`.
+require_tools() {
+    local missing=() t
+    for t in "$@"; do
+        command -v "$t" >/dev/null 2>&1 || missing+=("$t")
+    done
+    if [ "${#missing[@]}" -gt 0 ]; then
+        echo "  SKIP: missing required tool(s): ${missing[*]}"
+        skip=$((skip + 1))
+        return 1
+    fi
+    return 0
+}
 
 check() {
     local name="$1" expected="$2"
@@ -275,6 +289,14 @@ EOF
     mkdir -p repo/by-name/li/libbar/versions \
              repo/by-name/my/myapp/versions \
              repo/by-name/my/myapp-exact/versions
+    cat > repo/by-name/li/libbar/package.toml << EOF
+format_version = 1
+[metadata]
+name = "libbar"
+version = "1.0.0"
+architecture = "AMD64"
+description = "version constraint fixture"
+EOF
     cat > repo/by-name/li/libbar/versions/1.0.0.toml << EOF
 [artifact]
 filename = "libbar-1.0.0.pkg.tar.zst"
@@ -293,11 +315,27 @@ filename = "libbar-3.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/libbar-3.0.0.pkg.tar.zst"
 sha256 = "$lb30"
 EOF
+    cat > repo/by-name/my/myapp/package.toml << EOF
+format_version = 1
+[metadata]
+name = "myapp"
+version = "1.0.0"
+architecture = "AMD64"
+description = "version constraint fixture"
+EOF
     cat > repo/by-name/my/myapp/versions/1.0.0.toml << EOF
 [artifact]
 filename = "myapp-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/myapp-1.0.0.pkg.tar.zst"
 sha256 = "$mya"
+EOF
+    cat > repo/by-name/my/myapp-exact/package.toml << EOF
+format_version = 1
+[metadata]
+name = "myapp-exact"
+version = "1.0.0"
+architecture = "AMD64"
+description = "version constraint fixture"
 EOF
     cat > repo/by-name/my/myapp-exact/versions/1.0.0.toml << EOF
 [artifact]
@@ -314,25 +352,77 @@ EOF
 HTTP_PID=""
 HTTP_PORT=""
 startHttp() {
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "  SKIP: http fixture server (missing python3)"
+        skip=$((skip + 1))
+        HTTP_PORT=""
+        return 1
+    fi
     python3 "$SCRIPT_DIR/http_fixture.py" --root /tmp/meow-http-root --port 0 >/tmp/meow-http.log 2>&1 &
     HTTP_PID=$!
     for _ in $(seq 1 50); do
         if [ -s /tmp/meow-http.log ]; then
-            HTTP_PORT=$(grep -oP 'LISTENING_ON=\K[0-9]+' /tmp/meow-http.log || true)
+            HTTP_PORT=$(grep -oE 'LISTENING_ON=[0-9]+' /tmp/meow-http.log 2>/dev/null | tail -1 | cut -d= -f2)
             [ -n "$HTTP_PORT" ] && break
         fi
         sleep 0.1
     done
     if [ -z "$HTTP_PORT" ]; then
-        echo "  FAIL: http fixture server did not start"
-        fail=$((fail + 1))
+        echo "  SKIP: http fixture server did not start"
+        skip=$((skip + 1))
+        return 1
     fi
+    return 0
 }
 
 stopHttp() {
     [ -n "$HTTP_PID" ] && kill "$HTTP_PID" 2>/dev/null || true
     wait "$HTTP_PID" 2>/dev/null || true
     HTTP_PID=""
+}
+
+# Build a standalone repository with a single package for priority / mirror
+# failover / parallel-refresh tests. Used by sections 16-19.
+makePrioRepo() {
+    local dir="$1" name="$2" rid="$3" pkg="$4" ver="$5"
+    rm -rf "$dir" "/tmp/prio-src-$pkg"
+    mkdir -p "/tmp/prio-src-$pkg/files/usr/bin"
+    cat > "/tmp/prio-src-$pkg/package.toml" << EOF
+name = "$pkg"
+version = "$ver"
+architecture = "AMD64"
+description = "priority fixture"
+EOF
+    printf '#!/bin/sh\necho %s\n' "$pkg" > "/tmp/prio-src-$pkg/files/usr/bin/$pkg"
+    chmod +x "/tmp/prio-src-$pkg/files/usr/bin/$pkg"
+    "$ROOT_DIR/build/meow-build" --output "/tmp/prio-artifacts" "/tmp/prio-src-$pkg" >/dev/null 2>&1 || true
+    local arch="/tmp/prio-artifacts/$pkg-$ver.pkg.tar.zst"
+    local sha
+    sha=$(sha256sum "$arch" 2>/dev/null | cut -d' ' -f1)
+
+    mkdir -p "$dir/by-name/${pkg:0:2}/$pkg/versions"
+    cat > "$dir/by-name/${pkg:0:2}/$pkg/package.toml" << EOF
+format_version = 1
+[metadata]
+name = "$pkg"
+version = "$ver"
+architecture = "AMD64"
+description = "priority fixture"
+EOF
+    cat > "$dir/by-name/${pkg:0:2}/$pkg/versions/$ver.toml" << EOF
+[artifact]
+filename = "$pkg-$ver.pkg.tar.zst"
+url = "file://$arch"
+sha256 = "$sha"
+EOF
+    cat > "$dir/repository.toml" << EOF
+format_version = 1
+name = "$name"
+repository_id = "$rid"
+generated = "2024-01-01T00:00:00Z"
+expires = "2099-01-01T00:00:00Z"
+EOF
+    "$ROOT_DIR/build/meow-repo" sign --key "$KEYS_DIR/meow-release.pem" --key-id meow-release --repo "$dir" >/dev/null 2>&1 || true
 }
 
 

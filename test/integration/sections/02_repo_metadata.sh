@@ -3,6 +3,7 @@
 set -euo pipefail
 
 run_section() {
+    require_tools python3 || return 0
 
 echo "=== 11. Format version rejection ==="
 cp repo/by-name/he/hello/package.toml /tmp/hello-pkg-toml-bak

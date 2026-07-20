@@ -3,6 +3,7 @@
 set -euo pipefail
 
 run_section() {
+    require_tools python3 || return 0
 
 echo "=== 22. fresh-install from an empty system ==="
 FRESH_DB="$TMPDIR/fresh-$$.db"

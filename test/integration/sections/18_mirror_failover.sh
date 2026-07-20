@@ -3,6 +3,7 @@
 set -euo pipefail
 
 run_section() {
+    require_tools python3 curl || return 0
 
 echo "=== 34. Repository mirror failover ==="
 rm -rf /tmp/fo-fixture

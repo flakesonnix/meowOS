@@ -55,7 +55,7 @@ run_section_from "21_optionals.sh"
 run_section_from "14_resolver.sh"
 
 echo ""
-echo "Results: $pass passed, $fail failed"
+echo "Results: $pass passed, $fail failed, $skip skipped"
 git checkout -- repo 2>/dev/null || true
 git clean -fdq repo 2>/dev/null || true
 [ "$fail" -eq 0 ] || exit 1
