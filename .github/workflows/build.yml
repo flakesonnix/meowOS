@@ -29,8 +29,19 @@ jobs:
       - name: Build
         run: nix develop --command bash -c 'cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j"$(nproc)"'
 
-      - name: Integration tests
+      - name: Integration tests (legacy resolver)
+        env:
+          MEOW_RESOLVER: legacy
         run: nix develop --command bash -c './test/integration.sh'
+
+      - name: Integration tests (SAT resolver)
+        env:
+          MEOW_RESOLVER: sat
+        run: nix develop --command bash -c './test/integration.sh'
+
+      - name: Performance benchmark (CSV)
+        run: nix develop --command bash -c './build/meow-bench --csv | tee bench.csv'
+        continue-on-error: true
 
   portable-build:
     # A non-Nix fallback build to confirm the project still compiles with
