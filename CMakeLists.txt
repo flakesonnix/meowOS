@@ -39,6 +39,7 @@ set(MEOW_SOURCES
     meow/src/remove/remove.cpp
     meow/src/upgrade/upgrade.cpp
     meow/src/lock/lockfile.cpp
+    meow/src/lock/install_lock.cpp
     meow/src/verify/verifier.cpp
     meow/src/repair/repair.cpp
     meow/src/sync/sync.cpp
@@ -150,6 +151,12 @@ add_executable(meow-unit-signature-policy test/unit/signature_policy_test.cpp)
 target_include_directories(meow-unit-signature-policy
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-signature-policy PRIVATE meow_core)
+
+# In-process hashing + install advisory lock.
+add_executable(meow-unit-hash-lock test/unit/hash_lock_test.cpp)
+target_include_directories(meow-unit-hash-lock
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-hash-lock PRIVATE meow_core)
 
 target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)

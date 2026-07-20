@@ -21,6 +21,10 @@ bool verifyFile(
     const std::filesystem::path& keyPath
 );
 
+// Compute the hex-encoded SHA-256 of a file using OpenSSL (in-process, no
+// shell). Throws MeowError on read failure.
+std::string computeSha256(const std::filesystem::path& file);
+
 void signFile(
     const std::filesystem::path& filePath,
     const std::filesystem::path& keyPath,

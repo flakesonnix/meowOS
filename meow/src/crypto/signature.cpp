@@ -110,6 +110,53 @@ void saveSignature(const Signature& sig, const std::filesystem::path& path) {
     fclose(f);
 }
 
+std::string computeSha256(const std::filesystem::path& file) {
+    FILE* f = fopen(file.string().c_str(), "rb");
+    if (!f) {
+        throw error::MeowError(error::ErrorCode::FileNotFound,
+            "cannot open file for hashing: " + file.string());
+    }
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) {
+        fclose(f);
+        throw error::MeowError(error::ErrorCode::Internal,
+            "cannot allocate hash context");
+    }
+
+    unsigned char buf[65536];
+    size_t n = 0;
+    bool ok = (EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr) == 1);
+    while (ok && (n = fread(buf, 1, sizeof(buf), f)) > 0) {
+        ok = (EVP_DigestUpdate(ctx, buf, n) == 1);
+    }
+    fclose(f);
+
+    if (!ok) {
+        EVP_MD_CTX_free(ctx);
+        throw error::MeowError(error::ErrorCode::Internal,
+            "error hashing file: " + file.string());
+    }
+
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int mdLen = 0;
+    if (EVP_DigestFinal_ex(ctx, md, &mdLen) != 1) {
+        EVP_MD_CTX_free(ctx);
+        throw error::MeowError(error::ErrorCode::Internal,
+            "error finalizing hash: " + file.string());
+    }
+    EVP_MD_CTX_free(ctx);
+
+    static const char* hex = "0123456789abcdef";
+    std::string out;
+    out.reserve(mdLen * 2);
+    for (unsigned int i = 0; i < mdLen; ++i) {
+        out.push_back(hex[(md[i] >> 4) & 0xf]);
+        out.push_back(hex[md[i] & 0xf]);
+    }
+    return out;
+}
+
 void signFile(
     const std::filesystem::path& filePath,
     const std::filesystem::path& keyPath,

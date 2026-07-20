@@ -1,5 +1,6 @@
 #include <meow/download/downloader.hpp>
 #include <meow/error/error.hpp>
+#include <meow/crypto/signature.hpp>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -288,44 +289,16 @@ namespace meow::download {
     }
 
     bool verifyChecksum(const std::filesystem::path& file, const std::string& sha256) {
-        std::string cmd = "sha256sum \"" + file.string() + "\"";
-        std::array<char, 128> buf{};
-        std::string result;
-
-        auto* pipe = popen(cmd.c_str(), "r");
-        if (!pipe) return false;
-
-        while (fgets(buf.data(), buf.size(), pipe) != nullptr) {
-            result += buf.data();
+        std::string actual;
+        try {
+            actual = crypto::computeSha256(file);
+        } catch (...) {
+            return false;
         }
-        pclose(pipe);
-
-        auto pos = result.find(' ');
-        if (pos == std::string::npos) return false;
-
-        return result.substr(0, pos) == sha256;
+        return actual == sha256;
     }
 
     std::string computeFileHash(const std::filesystem::path& file) {
-        std::string cmd = "sha256sum \"" + file.string() + "\"";
-        std::array<char, 128> buf{};
-        std::string result;
-
-        auto* pipe = popen(cmd.c_str(), "r");
-        if (!pipe) {
-            throw error::MeowError(error::ErrorCode::Internal, "cannot compute hash for " + file.string());
-        }
-
-        while (fgets(buf.data(), buf.size(), pipe) != nullptr) {
-            result += buf.data();
-        }
-        pclose(pipe);
-
-        auto pos = result.find(' ');
-        if (pos == std::string::npos) {
-            throw error::MeowError(error::ErrorCode::Internal, "cannot parse hash for " + file.string());
-        }
-
-        return result.substr(0, pos);
+        return crypto::computeSha256(file);
     }
 }

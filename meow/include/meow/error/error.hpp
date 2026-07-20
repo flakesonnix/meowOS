@@ -18,6 +18,7 @@ namespace meow::error {
         DatabaseOpenFailed,
         DatabaseQueryFailed,
         DatabaseMigrationFailed,
+        AlreadyLocked,
         DependencyNotFound,
         DependencyCycleDetected,
         TransactionFailed,

@@ -5,6 +5,7 @@
 #include <meow/hooks/runner.hpp>
 #include <meow/config/config.hpp>
 #include <meow/error/error.hpp>
+#include <meow/lock/install_lock.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -78,6 +79,11 @@ namespace meow::install {
                           database::InstallReason requestReason,
                           const std::filesystem::path& root,
                           database::Database& db) {
+        // Serialize against any concurrent mutating operation. The lock lives
+        // for the whole extraction + commit window and is released on scope
+        // exit (also on throw / crash via the kernel).
+        auto lock = lock::InstallLock(lock::defaultInstallLockPath(db.path));
+
         auto policy = defaultPolicy();
         auto tx = transaction::beginTransaction();
 
