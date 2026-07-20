@@ -144,6 +144,13 @@ target_include_directories(meow-unit-security-policy
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-security-policy PRIVATE meow_core)
 
+# Repository signature trust enforcement: corrupt .sig, empty keyId,
+# tampered metadata, unsigned/invalid-sig HTTP backends (strict mode).
+add_executable(meow-unit-signature-policy test/unit/signature_policy_test.cpp)
+target_include_directories(meow-unit-signature-policy
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-signature-policy PRIVATE meow_core)
+
 target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-repo PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
@@ -193,6 +200,7 @@ set(UNIT_TESTS
     meow-unit-resolver-config
     meow-unit-archive-security
     meow-unit-security-policy
+    meow-unit-signature-policy
 )
 foreach(tgt ${UNIT_TESTS})
     add_test(NAME unit.${tgt} COMMAND ${tgt})

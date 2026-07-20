@@ -57,6 +57,45 @@ void addSymlink(struct archive* a, const std::string& path,
     archive_entry_free(e);
 }
 
+// Add a hardlink entry (path -> existing target) to an open archive writer.
+void addHardlink(struct archive* a, const std::string& path,
+                 const std::string& target) {
+    struct archive_entry* e = archive_entry_new();
+    archive_entry_set_pathname(e, path.c_str());
+    archive_entry_set_hardlink(e, target.c_str());
+    archive_write_header(a, e);
+    archive_entry_free(e);
+}
+
+// Add a device-node or FIFO entry to an open archive writer.
+void addSpecial(struct archive* a, const std::string& path, int filetype,
+                int perm = 0644) {
+    struct archive_entry* e = archive_entry_new();
+    archive_entry_set_pathname(e, path.c_str());
+    archive_entry_set_filetype(e, filetype);
+    archive_entry_set_perm(e, perm);
+    if (filetype == AE_IFCHR || filetype == AE_IFBLK) {
+        archive_entry_set_devmajor(e, 1);
+        archive_entry_set_devminor(e, 3);
+    }
+    archive_write_header(a, e);
+    archive_entry_free(e);
+}
+
+// Add a regular-file entry with explicit permission bits.
+void addFilePerm(struct archive* a, const std::string& path,
+                const std::string& contents, int perm) {
+    struct archive_entry* e = archive_entry_new();
+    archive_entry_set_pathname(e, path.c_str());
+    archive_entry_set_size(e, static_cast<la_int64_t>(contents.size()));
+    archive_entry_set_filetype(e, AE_IFREG);
+    archive_entry_set_perm(e, perm);
+    archive_write_header(a, e);
+    if (!contents.empty())
+        archive_write_data(a, contents.data(), contents.size());
+    archive_entry_free(e);
+}
+
 // Build a .tar archive at `out`. `build` receives the writer to add entries.
 template <typename Fn>
 void buildTar(const fs::path& out, Fn build) {
@@ -127,6 +166,74 @@ int main() {
             addSymlink(a, "files/link", "/etc/passwd");
         });
         expectRejected("rejects absolute symlink target", arc, tmp / "d4");
+    }
+
+    // 4b. Malicious hardlink whose target escapes the destination tree.
+    {
+        auto arc = tmp / "hardlink.tar";
+        buildTar(arc, [](struct archive* a) {
+            addFile(a, "files/keep.txt", "data");
+            addHardlink(a, "files/escape", "../../../../etc/passwd");
+        });
+        expectRejected("rejects hardlink escape", arc, tmp / "d4b");
+    }
+
+    // 4c. Device node entry (char device) is rejected.
+    {
+        auto arc = tmp / "chardev.tar";
+        buildTar(arc, [](struct archive* a) {
+            addSpecial(a, "files/null", AE_IFCHR);
+        });
+        expectRejected("rejects char device node", arc, tmp / "d4c");
+    }
+
+    // 4d. Block device entry is rejected.
+    {
+        auto arc = tmp / "blkdev.tar";
+        buildTar(arc, [](struct archive* a) {
+            addSpecial(a, "files/sda", AE_IFBLK);
+        });
+        expectRejected("rejects block device node", arc, tmp / "d4d");
+    }
+
+    // 4e. FIFO entry is rejected.
+    {
+        auto arc = tmp / "fifo.tar";
+        buildTar(arc, [](struct archive* a) {
+            addSpecial(a, "files/pipe", AE_IFIFO);
+        });
+        expectRejected("rejects FIFO entry", arc, tmp / "d4e");
+    }
+
+    // 4f. setuid permission bits are rejected (privilege escalation guard).
+    {
+        auto arc = tmp / "setuid.tar";
+        buildTar(arc, [](struct archive* a) {
+            addFilePerm(a, "files/usr/bin/suid", "#!/bin/sh\n", 04755);
+        });
+        expectRejected("rejects setuid/setgid bits", arc, tmp / "d4f");
+    }
+
+    // 4g. Valid *internal* symlink (target inside the package) is accepted.
+    {
+        auto arc = tmp / "goodsymlink.tar";
+        buildTar(arc, [](struct archive* a) {
+            addFile(a, "files/usr/bin/app", "#!/bin/sh\necho hi\n");
+            addSymlink(a, "files/usr/bin/app-link", "app");
+        });
+        auto dest = tmp / "d4g";
+        fs::create_directories(dest);
+        bool ok = false;
+        try {
+            auto ar = archive::openArchive(arc);
+            auto extracted = archive::extractPackageContent(ar, dest);
+            ok = fs::exists(dest / "usr/bin/app") &&
+                 fs::exists(dest / "usr/bin/app-link") &&
+                 extracted.value.size() == 2;
+        } catch (const std::exception& e) {
+            std::cout << "  (unexpected: " << e.what() << ")\n";
+        }
+        expectPass("valid internal symlink extracts normally", ok);
     }
 
     // 5. Valid package still extracts and lands inside the destination.

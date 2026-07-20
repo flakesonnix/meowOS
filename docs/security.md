@@ -45,7 +45,10 @@ enabled:
 - a repository with no `repository.toml.sig` is rejected with
   `InvalidSignature`;
 - a signature file with an empty `keyId` is rejected with `InvalidSignature`;
-- an invalid signature is rejected as before.
+- a corrupt or malformed `.sig` (e.g. truncated, non-TOML) is rejected with
+  `InvalidSignature` — it fails closed rather than propagating a parser error;
+- an invalid or mismatched signature (tampered `repository.toml`, or a bad
+  signature over HTTP) is rejected as before.
 
 For CI and tests, `MEOW_REQUIRE_SIGNATURE=1` sets the same policy without a
 config file.

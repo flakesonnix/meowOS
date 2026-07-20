@@ -19,7 +19,18 @@ Signature loadSignature(const std::filesystem::path& path) {
         );
     }
 
-    auto tbl = toml::parse_file(path.string());
+    // A corrupt/malformed .sig must fail closed as InvalidSignature rather
+    // than propagating a raw parser exception that would bypass the signature
+    // policy in verifyRepoSig (audit item 2 — corrupt .sig bypass).
+    toml::table tbl;
+    try {
+        tbl = toml::parse_file(path.string());
+    } catch (const std::exception& e) {
+        throw error::MeowError(
+            error::ErrorCode::InvalidSignature,
+            "cannot parse signature file " + path.string() + ": " +
+                std::string(e.what()));
+    }
     Signature sig;
     sig.algorithm = tbl["algorithm"].value_or("");
     sig.keyId = tbl["keyId"].value_or("");

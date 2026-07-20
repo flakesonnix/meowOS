@@ -115,20 +115,21 @@ namespace meow::archive {
             }
         }
 
-        // Reject a symlink entry whose target escapes the destination tree.
-        // libarchive's SECURE_SYMLINKS blocks writing *through* a symlink, but
-        // we additionally refuse to *create* a symlink pointing outside the
-        // extracted package (absolute or "../" escaping targets).
-        void ensureSafeSymlink(const std::filesystem::path& destination,
-                               const std::string& rel,
-                               struct archive_entry* entry) {
-            if (archive_entry_filetype(entry) != AE_IFLNK) return;
-            const char* tgt = archive_entry_symlink(entry);
-            std::string target = tgt ? tgt : "";
+        // Reject a symlink or hardlink entry whose target escapes the
+        // destination tree. libarchive's SECURE_SYMLINKS blocks writing *through*
+        // a symlink, but we additionally refuse to *create* a link pointing
+        // outside the extracted package (absolute or "../" escaping targets).
+        // Hardlinks are an attack vector too (they can alias sensitive files
+        // already present outside the package), so the same escape check
+        // applies to their targets.
+        void ensureSafeLink(const std::filesystem::path& destination,
+                            const std::string& rel,
+                            const char* targetRaw) {
+            std::string target = targetRaw ? targetRaw : "";
             std::filesystem::path tp(target);
             if (tp.is_absolute()) {
                 throw error::MeowError(error::ErrorCode::ArchiveInvalid,
-                    "unsafe symlink (absolute target): " + rel + " -> " + target);
+                    "unsafe link (absolute target): " + rel + " -> " + target);
             }
             auto linkDir = (destination / std::filesystem::path(rel)).parent_path();
             auto resolved = (linkDir / tp).lexically_normal();
@@ -138,8 +139,33 @@ namespace meow::archive {
             auto resStr = resolved.string();
             if (resStr != base.string() && resStr.rfind(baseStr, 0) != 0) {
                 throw error::MeowError(error::ErrorCode::ArchiveInvalid,
-                    "unsafe symlink (target escapes destination): " + rel +
+                    "unsafe link (target escapes destination): " + rel +
                     " -> " + target);
+            }
+        }
+
+        // Refuse archive entry types that have no legitimate place in a
+        // package and are classic extraction攻击 vectors: device nodes
+        // (char/block) and FIFOs. Fail-closed.
+        void ensureSafeFiletype(const std::string& rel, int filetype) {
+            switch (filetype) {
+                case AE_IFCHR:
+                case AE_IFBLK:
+                case AE_IFIFO:
+                    throw error::MeowError(error::ErrorCode::ArchiveInvalid,
+                        "unsafe archive entry (device node or FIFO): " + rel);
+                default:
+                    break;
+            }
+        }
+
+        // Reject permission bits that escalate privilege on extraction:
+        // setuid / setgid. A package must not install a setuid binary via the
+        // archive path. Fail-closed.
+        void ensureSafePerm(const std::string& rel, int perm) {
+            if (perm & 06000) {  // S_ISUID | S_ISGID
+                throw error::MeowError(error::ErrorCode::ArchiveInvalid,
+                    "unsafe archive entry (setuid/setgid bits): " + rel);
             }
         }
     }
@@ -234,7 +260,13 @@ namespace meow::archive {
             }
 
             ensureSafeEntry(destination, rel);
-            ensureSafeSymlink(destination, rel, entry);
+            ensureSafeFiletype(rel, archive_entry_filetype(entry));
+            ensureSafePerm(rel, archive_entry_perm(entry));
+            if (archive_entry_filetype(entry) == AE_IFLNK) {
+                ensureSafeLink(destination, rel, archive_entry_symlink(entry));
+            } else if (archive_entry_hardlink_is_set(entry)) {
+                ensureSafeLink(destination, rel, archive_entry_hardlink(entry));
+            }
 
             auto fullPath = destination / rel;
             archive_entry_set_pathname(entry, fullPath.c_str());
@@ -261,7 +293,13 @@ namespace meow::archive {
             if (name == target) {
                 auto rel = file.string();
                 ensureSafeEntry(destination, rel);
-                ensureSafeSymlink(destination, rel, entry);
+                ensureSafeFiletype(rel, archive_entry_filetype(entry));
+                ensureSafePerm(rel, archive_entry_perm(entry));
+                if (archive_entry_filetype(entry) == AE_IFLNK) {
+                    ensureSafeLink(destination, rel, archive_entry_symlink(entry));
+                } else if (archive_entry_hardlink_is_set(entry)) {
+                    ensureSafeLink(destination, rel, archive_entry_hardlink(entry));
+                }
 
                 auto fullPath = destination / file;
                 archive_entry_set_pathname(entry, fullPath.c_str());

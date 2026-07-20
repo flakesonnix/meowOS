@@ -22,6 +22,19 @@
 - Documented the remaining package-metadata trust boundary (per-package
   manifests and artifact hashes are not yet individually signed; requires a
   repository-format change) in `docs/security-audit-v0.5.md` §7.
+- Closed remaining extraction and signature gaps (audit follow-up):
+  - `loadSignature` now converts a corrupt/malformed `.sig` into the
+    `InvalidSignature` error path instead of propagating a raw parser
+    exception, preserving fail-closed behavior (audit item 2 — corrupt `.sig`
+    bypass).
+  - Archive extraction additionally rejects hardlink target escapes, device
+    nodes (char/block), FIFOs, and setuid/setgid permission bits; valid
+    *internal* symlinks (target inside the package) are still accepted.
+  - Expanded regression tests: `test/unit/archive_security_test.cpp`
+    (hardlink escape, char/block device, FIFO, setuid/setgid, valid internal
+    symlink) and `test/unit/signature_policy_test.cpp` (corrupt `.sig`, empty
+    `keyId`, tampered `repository.toml`, unsigned + invalid-signature HTTP
+    backends in strict mode).
 
 ### Added
 
