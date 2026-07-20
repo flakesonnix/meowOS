@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "myapp-exact"
+version = "1.0.0"
+architecture = "AMD64"
+description = "version constraint fixture"
+depends = ["libbar=1.0"]

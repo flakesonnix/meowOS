@@ -11,6 +11,7 @@
 #include <fstream>
 
 namespace fs = std::filesystem;
+using namespace meow::repository;
 
 static int failures = 0;
 #define CHECK(cond) do { \
@@ -40,7 +41,7 @@ static void test_unsigned_index_accepted() {
     out << "dependencies = [\"glibc>=2.38\"]\n";
     out.close();
 
-    auto idx = meow::repository::parsePackageIndex(p);
+    auto idx = parsePackageIndex(p);
     CHECK(idx.formatVersion == 1);
     CHECK(idx.packages.size() == 1);
     CHECK(idx.packages[0].name == "hello");
@@ -49,9 +50,9 @@ static void test_unsigned_index_accepted() {
     CHECK(idx.packages[0].dependencies.size() == 1);
 
     // Compatibility mode: unsigned index acceptable.
-    CHECK(meow::repository::acceptUnsignedPackageIndex(false) == true);
+    CHECK(acceptUnsignedPackageIndex(false) == true);
     // Strict mode (future): unsigned index NOT acceptable.
-    CHECK(meow::repository::acceptUnsignedPackageIndex(true) == false);
+    CHECK(acceptUnsignedPackageIndex(true) == false);
 
     fs::remove(p);
 }
@@ -69,7 +70,7 @@ static void test_invalid_signature_handling() {
     // Index present but no .sig -> should throw InvalidSignature.
     bool threw = false;
     try {
-        meow::repository::verifyPackageIndex(d, "default");
+        verifyPackageIndex(d, "default");
     } catch (const meow::error::MeowError& e) {
         threw = true;
         CHECK(e.code == meow::error::ErrorCode::InvalidSignature);
@@ -80,7 +81,7 @@ static void test_invalid_signature_handling() {
     fs::remove(p);
     threw = false;
     try {
-        meow::repository::verifyPackageIndex(d, "default");
+        verifyPackageIndex(d, "default");
     } catch (const meow::error::MeowError& e) {
         threw = true;
         CHECK(e.code == meow::error::ErrorCode::InvalidSignature);

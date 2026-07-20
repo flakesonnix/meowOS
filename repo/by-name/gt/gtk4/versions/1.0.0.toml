@@ -1,4 +1,4 @@
 [artifact]
 filename = "gtk4-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/gtk4-1.0.0.pkg.tar.zst"
-sha256 = "d253acbffa86ae9f00a0f3f1ec36899ec34de8f595c53fde231d659ec26c2792"
+sha256 = "5eda3d652b347f108b00ca27dc567bb876763227c31cd56978a4944b5c7d6859"

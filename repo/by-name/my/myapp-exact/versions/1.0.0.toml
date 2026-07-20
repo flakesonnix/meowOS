@@ -1,0 +1,4 @@
+[artifact]
+filename = "myapp-exact-1.0.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/myapp-exact-1.0.0.pkg.tar.zst"
+sha256 = "45aa74cdda200705d0d82e2b001226cb77419a18aa8e68046095280e533499b6"

@@ -1,4 +1,4 @@
 [artifact]
 filename = "hello-1.0.0.pkg.tar.zst"
-url = "file:///tmp/hello-1.0.0.pkg.tar.zst"
-sha256 = "533fb260e4c5a2cff6743de68ade698b6e3ea488c1a6d3e4632d4d4cb76c63ec"
+url = "file:///tmp/meow-artifacts/hello-1.0.0.pkg.tar.zst"
+sha256 = "7ab2ef9b67701a2265e804d0964740550de72c9b4ddc9c70afdf0396906c1e68"

@@ -1,6 +1,6 @@
 format_version = 1
 [metadata]
-name = "gtk4"
+name = "libbar"
 version = "1.0.0"
 architecture = "AMD64"
-description = "optional fixture"
+description = "version constraint fixture"

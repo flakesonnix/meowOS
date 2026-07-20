@@ -1,7 +1,6 @@
 format_version = 1
-
 [metadata]
 name = "qt6"
 version = "1.0.0"
 architecture = "AMD64"
-description = "Optional Qt frontend"
+description = "optional fixture"
