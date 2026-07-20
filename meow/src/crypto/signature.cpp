@@ -157,6 +157,34 @@ std::string computeSha256(const std::filesystem::path& file) {
     return out;
 }
 
+std::string computeSha256Bytes(const std::string& bytes) {
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) {
+        throw error::MeowError(error::ErrorCode::Internal,
+            "cannot allocate hash context");
+    }
+    bool ok = (EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr) == 1);
+    if (ok && !bytes.empty()) {
+        ok = (EVP_DigestUpdate(ctx, bytes.data(), bytes.size()) == 1);
+    }
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int mdLen = 0;
+    if (ok) ok = (EVP_DigestFinal_ex(ctx, md, &mdLen) == 1);
+    EVP_MD_CTX_free(ctx);
+    if (!ok) {
+        throw error::MeowError(error::ErrorCode::Internal,
+            "error hashing byte buffer");
+    }
+    static const char* hex = "0123456789abcdef";
+    std::string out;
+    out.reserve(mdLen * 2);
+    for (unsigned int i = 0; i < mdLen; ++i) {
+        out.push_back(hex[(md[i] >> 4) & 0xf]);
+        out.push_back(hex[md[i] & 0xf]);
+    }
+    return out;
+}
+
 void signFile(
     const std::filesystem::path& filePath,
     const std::filesystem::path& keyPath,

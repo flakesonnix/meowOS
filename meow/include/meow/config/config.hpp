@@ -71,6 +71,14 @@ struct Config {
     //   [security]
     //   require_repository_signature = true
     bool requireRepositorySignature = false;
+
+    // v0.7: when true, a repository must ship a signed package index
+    // (packages.toml + packages.toml.sig) and the client verifies every
+    // loaded manifest/artifact hash against it. Default false preserves the
+    // historical transport-trust behavior for repositories without an index.
+    //   [security]
+    //   require_package_index = true
+    bool requirePackageIndex = false;
 };
 
 Config defaultConfig();

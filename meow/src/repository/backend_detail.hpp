@@ -11,6 +11,7 @@
 #include <meow/log/logger.hpp>
 #include <meow/package/package.hpp>
 #include <meow/repository/security_policy.hpp>
+#include <meow/repository/package_index.hpp>
 #include <meow/repository/repository.hpp>
 
 #include <algorithm>
@@ -135,6 +136,109 @@ inline fs::path resolveLocalPath(const std::string& url) {
         return fs::path(url.substr(7));
     }
     return fs::absolute(fs::path(url));
+}
+
+inline std::string stripHashPrefix(const std::string& h) {
+    return h.starts_with("sha256:") ? h.substr(7) : h;
+}
+
+// Canonical manifest hash lives in package_index.hpp (meow::repository) so the
+// repo-builder and every backend share one definition. Reachable unqualified
+// from this nested namespace.
+
+// Verify the signature over packages.toml using the existing Ed25519 trust
+// chain (same trusted key store as repository.toml.sig). Returns false on
+// missing/empty keyId or bad signature rather than throwing, so callers can
+// map to the right error code.
+inline bool verifyIndexSignature(const fs::path& index, const fs::path& sig) {
+    auto s = crypto::loadSignature(sig);
+    if (s.keyId.empty()) return false;
+    auto key = crypto::loadTrustedKey(s.keyId);
+    return crypto::verifyFile(index, sig, key.path);
+}
+
+// Load + verify the signed package index from `dir` (packages.toml +
+// packages.toml.sig). Returns nullopt when the index is absent (compat
+// fallback). Throws:
+//   MissingPackageIndex - .sig missing and requirePackageIndex is set
+//   InvalidPackageIndex - parse or signature verification failure
+inline std::optional<PackageIndex> loadVerifiedPackageIndex(const fs::path& dir) {
+    auto index = dir / "packages.toml";
+    auto sig = dir / "packages.toml.sig";
+    if (!fs::exists(index)) {
+        // No index at all: legacy repo. Under strict mode this is rejected;
+        // otherwise manifest verification falls back to transport trust.
+        if (securityPolicy().requirePackageIndex) {
+            throw error::MeowError(
+                error::ErrorCode::MissingPackageIndex,
+                "repository has no package index and require_package_index is set");
+        }
+        return std::nullopt;
+    }
+    if (!fs::exists(sig)) {
+        if (securityPolicy().requirePackageIndex) {
+            throw error::MeowError(
+                error::ErrorCode::MissingPackageIndex,
+                "package index is unsigned and require_package_index is set");
+        }
+        log::log(log::LogLevel::Warning,
+                  "package index not signed, skipping verification");
+        return parsePackageIndex(index);
+    }
+    if (!verifyIndexSignature(index, sig)) {
+        throw error::MeowError(
+            error::ErrorCode::InvalidPackageIndex,
+            "package index signature invalid");
+    }
+    return parsePackageIndex(index);
+}
+
+inline const PackageIndexEntry* findIndexEntry(const PackageIndex& idx,
+                                            const std::string& name,
+                                            const std::string& version) {
+    for (const auto& e : idx.packages) {
+        if (e.name == name && e.version == version) return &e;
+    }
+    return nullptr;
+}
+
+// Validate a loaded package manifest + version against the signed index.
+// When `idx` is present the manifest hash must match the signed entry and a
+// corresponding entry must exist. Throws PackageIndexMismatch on any
+// disagreement (missing entry, hash mismatch, unexpected version).
+inline void validatePackageAgainstIndex(
+    const std::optional<PackageIndex>& idx,
+    const std::string& name,
+    const std::string& version,
+    const fs::path& pkgMetaPath,
+    const fs::path& versionPath) {
+    if (!idx) return;  // compatibility mode: trust transport
+    const auto* entry = findIndexEntry(*idx, name, version);
+    if (!entry) {
+        throw error::MeowError(
+            error::ErrorCode::PackageIndexMismatch,
+            "package " + name + " " + version +
+            " is not listed in the signed package index");
+    }
+    auto computed = computeManifestHash(pkgMetaPath, versionPath);
+    if (stripHashPrefix(entry->manifestHash) != computed) {
+        throw error::MeowError(
+            error::ErrorCode::PackageIndexMismatch,
+            "package " + name + " " + version +
+            " manifest hash does not match the signed package index");
+    }
+}
+
+// Return the trusted artifact hash for (name, version) from the signed index,
+// or the empty string when no index entry exists (caller keeps its own value).
+inline std::string lookupIndexArtifactHash(
+    const std::optional<PackageIndex>& idx,
+    const std::string& name,
+    const std::string& version) {
+    if (!idx) return "";
+    const auto* entry = findIndexEntry(*idx, name, version);
+    if (!entry) return "";
+    return stripHashPrefix(entry->artifactHash);
 }
 
 inline void verifyRepoSig(const fs::path& repoMetaPath,

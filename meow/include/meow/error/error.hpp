@@ -27,6 +27,9 @@ namespace meow::error {
         TrustedKeyNotFound,
         RepositoryExpired,
         InvalidRepository,
+        MissingPackageIndex,    // v0.7: signed package index absent in strict mode
+        InvalidPackageIndex,     // v0.7: index present but signature/parse invalid
+        PackageIndexMismatch,    // v0.7: manifest/artifact hash disagrees with index
         DownloadTimeout,
         DownloadHttpError,
         DownloadHttp5xx,

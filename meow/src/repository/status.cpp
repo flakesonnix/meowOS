@@ -24,10 +24,17 @@ RepositoryStatus classifyRepositoryError(const error::MeowError& e) {
 
         case error::ErrorCode::InvalidSignature:
         case error::ErrorCode::TrustedKeyNotFound:
+        // v0.7 signed package index: a missing (strict) or invalid index is a
+        // signature/trust failure, mirroring repository.toml signature policy.
+        case error::ErrorCode::MissingPackageIndex:
+        case error::ErrorCode::InvalidPackageIndex:
             return RepositoryStatus::InvalidSignature;
 
         case error::ErrorCode::InvalidRepository:
         case error::ErrorCode::InvalidManifest:
+        // A manifest whose hash disagrees with the signed index is untrusted
+        // metadata (the per-package manifest is no longer authenticated alone).
+        case error::ErrorCode::PackageIndexMismatch:
             return RepositoryStatus::InvalidMetadata;
 
         default:

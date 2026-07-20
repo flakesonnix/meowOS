@@ -1,3 +1,4 @@
+#include <meow/repository/package_index.hpp>
 #include "meow/repository/http_backend.hpp"
 #include "backend_detail.hpp"
 
@@ -101,9 +102,34 @@ Repository HttpRepositoryBackend::loadRepository() {
         // Missing signature is tolerated (matches filesystem behavior).
     }
     verifyRepoSig(repoMetaPath, cache);
-
     validateRepoId(repo.id);
     checkRepoExpiry(repo.name, repo.expires);
+
+    // v0.7: download + verify the signed package index when the server
+    // ships one. Absent index is compatibility mode (manifests trusted by
+    // transport). A missing signature or bad signature is fatal in strict
+    // mode; otherwise warned and skipped.
+    auto signedIndexDest = cache / "packages.toml";
+    auto signedIndexSig = cache / "packages.toml.sig";
+    // Drop any stale cached index so a repo that stopped publishing one does
+    // not keep verifying against yesterday's file.
+    { std::error_code rmec; fs::remove(signedIndexDest, rmec); fs::remove(signedIndexSig, rmec); }
+    try {
+        download::downloadFile(absUrl("packages.toml"), signedIndexDest);
+    } catch (const error::MeowError&) {
+        // Index absent on the server (e.g. 404). Compatibility mode unless
+        // strict; loadVerifiedPackageIndex enforces the policy below.
+    }
+    if (fs::exists(signedIndexDest)) {
+        try {
+            download::downloadFile(absUrl("packages.toml.sig"), signedIndexSig);
+        } catch (const error::MeowError&) {
+            // signature missing; handled by loadVerifiedPackageIndex
+        }
+    }
+    // Verify + load (or enforce strict policy on a missing index). Trust
+    // failures (InvalidPackageIndex / MissingPackageIndex) propagate.
+    repo.packageIndex = loadVerifiedPackageIndex(cache);
 
     refreshRepoCache(repo.id, repoMetaPath);
 
@@ -149,6 +175,15 @@ Repository HttpRepositoryBackend::loadRepository() {
                            ".toml"),
                     verPath);
                 auto rv = parseVersionManifest(readFileForCache(verPath), ver);
+                // v0.7: cross-check against the signed index and promote the
+                // trusted artifact hash (compatibility mode is a no-op).
+                validatePackageAgainstIndex(repo.packageIndex, name, ver,
+                                           pkgMetaPath, verPath);
+                auto trustedHash =
+                    lookupIndexArtifactHash(repo.packageIndex, name, ver);
+                if (!trustedHash.empty()) {
+                    rv.artifact.sha256 = trustedHash;
+                }
                 rv.artifact.url =
                     resolveArtifactUrl(rv.artifact.url, baseUrl_);
                 pkg.versions.push_back(std::move(rv));

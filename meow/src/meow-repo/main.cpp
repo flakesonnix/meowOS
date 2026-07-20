@@ -8,8 +8,9 @@ int main(int argc, char** argv) {
         std::cerr << "usage: meow-repo <command> [options]\n"
                   << "  add <archive.pkg.tar.zst> [--repo <dir>]\n"
                   << "  remove <package> [--repo <dir>]\n"
-                  << "  sync [--repo <dir>]\n"
-                  << "  sign --key <keyfile> [--repo <dir>] [--key-id <id>]\n";
+                   << "  sync [--repo <dir>]\n"
+                   << "  index [--repo <dir>]\n"
+                   << "  sign --key <keyfile> [--repo <dir>] [--key-id <id>]\n";
         return 1;
     }
 
@@ -47,6 +48,8 @@ int main(int argc, char** argv) {
             meow::repo::repoRemove(opts);
         } else if (cmd == "sync") {
             meow::repo::repoSync(opts);
+        } else if (cmd == "index") {
+            meow::repo::repoBuildIndex(opts);
         } else if (cmd == "sign") {
             if (!opts.signKey) {
                 std::cerr << "error: --key required for sign\n";

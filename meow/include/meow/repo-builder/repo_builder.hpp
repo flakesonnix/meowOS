@@ -20,6 +20,9 @@ void repoAdd(const RepoBuildOptions& opts);
 void repoRemove(const RepoBuildOptions& opts);
 void repoSync(const RepoBuildOptions& opts);
 void repoSigUpdate(const RepoBuildOptions& opts);
+// v0.7: regenerate packages.toml from the by-name tree. Must be run
+// before repoSigUpdate so the index is signed along with repository.toml.
+void repoBuildIndex(const RepoBuildOptions& opts);
 
 }
 

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <meow/types/types.hpp>
+#include <meow/repository/package_index.hpp>
 
 namespace meow::repository {
 
@@ -38,6 +39,11 @@ struct Repository {
     std::vector<RepositoryPackage> packages;
     std::optional<std::string> generated;
     std::optional<std::string> expires;
+    // v0.7: verified signed package index (packages.toml), when the
+    // repository ships one and it passed signature verification. When present,
+    // manifest and artifact hashes are taken from here rather than from the
+    // unsigned per-package manifests.
+    std::optional<PackageIndex> packageIndex;
 };
 
 Repository openRepository(const std::string& url);

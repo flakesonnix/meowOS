@@ -14,6 +14,7 @@ set(MEOW_SOURCES
     meow/src/repository/http_backend.cpp
     meow/src/repository/manager.cpp
     meow/src/repository/security_policy.cpp
+    meow/src/repository/package_index.cpp
     meow/src/repository/status.cpp
     meow/src/repository/failover.cpp
     meow/src/repository/refresh.cpp
@@ -231,6 +232,7 @@ set(UNIT_TESTS
     meow-unit-archive-security
     meow-unit-security-policy
     meow-unit-signature-policy
+    meow-unit-pkgidx
 )
 foreach(tgt ${UNIT_TESTS})
     add_test(NAME unit.${tgt} COMMAND ${tgt})
@@ -261,6 +263,7 @@ set(INTEGRATION_SECTIONS
     20.history
     21.optionals
     22.groups
+    23.signed_index
 )
 foreach(section ${INTEGRATION_SECTIONS})
     string(REPLACE "." ";" parts "${section}")

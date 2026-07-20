@@ -511,9 +511,15 @@ int main(int argc, char** argv) {
         {
             meow::repository::SecurityPolicy policy;
             policy.requireRepositorySignature = cfg.requireRepositorySignature;
+            policy.requirePackageIndex = cfg.requirePackageIndex;
             if (const char* e = std::getenv("MEOW_REQUIRE_SIGNATURE")) {
                 std::string v(e);
                 policy.requireRepositorySignature =
+                    (v == "1" || v == "true" || v == "yes");
+            }
+            if (const char* e = std::getenv("MEOW_REQUIRE_PACKAGE_INDEX")) {
+                std::string v(e);
+                policy.requirePackageIndex =
                     (v == "1" || v == "true" || v == "yes");
             }
             meow::repository::setSecurityPolicy(policy);

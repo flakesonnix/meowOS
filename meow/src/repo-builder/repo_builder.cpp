@@ -1,4 +1,5 @@
 #include <meow/repo-builder/repo_builder.hpp>
+#include <meow/repository/package_index.hpp>
 #include <meow/package/parser.hpp>
 #include <meow/package/package.hpp>
 #include <meow/archive/archive.hpp>
@@ -97,6 +98,8 @@ namespace meow::repo {
         }
     }
 
+    std::string utcTimestamp(std::chrono::system_clock::time_point tp);
+
     void repoAdd(const RepoBuildOptions& opts) {
         if (!opts.archivePath) {
             throw error::MeowError(error::ErrorCode::FileNotFound, "archive path required");
@@ -131,6 +134,70 @@ namespace meow::repo {
         }
 
         log::log(log::LogLevel::Info, "added " + metadata.name.value + " " + metadata.version.value + " to repo");
+    }
+
+    // v0.7: (re)generate packages.toml from the by-name tree, binding
+    // every package version to its manifest hash + artifact hash. The index is
+    // signed separately by repoSigUpdate so it shares the repository key.
+    void repoBuildIndex(const RepoBuildOptions& opts) {
+        auto byNameDir = opts.repoDir / "by-name";
+        if (!std::filesystem::is_directory(byNameDir)) {
+            throw error::MeowError(error::ErrorCode::InvalidRepository,
+                "no by-name directory; run add first");
+        }
+
+        std::ostringstream ss;
+        ss << "format_version = 1\n";
+        ss << "generated = \"" << utcTimestamp(std::chrono::system_clock::now()) << "\"\n\n";
+
+        for (const auto& shardDir : std::filesystem::directory_iterator(byNameDir)) {
+            if (!shardDir.is_directory()) continue;
+            for (const auto& pkgDir : std::filesystem::directory_iterator(shardDir.path())) {
+                if (!pkgDir.is_directory()) continue;
+                auto pkgMetaPath = pkgDir.path() / "package.toml";
+                if (!std::filesystem::exists(pkgMetaPath)) continue;
+
+                auto versionsDir = pkgDir.path() / "versions";
+                if (!std::filesystem::is_directory(versionsDir)) continue;
+
+                for (const auto& entry : std::filesystem::directory_iterator(versionsDir)) {
+                    if (!entry.is_regular_file()) continue;
+                    if (entry.path().extension() != ".toml") continue;
+
+                    auto version = entry.path().stem().string();
+                    // Canonical manifest hash = sha256(package.toml || version toml),
+                    // identical to the client-side computation in backend_detail.
+                    auto manifestHash = repository::computeManifestHash(pkgMetaPath, entry.path());
+
+                    // Artifact hash: read it back from the version manifest so the
+                    // index reflects what is actually published.
+                    std::string artifactHash;
+                    std::uintmax_t size = 0;
+                    try {
+                        auto vt = toml::parse_file(entry.path().string());
+                        if (auto* art = vt["artifact"].as_table()) {
+                            artifactHash = (*art)["sha256"].value_or("");
+                            std::string fn = (*art)["filename"].value_or("");
+                            auto archive = opts.repoDir / "packages" / fn;
+                            if (!fn.empty() && std::filesystem::exists(archive)) {
+                                size = std::filesystem::file_size(archive);
+                            }
+                        }
+                    } catch (...) {}
+
+                    ss << "[[package]]\n";
+                    ss << "name = \"" << pkgDir.path().filename().string() << "\"\n";
+                    ss << "version = \"" << version << "\"\n";
+                    ss << "manifest_hash = \"sha256:" << manifestHash << "\"\n";
+                    ss << "artifact_hash = \"sha256:" << artifactHash << "\"\n";
+                    ss << "size = " << size << "\n";
+                    ss << "\n";
+                }
+            }
+        }
+
+        writeFileContent(opts.repoDir / "packages.toml", ss.str());
+        log::log(log::LogLevel::Info, "built packages.toml index");
     }
 
     void repoRemove(const RepoBuildOptions& opts) {
@@ -198,5 +265,21 @@ namespace meow::repo {
         auto sigPath = opts.repoDir / "repository.toml.sig";
         crypto::signFile(repoMetaPath, *opts.signKey, sigPath, opts.signKeyId);
         log::log(log::LogLevel::Info, "signed repository.toml");
+
+        // v0.7: regenerate the package index from the current by-name tree so
+        // the signed index always matches what is published, then sign it with
+        // the same key. Skipped only when there is nothing to index.
+        if (std::filesystem::is_directory(opts.repoDir / "by-name")) {
+            repoBuildIndex(opts);
+        }
+
+        // Sign the package index with the same key so the client can
+        // authenticate every manifest/artifact hash.
+        auto index = opts.repoDir / "packages.toml";
+        if (std::filesystem::exists(index)) {
+            auto indexSig = opts.repoDir / "packages.toml.sig";
+            crypto::signFile(index, *opts.signKey, indexSig, opts.signKeyId);
+            log::log(log::LogLevel::Info, "signed packages.toml");
+        }
     }
 }

@@ -47,6 +47,9 @@ Config loadConfig(const std::filesystem::path& path) {
     if (auto s = tbl["security"]["require_repository_signature"].value<bool>()) {
         cfg.requireRepositorySignature = *s;
     }
+    if (auto s = tbl["security"]["require_package_index"].value<bool>()) {
+        cfg.requirePackageIndex = *s;
+    }
 
     std::vector<RepositoryConfig> repos;
 

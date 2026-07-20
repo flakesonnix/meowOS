@@ -1,3 +1,4 @@
+#include <meow/repository/package_index.hpp>
 #include "meow/repository/backend.hpp"
 #include "meow/repository/http_backend.hpp"
 #include "meow/repository/memory_backend.hpp"
@@ -19,7 +20,9 @@ using namespace detail;
 
 namespace {
 
-std::vector<RepositoryPackage> scanByNameDir(const fs::path& byNameDir) {
+std::vector<RepositoryPackage> scanByNameDir(
+    const fs::path& byNameDir,
+    const std::optional<PackageIndex>& idx) {
     std::vector<RepositoryPackage> packages;
 
     for (const auto& shardDir : fs::directory_iterator(byNameDir)) {
@@ -39,15 +42,34 @@ std::vector<RepositoryPackage> scanByNameDir(const fs::path& byNameDir) {
                 for (const auto& entry : fs::directory_iterator(versionsDir)) {
                     if (!entry.is_regular_file()) continue;
                     if (entry.path().extension() != ".toml") continue;
-                    try {
-                        auto rv = parseVersionManifest(
-                            readFileForCache(entry.path()),
-                            entry.path().stem().string());
-                        pkg.versions.push_back(std::move(rv));
-                    } catch (...) {
+                    auto rv = [&]() -> std::optional<RepositoryVersion> {
+                        try {
+                            return parseVersionManifest(
+                                readFileForCache(entry.path()),
+                                entry.path().stem().string());
+                        } catch (...) {
+                            return std::nullopt;
+                        }
+                    }();
+                    if (!rv) {
                         log::log(log::LogLevel::Warning,
                                  "failed to parse " + entry.path().string());
+                        continue;
                     }
+                    // v0.7: cross-check the loaded manifest against the
+                    // signed package index and promote the trusted artifact
+                    // hash. Compatibility mode (no index) is a no-op.
+                    // Validation throws MeowError on trust disagreement and
+                    // must propagate (not be swallowed).
+                    validatePackageAgainstIndex(
+                        idx, pkg.name.value, rv->version.value,
+                        pkgMetaPath, entry.path());
+                    auto trustedHash = lookupIndexArtifactHash(
+                        idx, pkg.name.value, rv->version.value);
+                    if (!trustedHash.empty()) {
+                        rv->artifact.sha256 = trustedHash;
+                    }
+                    pkg.versions.push_back(std::move(*rv));
                 }
             }
 
@@ -135,11 +157,16 @@ Repository FilesystemRepositoryBackend::loadRepository() {
     validateRepoId(repo.id);
     checkRepoExpiry(repo.name, repo.expires);
 
+    // v0.7: load + verify the signed package index (when present). In
+    // compatibility mode (no index) this returns nullopt and manifests are
+    // trusted by transport, as before.
+    repo.packageIndex = loadVerifiedPackageIndex(root);
+
     refreshRepoCache(repo.id, repoMetaPath);
 
     auto byNameDir = root / "by-name";
     if (fs::is_directory(byNameDir)) {
-        repo.packages = scanByNameDir(byNameDir);
+        repo.packages = scanByNameDir(byNameDir, repo.packageIndex);
         log::log(log::LogLevel::Debug,
                  std::to_string(repo.packages.size()) + " packages loaded");
     } else {
