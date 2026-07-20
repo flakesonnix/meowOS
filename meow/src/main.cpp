@@ -31,45 +31,49 @@ namespace {
     const auto lockfilePath = std::filesystem::path("meow.lock");
     const auto installRoot = std::filesystem::path("/tmp/meow-install");
 
-    void cmdInfo(const meow::repository::Repository& repo, std::string_view name) {
-        auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{std::string(name)});
+     void cmdInfo(const meow::repository::Repository& repo, std::string_view name) {
+         auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{std::string(name)});
+         // Optional dependencies live in the repository metadata
+         // (RepositoryPackage::optionalDepends), not in the built artifact, so
+         // read them from the repository package rather than the loaded file.
+         const auto* rp = meow::repository::findPackage(repo, meow::types::PackageName{std::string(name)});
 
-        std::cout << "Package      " << pkg.metadata.name.value << "\n"
-                  << "Version      " << pkg.metadata.version.value << "\n"
-                  << "Architecture " << (pkg.metadata.architecture == meow::types::CpuArch::AMD64 ? "amd64" : "aarch64") << "\n"
-                  << "\n"
-                  << "Description\n"
-                  << "------------\n"
-                  << pkg.metadata.description.value << "\n"
-                  << "\n"
-                  << "Dependencies\n"
-                  << "------------\n";
+         std::cout << "Package      " << pkg.metadata.name.value << "\n"
+                   << "Version      " << pkg.metadata.version.value << "\n"
+                   << "Architecture " << (pkg.metadata.architecture == meow::types::CpuArch::AMD64 ? "amd64" : "aarch64") << "\n"
+                   << "\n"
+                   << "Description\n"
+                   << "------------\n"
+                   << pkg.metadata.description.value << "\n"
+                   << "\n"
+                   << "Dependencies\n"
+                   << "------------\n";
 
-        if (pkg.metadata.dependencies.value.empty()) {
-            std::cout << "(none)\n";
-        } else {
-            for (const auto& dep : pkg.metadata.dependencies.value) {
-                std::cout << "  " << dep.name.value;
-                for (const auto& c : dep.constraints) {
-                    std::cout << " " << c.op << c.version.value;
-                }
-                std::cout << "\n";
-            }
-        }
+         if (pkg.metadata.dependencies.value.empty()) {
+             std::cout << "(none)\n";
+         } else {
+             for (const auto& dep : pkg.metadata.dependencies.value) {
+                 std::cout << "  " << dep.name.value;
+                 for (const auto& c : dep.constraints) {
+                     std::cout << " " << c.op << c.version.value;
+                 }
+                 std::cout << "\n";
+             }
+         }
 
-        std::cout << "\n"
-                  << "Optional dependencies\n"
-                  << "--------------------\n";
+         std::cout << "\n"
+                   << "Optional dependencies\n"
+                   << "--------------------\n";
 
-        if (pkg.metadata.optionalDependencies.empty()) {
-            std::cout << "(none)\n";
-        } else {
-            for (const auto& od : pkg.metadata.optionalDependencies) {
-                std::cout << "  " << od.package.value;
-                if (!od.description.empty()) std::cout << "  " << od.description;
-                std::cout << "\n";
-            }
-        }
+         if (!rp || rp->optionalDepends.empty()) {
+             std::cout << "(none)\n";
+         } else {
+             for (const auto& od : rp->optionalDepends) {
+                 std::cout << "  " << od.package.value;
+                 if (!od.description.empty()) std::cout << "  " << od.description;
+                 std::cout << "\n";
+             }
+         }
 
         std::cout << "\n"
                   << "License: " << pkg.metadata.license << "\n"
