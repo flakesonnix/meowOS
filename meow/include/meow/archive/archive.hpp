@@ -12,8 +12,6 @@ namespace meow::archive {
     Archive openArchive(const std::filesystem::path& path);
     types::FileList listFiles(const Archive& archive);
     std::string readFile(const Archive& archive, const std::filesystem::path& filename);
-    types::FileList extractAll(const Archive& archive, const std::filesystem::path& destination);
-    void extractFile(const Archive& archive, const std::filesystem::path& file, const std::filesystem::path& destination);
 
     types::FileList listPackageContent(const Archive& archive);
     types::FileList extractPackageContent(const Archive& archive, const std::filesystem::path& destination);

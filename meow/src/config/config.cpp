@@ -40,6 +40,10 @@ Config loadConfig(const std::filesystem::path& path) {
     if (auto n = tbl["hook_allow_network"].value<bool>())
         cfg.hookAllowNetwork = *n;
 
+    if (auto s = tbl["security"]["require_repository_signature"].value<bool>()) {
+        cfg.requireRepositorySignature = *s;
+    }
+
     std::vector<RepositoryConfig> repos;
 
     // Modern form: [[repositories]]

@@ -29,6 +29,33 @@ matching trusted public key by `key_id`. An unknown `key_id` fails with
 Unsigned repositories are accepted only with a warning and should never be
 used for production.
 
+### Requiring signatures
+
+To make unsigned (or empty-`keyId`) repositories a hard error instead of a
+warning, enable require-signature mode in the config file:
+
+```toml
+[security]
+require_repository_signature = true
+```
+
+Default is `false` (warn-and-continue) for backwards compatibility. When
+enabled:
+
+- a repository with no `repository.toml.sig` is rejected with
+  `InvalidSignature`;
+- a signature file with an empty `keyId` is rejected with `InvalidSignature`;
+- an invalid signature is rejected as before.
+
+For CI and tests, `MEOW_REQUIRE_SIGNATURE=1` sets the same policy without a
+config file.
+
+> **Scope note.** Require-signature mode authenticates the repository **index**
+> (`repository.toml`). Per-package manifests and the artifact `sha256` they
+> carry are **not yet individually signed** — see the trust-boundary note in
+> `docs/security-audit-v0.5.md` §7. For HTTP repositories, TLS (on by default)
+> protects manifest integrity in transit.
+
 ## Trusted keys
 
 Trusted public keys live in `~/.config/meow/keys/`. Manage them with:

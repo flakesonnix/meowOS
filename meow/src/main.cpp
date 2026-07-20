@@ -12,6 +12,7 @@
 #include <meow/repository/version.hpp>
 #include <meow/repository/resolver.hpp>
 #include <meow/repository/manager.hpp>
+#include <meow/repository/security_policy.hpp>
 #include <meow/download/queue.hpp>
 #include <meow/install/installer.hpp>
 #include <meow/dependency/resolver.hpp>
@@ -376,6 +377,19 @@ int main(int argc, char** argv) {
                 .id = "default",
                 .mirrors = {repositoryOverride},
                 .url = repositoryOverride});
+        }
+
+        // Apply the repository security policy before any repository is opened.
+        // MEOW_REQUIRE_SIGNATURE=1 lets CI/tests enforce without a config file.
+        {
+            meow::repository::SecurityPolicy policy;
+            policy.requireRepositorySignature = cfg.requireRepositorySignature;
+            if (const char* e = std::getenv("MEOW_REQUIRE_SIGNATURE")) {
+                std::string v(e);
+                policy.requireRepositorySignature =
+                    (v == "1" || v == "true" || v == "yes");
+            }
+            meow::repository::setSecurityPolicy(policy);
         }
 
         meow::repository::RepositoryManager manager(cfg);

@@ -62,11 +62,85 @@ namespace meow::archive {
 
         const std::string filesPrefix = "files/";
 
+        // libarchive security flags applied to every extraction. Combined with
+        // the explicit pre-checks below they defend against the classic
+        // package-archive attacks:
+        //   SECURE_NODOTDOT       - reject entries containing ".."
+        //   SECURE_SYMLINKS       - refuse to write through an existing symlink
+        //   UNLINK                - remove an existing target (incl. symlink)
+        //                           before writing, closing symlink-follow TOCTOU
+        //
+        // ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS is intentionally NOT set here:
+        // we rewrite each entry's pathname to an absolute `destination / rel`,
+        // which that flag would reject. Absolute *source* entries are instead
+        // caught by ensureSafeEntry() before extraction.
+        constexpr int secureExtractFlags =
+            ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME |
+            ARCHIVE_EXTRACT_SECURE_NODOTDOT |
+            ARCHIVE_EXTRACT_SECURE_SYMLINKS |
+            ARCHIVE_EXTRACT_UNLINK;
+
         std::string norm(const char* raw) {
             std::string s = raw ? raw : "";
             if (s.starts_with("./")) s = s.substr(2);
             if (s.ends_with("/") && s.size() > 1) s.pop_back();
             return s;
+        }
+
+        // Reject a relative archive entry that would escape `destination` once
+        // resolved (defense-in-depth on top of the libarchive SECURE flags).
+        // `rel` is the path *relative to the destination* (files/ prefix already
+        // stripped). Absolute paths, "..", and symlink escapes are refused.
+        void ensureSafeEntry(const std::filesystem::path& destination,
+                             const std::string& rel) {
+            std::filesystem::path relPath(rel);
+            if (relPath.is_absolute()) {
+                throw error::MeowError(error::ErrorCode::ArchiveInvalid,
+                    "unsafe archive entry (absolute path): " + rel);
+            }
+            for (const auto& part : relPath) {
+                if (part == "..") {
+                    throw error::MeowError(error::ErrorCode::ArchiveInvalid,
+                        "unsafe archive entry (path traversal): " + rel);
+                }
+            }
+            auto resolved = (destination / relPath).lexically_normal();
+            auto base = destination.lexically_normal();
+            auto baseStr = base.string();
+            if (!baseStr.empty() && baseStr.back() != '/') baseStr += '/';
+            auto resStr = resolved.string();
+            if (resStr != base.string() && resStr.rfind(baseStr, 0) != 0) {
+                throw error::MeowError(error::ErrorCode::ArchiveInvalid,
+                    "unsafe archive entry (escapes destination): " + rel);
+            }
+        }
+
+        // Reject a symlink entry whose target escapes the destination tree.
+        // libarchive's SECURE_SYMLINKS blocks writing *through* a symlink, but
+        // we additionally refuse to *create* a symlink pointing outside the
+        // extracted package (absolute or "../" escaping targets).
+        void ensureSafeSymlink(const std::filesystem::path& destination,
+                               const std::string& rel,
+                               struct archive_entry* entry) {
+            if (archive_entry_filetype(entry) != AE_IFLNK) return;
+            const char* tgt = archive_entry_symlink(entry);
+            std::string target = tgt ? tgt : "";
+            std::filesystem::path tp(target);
+            if (tp.is_absolute()) {
+                throw error::MeowError(error::ErrorCode::ArchiveInvalid,
+                    "unsafe symlink (absolute target): " + rel + " -> " + target);
+            }
+            auto linkDir = (destination / std::filesystem::path(rel)).parent_path();
+            auto resolved = (linkDir / tp).lexically_normal();
+            auto base = destination.lexically_normal();
+            auto baseStr = base.string();
+            if (!baseStr.empty() && baseStr.back() != '/') baseStr += '/';
+            auto resStr = resolved.string();
+            if (resStr != base.string() && resStr.rfind(baseStr, 0) != 0) {
+                throw error::MeowError(error::ErrorCode::ArchiveInvalid,
+                    "unsafe symlink (target escapes destination): " + rel +
+                    " -> " + target);
+            }
         }
     }
 
@@ -120,54 +194,6 @@ namespace meow::archive {
         throw error::MeowError(error::ErrorCode::FileNotFound, "file not found in archive: " + filename.string());
     }
 
-    types::FileList extractAll(const Archive& archive, const std::filesystem::path& destination) {
-        ArchiveHandle ah{archive.path};
-
-        types::FileList extracted;
-        struct archive_entry* entry;
-        while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
-            auto name = norm(archive_entry_pathname(entry));
-            if (name.empty()) { skipData(ah.ptr); continue; }
-
-            auto fullPath = destination / name;
-            archive_entry_set_pathname(entry, fullPath.c_str());
-
-            int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
-            if (r != ARCHIVE_OK) {
-                throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + name + ": " + archive_error_string(ah.ptr));
-            }
-            extracted.value.push_back(fullPath);
-        }
-        return extracted;
-    }
-
-    void extractFile(const Archive& archive, const std::filesystem::path& file, const std::filesystem::path& destination) {
-        ArchiveHandle ah{archive.path};
-        auto target = file.lexically_normal().string();
-        if (target.starts_with("./")) target = target.substr(2);
-
-        struct archive_entry* entry;
-        while (archive_read_next_header(ah.ptr, &entry) == ARCHIVE_OK) {
-            auto name = norm(archive_entry_pathname(entry));
-            if (name.empty()) { skipData(ah.ptr); continue; }
-
-            if (name == target) {
-                auto fullPath = destination / name;
-                archive_entry_set_pathname(entry, fullPath.c_str());
-
-                int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
-                if (r != ARCHIVE_OK) {
-                    throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + file.string() + ": " + archive_error_string(ah.ptr));
-                }
-                return;
-            }
-
-            skipData(ah.ptr);
-        }
-
-        throw error::MeowError(error::ErrorCode::FileNotFound, "file not found in archive: " + file.string());
-    }
-
     types::FileList listPackageContent(const Archive& archive) {
         ArchiveHandle ah{archive.path};
 
@@ -207,10 +233,13 @@ namespace meow::archive {
                 continue;
             }
 
+            ensureSafeEntry(destination, rel);
+            ensureSafeSymlink(destination, rel, entry);
+
             auto fullPath = destination / rel;
             archive_entry_set_pathname(entry, fullPath.c_str());
 
-            int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
+            int r = archive_read_extract(ah.ptr, entry, secureExtractFlags);
             if (r != ARCHIVE_OK) {
                 throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + spath + ": " + archive_error_string(ah.ptr));
             }
@@ -230,10 +259,14 @@ namespace meow::archive {
             auto name = norm(archive_entry_pathname(entry));
 
             if (name == target) {
+                auto rel = file.string();
+                ensureSafeEntry(destination, rel);
+                ensureSafeSymlink(destination, rel, entry);
+
                 auto fullPath = destination / file;
                 archive_entry_set_pathname(entry, fullPath.c_str());
 
-                int r = archive_read_extract(ah.ptr, entry, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME);
+                int r = archive_read_extract(ah.ptr, entry, secureExtractFlags);
                 if (r != ARCHIVE_OK) {
                     throw error::MeowError(error::ErrorCode::ArchiveInvalid, "error extracting " + file.string() + ": " + archive_error_string(ah.ptr));
                 }

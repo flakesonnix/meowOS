@@ -9,6 +9,7 @@
 #include <meow/format/version.hpp>
 #include <meow/log/logger.hpp>
 #include <meow/package/package.hpp>
+#include <meow/repository/security_policy.hpp>
 #include <meow/repository/repository.hpp>
 
 #include <algorithm>
@@ -145,6 +146,11 @@ inline void verifyRepoSig(const fs::path& repoMetaPath,
     }
 
     if (!fs::exists(sigPath)) {
+        if (securityPolicy().requireRepositorySignature) {
+            throw error::MeowError(
+                error::ErrorCode::InvalidSignature,
+                "repository is not signed and require_repository_signature is set");
+        }
         log::log(log::LogLevel::Warning,
                  "repository not signed, skipping verification");
         return;
@@ -152,6 +158,12 @@ inline void verifyRepoSig(const fs::path& repoMetaPath,
 
     auto sig = crypto::loadSignature(sigPath);
     if (sig.keyId.empty()) {
+        if (securityPolicy().requireRepositorySignature) {
+            throw error::MeowError(
+                error::ErrorCode::InvalidSignature,
+                "repository signature has no keyId and "
+                "require_repository_signature is set");
+        }
         log::log(log::LogLevel::Warning,
                  "signature has no keyId, skipping verification");
         return;

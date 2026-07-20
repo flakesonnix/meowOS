@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Security
+
+- Secure archive extraction (audit HIGH). Package extraction now applies
+  libarchive `ARCHIVE_EXTRACT_SECURE_NODOTDOT | SECURE_SYMLINKS | UNLINK`
+  together with explicit entry checks that reject absolute paths, `..`
+  traversal, destination escapes, and symlinks whose target escapes the
+  extracted tree. The unused, unscoped `extractAll`/`extractFile` helpers
+  (which allowed raw traversal) were removed. Regression tests:
+  `test/unit/archive_security_test.cpp` (`../` escape, absolute path,
+  escaping/absolute symlink, valid package).
+- Require-repository-signature mode (audit HIGH/MED). New config option
+  `[security] require_repository_signature` (default `false`, preserving
+  existing warn-and-continue behavior). When enabled, a repository with no
+  `.sig`, an empty `keyId`, or an invalid signature is a hard `InvalidSignature`
+  error. Enforced via a process-wide `SecurityPolicy` set from config; also
+  togglable with `MEOW_REQUIRE_SIGNATURE=1` for CI/tests. Regression tests:
+  `test/unit/security_policy_test.cpp`. See `docs/security.md`.
+- Documented the remaining package-metadata trust boundary (per-package
+  manifests and artifact hashes are not yet individually signed; requires a
+  repository-format change) in `docs/security-audit-v0.5.md` §7.
+
 ### Added
 
 - Optional dependencies (phase 1 — metadata only): package manifests and

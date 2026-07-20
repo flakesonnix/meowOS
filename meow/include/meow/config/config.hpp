@@ -54,6 +54,13 @@ struct Config {
     int downloadWorkers = 0; // 0 = default (min(hardware_concurrency, 8))
     int hookTimeout = 30;    // seconds; max runtime for a package script
     bool hookAllowNetwork = false; // network policy for hooks (advisory)
+
+    // When true, a repository with no `.sig`, an empty `keyId`, or an invalid
+    // signature is a hard error rather than a logged warning. Default false
+    // preserves the historical warn-and-continue behavior; operators opt in via
+    //   [security]
+    //   require_repository_signature = true
+    bool requireRepositorySignature = false;
 };
 
 Config defaultConfig();

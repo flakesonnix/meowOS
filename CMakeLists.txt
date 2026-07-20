@@ -13,6 +13,7 @@ set(MEOW_SOURCES
     meow/src/repository/backend.cpp
     meow/src/repository/http_backend.cpp
     meow/src/repository/manager.cpp
+    meow/src/repository/security_policy.cpp
     meow/src/repository/status.cpp
     meow/src/repository/failover.cpp
     meow/src/repository/refresh.cpp
@@ -87,6 +88,18 @@ add_executable(meow-unit-optional test/unit/optional_test.cpp)
 target_include_directories(meow-unit-optional
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-optional PRIVATE meow_core)
+
+# Secure archive extraction regression tests (path traversal, symlink escape).
+add_executable(meow-unit-archive-security test/unit/archive_security_test.cpp)
+target_include_directories(meow-unit-archive-security
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-archive-security PRIVATE meow_core LibArchive::LibArchive)
+
+# Repository security policy: require_repository_signature enforcement.
+add_executable(meow-unit-security-policy test/unit/security_policy_test.cpp)
+target_include_directories(meow-unit-security-policy
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-security-policy PRIVATE meow_core)
 
 target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
