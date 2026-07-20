@@ -38,6 +38,25 @@
 
 ### Added
 
+- Signed package index (v0.7). A repository may ship `packages.toml` +
+  `packages.toml.sig`, a second Ed25519-signed index authenticating each
+  package version's `manifest_hash` (`sha256(raw package manifest ‖ raw version
+  manifest)`) and `artifact_hash`. On load, when present, the index is verified
+  and every package version's recomputed hashes must match, closing the
+  per-package manifest / artifact trust boundary (audit §7). New error codes
+  `MissingPackageIndex`, `InvalidPackageIndex`, `PackageIndexMismatch`. New
+  config `[security] require_package_index` (default `false`) and env
+  `MEOW_REQUIRE_PACKAGE_INDEX=1` make a missing/unsigned index a hard
+  `InvalidSignature` error. The index is regenerated automatically on
+  `meow repo sign`. Regression tests: `test/unit/package_index_test.cpp` and
+  `test/integration/sections/23_signed_index.sh`. See `docs/security.md`.
+
+- SAT resolver status: feature-complete and at parity with the legacy resolver
+  (integration suite passes identically under `MEOW_RESOLVER=legacy` and
+  `MEOW_RESOLVER=sat`); the default engine remains `Legacy`
+  (`ResolverEngine::Auto`). See `docs/release-readiness-v0.7.md` for the
+  full review and the criteria assessment in `docs/sat-default-criteria.md`.
+
 - Optional dependencies (phase 1 — metadata only): package manifests and
   repository metadata now support `[[optional_depends]]` with `package` and
   `description`; `meow info` prints an "Optional dependencies" section. No

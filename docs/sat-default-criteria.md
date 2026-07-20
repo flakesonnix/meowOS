@@ -1,8 +1,13 @@
 # SAT-as-default resolver — transition criteria
 
-`SatResolver` is feature-complete and has been the default since v0.7.0
-(`ResolverEngine::Auto` maps to `Sat`). `Legacy` remains selectable via
-`MEOW_RESOLVER=legacy` or `ResolverEngine::Legacy` for compatibility.
+`SatResolver` is feature-complete and has reached correctness/performance
+parity with the legacy resolver (see the release-readiness report). It is
+**not yet the default**: `ResolverEngine::Auto` currently maps to
+`LegacyResolver` (see `meow/src/dependency/resolver_factory.cpp`), so the
+default engine remains the legacy DFS resolver. `Sat` is selectable via
+`MEOW_RESOLVER=sat` or `ResolverEngine::Sat`; `Legacy` remains selectable via
+`MEOW_RESOLVER=legacy` or `ResolverEngine::Legacy` for compatibility and
+rollout safety.
 
 The following criteria were used to gate the flip:
 
@@ -76,7 +81,14 @@ The following criteria were used to gate the flip:
 
 | Step | Date | Commit |
 |------|------|--------|
-| `ResolverEngine::Auto` → `SatResolver` | v0.7.0 | — |
-| Docs reflect SAT as default | v0.7.0 | — |
-| Legacy stays selectable via config/env | v0.7.0 | — |
-| Follow-up issue filed to remove Legacy | v0.8.x | — |
+| `SatResolver` reaches parity (correctness + perf + robustness) | v0.7 | see release-readiness report |
+| `ResolverEngine::Auto` → `SatResolver` (the actual default flip) | **not yet done** | — |
+| Docs reflect SAT as default | pending the flip | — |
+| Legacy stays selectable via config/env | yes (today) | — |
+| Follow-up issue filed to remove Legacy | after a stabilization window | — |
+
+> **Status (last reviewed v0.7):** all blocking criteria (§1–§4) are met
+> *except* the actual `Auto → Sat` code change and its release-note paragraph.
+> The criteria doc previously claimed SAT had been the default since v0.7.0;
+> that was incorrect — the code default is still `Legacy`. The flip is a
+> deliberate, separate decision and has **not** been made automatically.

@@ -53,11 +53,57 @@ enabled:
 For CI and tests, `MEOW_REQUIRE_SIGNATURE=1` sets the same policy without a
 config file.
 
-> **Scope note.** Require-signature mode authenticates the repository **index**
-> (`repository.toml`). Per-package manifests and the artifact `sha256` they
-> carry are **not yet individually signed** — see the trust-boundary note in
-> `docs/security-audit-v0.5.md` §7. For HTTP repositories, TLS (on by default)
-> protects manifest integrity in transit.
+### Signed package index (v0.7)
+
+Require-signature mode authenticates the repository **index**
+(`repository.toml`), but that alone does not authenticate the per-package
+manifests or the artifact `sha256` they carry: those are separate files that a
+mirror or MITM could rewrite without breaking the `repository.toml` signature.
+v0.7 closes that trust boundary with a second, independently signed index.
+
+A repository may ship `packages.toml` (the *package index*) alongside
+`packages.toml.sig`. The index is a TOML document listing, per package version,
+the `manifest_hash` (a SHA-256 over the raw bytes of the package manifest
+concatenated with the raw bytes of its version manifest) and the
+`artifact_hash` (the artifact `sha256` already declared in the manifest). The
+index is signed with the **same** Ed25519 trusted key as `repository.toml.sig`,
+so a single trust root authenticates both.
+
+On load, when an index is present it is verified; for every package version the
+recomputed `manifest_hash` and `artifact_hash` must match the signed entry,
+otherwise the source is rejected with `PackageIndexMismatch` (treated as an
+`InvalidMetadata` trust failure — non-failover, like a bad `repository.toml`
+signature). A tampered or missing `packages.toml.sig` is rejected with
+`InvalidPackageIndex` (an `InvalidSignature` trust failure). The untrusted
+source is dropped and never served.
+
+To make a missing or unsigned index a hard error instead of a warning, enable
+require-signature mode (above) **and** require the package index:
+
+```toml
+[security]
+require_repository_signature = true
+require_package_index = true
+```
+
+When `require_package_index` is set, a repository with no `packages.toml` (or no
+valid `packages.toml.sig`) is rejected with `MissingPackageIndex` (an
+`InvalidSignature` trust failure). Default is `false`: when the index is absent
+the package manager falls back to the previous behavior (per-package manifests
+authenticated only transitively via `repository.toml` / TLS), preserving
+backwards compatibility with repositories that have not yet published an index.
+
+For CI and tests, `MEOW_REQUIRE_PACKAGE_INDEX=1` sets the same policy without a
+config file.
+
+The index is regenerated automatically whenever the repository is signed
+(`meow repo sign`), so a published index always matches the by-name tree.
+
+> **Scope note.** With a signed package index present and verified, per-package
+> manifests and artifact hashes are now individually authenticated end-to-end,
+> closing the trust-boundary gap noted in `docs/security-audit-v0.5.md` §7. For
+> HTTP repositories without an index, TLS (on by default) still protects
+> manifest integrity in transit.
 
 ## Trusted keys
 
