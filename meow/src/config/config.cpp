@@ -40,6 +40,10 @@ Config loadConfig(const std::filesystem::path& path) {
     if (auto n = tbl["hook_allow_network"].value<bool>())
         cfg.hookAllowNetwork = *n;
 
+    if (auto e = tbl["resolver"]["engine"].value<std::string>()) {
+        cfg.resolverEngine = parseResolverEngine(*e);
+    }
+
     if (auto s = tbl["security"]["require_repository_signature"].value<bool>()) {
         cfg.requireRepositorySignature = *s;
     }
@@ -135,6 +139,12 @@ Config loadConfig(const std::filesystem::path& path) {
     }
 
     return cfg;
+}
+
+ResolverEngine parseResolverEngine(const std::string& s) {
+    if (s == "legacy") return ResolverEngine::Legacy;
+    if (s == "sat") return ResolverEngine::Sat;
+    return ResolverEngine::Auto;
 }
 
 }  // namespace meow::config

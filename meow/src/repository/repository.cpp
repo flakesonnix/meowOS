@@ -57,14 +57,6 @@ namespace meow::repository {
         const Repository& repo,
         const types::PackageName& top
     ) {
-        // Split "name>=1.0.0" -> "name"
-        auto depName = [](std::string spec) -> types::PackageName {
-            size_t pos = spec.find_first_of("><=~^");
-            if (pos != std::string::npos) spec = spec.substr(0, pos);
-            while (!spec.empty() && std::isspace((unsigned char)spec.back())) spec.pop_back();
-            return types::PackageName{spec};
-        };
-
         std::vector<types::PackageName> order;
         std::set<std::string> visited;
         std::set<std::string> inStack;
@@ -80,7 +72,7 @@ namespace meow::repository {
             const auto* pkg = findPackage(repo, name);
             if (pkg) {
                 for (const auto& dep : pkg->depends) {
-                    visit(depName(dep.value));
+                    visit(dep.name);
                 }
             }
 
@@ -89,7 +81,7 @@ namespace meow::repository {
             order.push_back(name);
         };
 
-        visit(depName(top.value));
+        visit(top);
         return order;
     }
 }

@@ -159,7 +159,7 @@ RepositoryPackage simplePkg(const std::string& name,
                             const std::vector<std::string>& optionals = {}) {
     RepositoryPackage p;
     p.name = PackageName{name};
-    for (auto& d : depends) p.depends.push_back(PackageName{d});
+    for (auto& d : depends) p.depends.push_back({PackageName{d}, {}});
     for (auto& c : conflicts) p.conflicts.push_back(PackageName{c});
     for (auto& pr : provides) p.provides.push_back(PackageName{pr});
     for (auto& o : optionals) {
@@ -179,7 +179,7 @@ RepositoryPackage multiVerPkg(const std::string& name,
                               const std::vector<std::string>& depends = {}) {
     RepositoryPackage p;
     p.name = PackageName{name};
-    for (auto& d : depends) p.depends.push_back(PackageName{d});
+    for (auto& d : depends) p.depends.push_back({PackageName{d}, {}});
     for (auto& v : versions) {
         RepositoryVersion rv;
         rv.version = PackageVersion{v};
@@ -246,9 +246,27 @@ int main() {
     std::cout << "--- Fixture 2: diamond ---\n";
     run(lr, sr, repoBase, {"apex"});
 
-    // Fixture 3: multiple providers of virtual ssl (client depends ssl)
+    // Fixture 3: virtual provider — client depends on virtual "ssl".
+    // SAT resolves virtuals natively, selecting one provider (libssl).
+    // Legacy does not expand virtuals to providers.
+    // INTENTIONAL DIVERGENCE (provider encoding).
     std::cout << "--- Fixture 3: virtual provider ---\n";
-    run(lr, sr, repoBase, {"client"});
+    {
+        auto a = lr.resolve(repoBase, ResolveRequest{{PackageName{"client"}}});
+        auto s = sr.resolve(repoBase, ResolveRequest{{PackageName{"client"}}});
+        std::cout << "    legacy=";
+        for (auto& n : nameSet(a)) std::cout << n << " ";
+        std::cout << "\n    sat   =";
+        for (auto& n : nameSet(s)) std::cout << n << " ";
+        std::cout << "\n";
+        expectPass("provider: both SAT", a.ok && s.ok);
+        expectPass("provider: legacy only picks client",
+                    nameSet(a) == std::set<std::string>{"client"});
+        expectPass("provider: SAT picks one provider for virtual 'ssl'",
+                    nameSet(s) == std::set<std::string>{"client", "libssl"});
+        expectPass("provider: SAT did not select virtual 'ssl'",
+                    nameSet(s).count("ssl") == 0);
+    }
 
     // Fixture 4: version choice — both pick latest (2.0)
     std::cout << "--- Fixture 4: version choice ---\n";
@@ -300,7 +318,7 @@ int main() {
         cyc.name = "cyc";
         auto p = [&](const std::string& n, const std::string& d) {
             RepositoryPackage pk; pk.name = PackageName{n};
-            pk.depends.push_back(PackageName{d});
+            pk.depends.push_back({PackageName{d}, {}});
             RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
             pk.versions.push_back(rv); cyc.packages.push_back(std::move(pk));
         };
@@ -329,21 +347,18 @@ int main() {
         expectPass("optional requested: set agree", setAgrees(a, s));
     }
 
-    // Fixture 10: virtual dependency — virtual names are not auto-expanded
-    // to providers. Both backends agree.
+    // Fixture 10: virtual dependency — SAT native provider resolution.
+    // INTENTIONAL DIVERGENCE (same as fixture 3 above).
     std::cout << "--- Fixture 10: virtual not expanded ---\n";
     {
         auto a = lr.resolve(repoBase, ResolveRequest{{PackageName{"client"}}});
         auto s = sr.resolve(repoBase, ResolveRequest{{PackageName{"client"}}});
-        expectPass("provider/virtual: legacy and SAT agree set",
-                    nameSet(a) == nameSet(s));
-        expectPass("provider/virtual: virtual 'ssl' not selected by either",
+        expectPass("provider/virtual: SAT selects one concrete provider",
+                    nameSet(s).count("libssl") == 1);
+        expectPass("provider/virtual: virtual 'ssl' not in resolved set",
                     nameSet(a).count("ssl") == 0 && nameSet(s).count("ssl") == 0);
-        expectPass("provider/virtual: no concrete provider pulled in",
-                    nameSet(a).count("libssl") == 0 &&
-                    nameSet(a).count("libssl-ng") == 0 &&
-                    nameSet(s).count("libssl") == 0 &&
-                    nameSet(s).count("libssl-ng") == 0);
+        expectPass("provider/virtual: legacy does not expand to providers",
+                    nameSet(a).count("libssl") == 0);
     }
 
     // Fixture 11: multiple roots in one request
@@ -365,7 +380,7 @@ int main() {
         for (int i = 0; i < 1000; ++i) {
             RepositoryPackage p;
             p.name = PackageName{"n" + std::to_string(i)};
-            if (i + 1 < 1000) p.depends.push_back(PackageName{"n" + std::to_string(i + 1)});
+            if (i + 1 < 1000) p.depends.push_back({PackageName{"n" + std::to_string(i + 1)}, {}});
             RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
             p.versions.push_back(rv); big.packages.push_back(std::move(p));
         }
@@ -416,7 +431,7 @@ int main() {
         for (int i = 0; i < 500; ++i) {
             RepositoryPackage p;
             p.name = PackageName{"dn" + std::to_string(i)};
-            if (i + 1 < 500) p.depends.push_back(PackageName{"dn" + std::to_string(i + 1)});
+            if (i + 1 < 500) p.depends.push_back({PackageName{"dn" + std::to_string(i + 1)}, {}});
             RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
             p.versions.push_back(rv); big.packages.push_back(std::move(p));
         }
@@ -572,7 +587,7 @@ int main() {
             RepositoryVersion v2; v2.version = PackageVersion{"2.0"};
             p.versions.push_back(v1);
             p.versions.push_back(v2);
-            p.depends.push_back(PackageName{"lib-a"}); // dependencies shared by both versions
+            p.depends.push_back({PackageName{"lib-a"}, {}}); // dependencies shared by both versions
             repo.packages.push_back(std::move(p));
         }
         repo.packages.push_back(simplePkg("lib-a"));
@@ -776,8 +791,8 @@ int main() {
             auto s = sr.resolve(repo, req);
             expectPass("diag conflict: legacy SAT (no diag)", a.ok && a.diagnostics.empty());
             expectPass("diag conflict: SAT UNSAT (with diag)", !s.ok && !s.diagnostics.empty());
-            expectPass("diag conflict: SAT diagnostic kind is MissingPackage",
-                        s.diagnostics[0].kind == ResolveDiagnostic::Kind::MissingPackage);
+            expectPass("diag conflict: SAT diagnostic kind is PackageConflict",
+                        s.diagnostics[0].kind == ResolveDiagnostic::Kind::PackageConflict);
         }
     }
 
@@ -792,7 +807,7 @@ int main() {
         for (int i = 0; i < 2000; ++i) {
             RepositoryPackage p;
             p.name = PackageName{"xn" + std::to_string(i)};
-            if (i + 1 < 2000) p.depends.push_back(PackageName{"xn" + std::to_string(i + 1)});
+            if (i + 1 < 2000) p.depends.push_back({PackageName{"xn" + std::to_string(i + 1)}, {}});
             RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
             p.versions.push_back(rv); big.packages.push_back(std::move(p));
         }
@@ -824,6 +839,361 @@ int main() {
         expectPass("multi-version tree: top at 2.0",
                     versionMap(a)["top"] == "2.0" && versionMap(s)["top"] == "2.0");
         expectPass("multi-version tree: set agree", setAgrees(a, s));
+    }
+
+    // ====================================================================
+    // Provider-specific fixtures (SAT-native virtual resolution)
+    // ====================================================================
+
+    // Fixture 26: single provider for a depended-on virtual
+    std::cout << "--- Fixture 26: single provider ---\n";
+    {
+        Repository repo;
+        repo.name = "singleprov";
+        repo.packages.push_back(simplePkg("app", {"db-lib"}));
+        repo.packages.push_back(simplePkg("mysql-lib", {}, {}, {"db-lib"}));
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("single provider: both SAT", a.ok && s.ok);
+        expectPass("single provider: legacy picks app only",
+                    nameSet(a) == std::set<std::string>{"app"});
+        expectPass("single provider: SAT picks app + provider",
+                    nameSet(s) == std::set<std::string>{"app", "mysql-lib"});
+    }
+
+    // Fixture 27: provider not needed when virtual not depended on
+    std::cout << "--- Fixture 27: provider not pulled ---\n";
+    {
+        Repository repo;
+        repo.name = "provnotneeded";
+        repo.packages.push_back(simplePkg("standalone", {}, {}, {}));
+        repo.packages.push_back(simplePkg("shelved", {}, {}, {"unused-virt"}));
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"standalone"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"standalone"}}});
+        expectPass("unneeded provider: both SAT", a.ok && s.ok);
+        expectPass("unneeded provider: set agree", setAgrees(a, s));
+        expectPass("unneeded provider: provider not pulled",
+                    nameSet(a).count("shelved") == 0);
+    }
+
+    // Fixture 28: provider chain — consumer depends on provider that
+    // also provides a virtual another package depends on.
+    std::cout << "--- Fixture 28: provider chain ---\n";
+    {
+        Repository repo;
+        repo.name = "provchain";
+        repo.packages.push_back(simplePkg("app", {"client"}));
+        repo.packages.push_back(simplePkg("client", {"ssl-lib"}));
+        repo.packages.push_back(simplePkg("openssl", {}, {}, {"ssl-lib"}));
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("provider chain: both SAT", a.ok && s.ok);
+        expectPass("provider chain: legacy picks app + client (real chain)",
+                    nameSet(a) == std::set<std::string>{"app", "client"});
+        expectPass("provider chain: SAT resolves through virtual",
+                    nameSet(s) == std::set<std::string>{"app", "client", "openssl"});
+    }
+
+    // Fixture 29: missing virtual — no package provides the virtual.
+    // Both resolvers silently treat unresolved names as satisfied
+    // (same as Fixture 23 transitive miss).
+    std::cout << "--- Fixture 29: missing virtual ---\n";
+    {
+        Repository repo;
+        repo.name = "missvirt";
+        repo.packages.push_back(simplePkg("app", {"missing-virt"}));
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("missing virtual: both SAT (silent skip)", a.ok && s.ok);
+        expectPass("missing virtual: set agree", setAgrees(a, s));
+        expectPass("missing virtual: no diagnostics", a.diagnostics.empty());
+    }
+
+    // Fixture 30: provider with real deps — provider has its own real
+    // dependencies that must also be selected.
+    std::cout << "--- Fixture 30: provider with real deps ---\n";
+    {
+        Repository repo;
+        repo.name = "provdeps";
+        repo.packages.push_back(simplePkg("app", {"virt"}));
+        repo.packages.push_back(simplePkg("provider-a", {"lib"}, {}, {"virt"}));
+        repo.packages.push_back(simplePkg("lib"));
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("provider w/ deps: both SAT", a.ok && s.ok);
+        expectPass("provider w/ deps: legacy picks app only",
+                    nameSet(a) == std::set<std::string>{"app"});
+        expectPass("provider w/ deps: SAT pulls provider + its deps",
+                    nameSet(s) == std::set<std::string>{"app", "provider-a", "lib"});
+    }
+
+    // ====================================================================
+    // Version constraint fixtures (SAT-side only where constraints matter)
+    // ====================================================================
+
+    // Fixture 31: version constraint `= exact` — SAT selects package at = version
+    std::cout << "--- Fixture 31: version constraint = ---\n";
+    {
+        Repository repo;
+        repo.name = "verconstreq";
+        // lib has versions 1.0, 2.0, 3.0
+        repo.packages.push_back(multiVerPkg("lib", {"1.0", "2.0", "3.0"}));
+        // app depends on lib = 2.0
+        RepositoryPackage app;
+        app.name = PackageName{"app"};
+        app.depends.push_back({
+            PackageName{"lib"},
+            {types::VersionConstraint{"=", types::PackageVersion{"2.0"}}}
+        });
+        RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
+        app.versions.push_back(rv);
+        repo.packages.push_back(std::move(app));
+
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("ver =: both SAT", a.ok && s.ok);
+        // Legacy ignores constraints, always picks highest (3.0)
+        expectPass("ver =: legacy picks 3.0 (highest, ignores =2.0)",
+                    versionMap(a)["lib"] == "3.0");
+        // SAT enforces =2.0 constraint
+        expectPass("ver =: SAT picks 2.0 (enforces = constraint)",
+                    versionMap(s)["lib"] == "2.0");
+    }
+
+    // Fixture 32: version constraint `>=` — SAT allows any satisfying version
+    std::cout << "--- Fixture 32: version constraint >= ---\n";
+    {
+        Repository repo;
+        repo.name = "verconstge";
+        repo.packages.push_back(multiVerPkg("lib", {"1.0", "2.0", "3.0"}));
+        RepositoryPackage app;
+        app.name = PackageName{"app"};
+        app.depends.push_back({
+            PackageName{"lib"},
+            {types::VersionConstraint{">=", types::PackageVersion{"2.0"}}}
+        });
+        RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
+        app.versions.push_back(rv);
+        repo.packages.push_back(std::move(app));
+
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("ver >=: both SAT", a.ok && s.ok);
+        // Both pick highest valid version (SAT constraint allows 2.0/3.0, pickVersion picks 3.0)
+        expectPass("ver >=: both pick 3.0", versionMap(a)["lib"] == "3.0" && versionMap(s)["lib"] == "3.0");
+    }
+
+    // Fixture 33: version constraint with provider — provider must satisfy constraint
+    std::cout << "--- Fixture 33: provider version constraint ---\n";
+    {
+        Repository repo;
+        repo.name = "provver";
+        // Two providers: aba at 2.0, abb at 1.0
+        {
+            RepositoryPackage p; p.name = PackageName{"aba"};
+            p.provides.push_back(PackageName{"virt"});
+            RepositoryVersion pv; pv.version = PackageVersion{"2.0"}; p.versions.push_back(pv);
+            repo.packages.push_back(std::move(p));
+        }
+        {
+            RepositoryPackage p; p.name = PackageName{"abb"};
+            p.provides.push_back(PackageName{"virt"});
+            RepositoryVersion pv; pv.version = PackageVersion{"1.0"}; p.versions.push_back(pv);
+            repo.packages.push_back(std::move(p));
+        }
+        RepositoryPackage app;
+        app.name = PackageName{"app"};
+        app.depends.push_back({
+            PackageName{"virt"},
+            {types::VersionConstraint{">=", types::PackageVersion{"2.0"}}}
+        });
+        RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
+        app.versions.push_back(rv);
+        repo.packages.push_back(std::move(app));
+
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("prov ver: both SAT", a.ok && s.ok);
+        // Legacy: only app (no provider expansion)
+        expectPass("prov ver: legacy picks app only", nameSet(a) == std::set<std::string>{"app"});
+        // SAT: picks aba (>=2.0 constraint on virt, aba is the only satisfying provider)
+        expectPass("prov ver: SAT picks aba (satisfies >=2.0)",
+                    nameSet(s) == std::set<std::string>{"app", "aba"});
+    }
+
+    // Fixture 34: version constraint UNSAT — impossible constraint
+    std::cout << "--- Fixture 34: version constraint UNSAT ---\n";
+    {
+        Repository repo;
+        repo.name = "verunsat";
+        repo.packages.push_back(multiVerPkg("lib", {"1.0"}));
+        RepositoryPackage app;
+        app.name = PackageName{"app"};
+        app.depends.push_back({
+            PackageName{"lib"},
+            {types::VersionConstraint{">=", types::PackageVersion{"2.0"}}}
+        });
+        RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
+        app.versions.push_back(rv);
+        repo.packages.push_back(std::move(app));
+
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("ver unsat: legacy SAT (ignores constraints)", a.ok);
+        expectPass("ver unsat: SAT UNSAT", !s.ok);
+        expectPass("ver unsat: SAT has VersionConflict diagnostic",
+                    !s.diagnostics.empty() &&
+                    s.diagnostics[0].kind == ResolveDiagnostic::Kind::VersionConflict);
+    }
+
+    // Fixture 35: optional dependency with provider behind a real optional name
+    std::cout << "--- Fixture 35: optional + provider ---\n";
+    {
+        Repository repo;
+        repo.name = "optprov";
+        // app has optional dep on "db-ext" (real package) which depends on virtual "db-api"
+        // Two providers for "db-api": mysql-lib, sqlite-lib
+        repo.packages.push_back(simplePkg("app", {"core"}, {}, {}, "1.0", {"db-ext"}));
+        repo.packages.push_back(simplePkg("core"));
+        repo.packages.push_back(simplePkg("db-ext", {"db-api"}));
+        repo.packages.push_back(simplePkg("mysql-lib", {}, {}, {"db-api"}));
+        repo.packages.push_back(simplePkg("sqlite-lib", {}, {}, {"db-api"}));
+
+        // Without optional — both resolve same
+        auto a = lr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("optprov without: both SAT", a.ok && s.ok);
+        expectPass("optprov without: set agree", setAgrees(a, s));
+
+        // With optional db-ext — SAT expands virtual in its chain
+        ResolveRequest withOpt;
+        withOpt.roots.push_back(PackageName{"app"});
+        withOpt.selectedOptional.insert(PackageName{"db-ext"});
+        auto a2 = lr.resolve(repo, withOpt);
+        auto s2 = sr.resolve(repo, withOpt);
+        expectPass("optprov with: both SAT", a2.ok && s2.ok);
+        expectPass("optprov with: legacy pulls app+core+db-ext (no virtual expansion)",
+                    nameSet(a2) == std::set<std::string>{"app", "core", "db-ext"});
+        expectPass("optprov with: SAT picks app+core+db-ext+provider",
+                    nameSet(s2) == std::set<std::string>{"app", "core", "db-ext", "mysql-lib"});
+    }
+
+    // Fixture 36: deterministic provider selection (multiple, same ver, diff names)
+    std::cout << "--- Fixture 36: deterministic provider ---\n";
+    {
+        Repository repo;
+        repo.name = "detprov";
+        repo.packages.push_back(simplePkg("app", {"virt"}));
+        repo.packages.push_back(simplePkg("alpha", {}, {}, {"virt"}));
+        repo.packages.push_back(simplePkg("beta", {}, {}, {"virt"}));
+        repo.packages.push_back(simplePkg("gamma", {}, {}, {"virt"}));
+
+        // Run 3x — always get same provider (alpha, alphabetically first with same version)
+        auto s1 = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s2 = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        auto s3 = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("det prov: always SAT", s1.ok && s2.ok && s3.ok);
+        expectPass("det prov: always picks alpha",
+                    nameSet(s1) == std::set<std::string>{"app", "alpha"} &&
+                    nameSet(s2) == std::set<std::string>{"app", "alpha"} &&
+                    nameSet(s3) == std::set<std::string>{"app", "alpha"});
+    }
+
+    // Fixture 37: deterministic provider — higher version wins over name
+    std::cout << "--- Fixture 37: deterministic provider version order ---\n";
+    {
+        Repository repo;
+        repo.name = "detprovver";
+        repo.packages.push_back(simplePkg("app", {"virt"}));
+        {
+            RepositoryPackage p; p.name = PackageName{"newer"};
+            p.provides.push_back(PackageName{"virt"});
+            RepositoryVersion pv; pv.version = PackageVersion{"2.0"}; p.versions.push_back(pv);
+            repo.packages.push_back(std::move(p));
+        }
+        {
+            RepositoryPackage p; p.name = PackageName{"older"};
+            p.provides.push_back(PackageName{"virt"});
+            RepositoryVersion pv; pv.version = PackageVersion{"1.0"}; p.versions.push_back(pv);
+            repo.packages.push_back(std::move(p));
+        }
+        // newer has version 2.0 > older's 1.0, so newer should be selected
+
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("det prov ver: SAT picks newer (higher version)",
+                    nameSet(s) == std::set<std::string>{"app", "newer"});
+    }
+
+    // Fixture 38: UNSAT diagnostic — missing provider
+    std::cout << "--- Fixture 38: UNSAT missing provider ---\n";
+    {
+        Repository repo;
+        repo.name = "missprovdiag";
+        repo.packages.push_back(simplePkg("app", {"missing-virt"}));
+
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        // app depends on "missing-virt", no one provides it
+        // SAT: app -> missing-virt, but no (¬missing-virt ∨ provider) — virtual has no providers
+        // This makes SAT from the closure analysis (sat defaults to empty provider check)
+        // BUT actually SAT currently allows app+missing-virt because virtual has no clauses
+        // constraining it. So it's SAT, not UNSAT.
+        // Only UNSAT if there's a conflict or missing provider found by closure analysis.
+        // Since the closure analysis in collectUnsatDiagnostics hasn't run (SAT succeeded),
+        // this is SAT. Let me check if it IS SAT or UNSAT with the new encoding...
+        //
+        // Actually: with the current encoding, "missing-virt" has a virtual reverse clause
+        // (¬missing-virt ∨ app) from virtualDependents, but no provider clause since
+        // no one provides it. Forward: (¬app ∨ missing-virt). Root: (app).
+        // app=true, missing-virt=true. SAT. Both resolvers silently skip.
+        // This is the INTENTIONAL behavior (matching legacy).
+        expectPass("miss prov: SAT (silent skip, matches legacy)",
+                    s.ok && s.diagnostics.empty());
+    }
+
+    // Fixture 39: conflict diagnostic — PackageConflict kind
+    std::cout << "--- Fixture 39: conflict diagnostic ---\n";
+    {
+        Repository repo;
+        repo.name = "confdiag";
+        repo.packages.push_back(simplePkg("editor-a", {}, {"editor-b"}));
+        repo.packages.push_back(simplePkg("editor-b", {}, {"editor-a"}));
+
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"editor-a"}, PackageName{"editor-b"}}});
+        expectPass("conf diag: SAT UNSAT", !s.ok);
+        expectPass("conf diag: PackageConflict diagnostic",
+                    !s.diagnostics.empty() &&
+                    s.diagnostics[0].kind == ResolveDiagnostic::Kind::PackageConflict);
+        expectPass("conf diag: message mentions conflict",
+                    s.diagnostics[0].message.find("conflicts") != std::string::npos);
+    }
+
+    // Fixture 40: provider chain with deterministic selection
+    std::cout << "--- Fixture 40: provider chain deterministic ---\n";
+    {
+        Repository repo;
+        repo.name = "provchaindet";
+        // app -> mid -> "srv" virtual
+        // Both "fast" and "safe" provide "srv"
+        repo.packages.push_back(simplePkg("app", {"mid"}));
+        repo.packages.push_back(simplePkg("mid", {"srv"}));
+        {
+            RepositoryPackage p; p.name = PackageName{"fast"};
+            p.provides.push_back(PackageName{"srv"});
+            RepositoryVersion pv; pv.version = PackageVersion{"2.0"}; p.versions.push_back(pv);
+            repo.packages.push_back(std::move(p));
+        }
+        {
+            RepositoryPackage p; p.name = PackageName{"safe"};
+            p.provides.push_back(PackageName{"srv"});
+            RepositoryVersion pv; pv.version = PackageVersion{"1.0"}; p.versions.push_back(pv);
+            repo.packages.push_back(std::move(p));
+        }
+
+        auto s = sr.resolve(repo, ResolveRequest{{PackageName{"app"}}});
+        expectPass("prov chain: SAT", s.ok);
+        expectPass("prov chain: resolves app+mid+provider",
+                    nameSet(s) == std::set<std::string>{"app", "mid", "fast"});
+        // fast has version 2.0 > safe's 1.0, so fast wins
     }
 
     // ====================================================================

@@ -6,6 +6,7 @@
 #include <meow/error/error.hpp>
 #include <meow/crypto/signature.hpp>
 #include <meow/crypto/keystore.hpp>
+#include <meow/dependency/constraint.hpp>
 #include <meow/format/version.hpp>
 #include <meow/log/logger.hpp>
 #include <meow/package/package.hpp>
@@ -211,7 +212,7 @@ inline RepositoryPackage parsePackageManifest(const std::string& tomlText,
             if (!arr) return;
             for (auto&& node : *arr) {
                 if (auto val = node.value<std::string>())
-                    pkg.depends.push_back(types::PackageName{*val});
+                    pkg.depends.push_back(dependency::parseDependencyString(*val));
             }
         };
         readNames(pkgTbl["depends"].as_array());

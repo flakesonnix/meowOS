@@ -27,15 +27,28 @@ namespace meow::dependency {
             return nullptr;
         }
 
+        // Resolve a single dependency recursively. When `diags` is non-null,
+        // failures are recorded there and the function returns without throwing
+        // (so the caller can keep collecting other diagnostics). When `diags`
+        // is null, failures throw as before (the install path).
         void resolveDependency(
             const repository::Repository& repo,
             const types::Dependency& dep,
             database::Database& db,
             DependencyTree& tree,
             std::set<std::string>& visited,
-            const lock::Lockfile* lock
+            const lock::Lockfile* lock,
+            std::vector<ResolveDiagnostic>* diags
         ) {
             if (visited.find(dep.name.value) != visited.end()) {
+                if (diags) {
+                    ResolveDiagnostic d;
+                    d.kind = ResolveDiagnostic::Kind::Cycle;
+                    d.package = dep.name;
+                    d.message = "cycle detected: " + dep.name.value;
+                    diags->push_back(std::move(d));
+                    return;
+                }
                 throw error::MeowError(
                     error::ErrorCode::DependencyCycleDetected,
                     "cycle detected: " + dep.name.value
@@ -49,6 +62,20 @@ namespace meow::dependency {
                     return;
                 }
                 if (installedVer) {
+                    if (diags) {
+                        ResolveDiagnostic d;
+                        d.kind = ResolveDiagnostic::Kind::VersionConflict;
+                        d.package = dep.name;
+                        d.message = "installed " + dep.name.value + " " +
+                                    installedVer->value + " does not satisfy constraints";
+                        for (const auto& c : dep.constraints) {
+                            if (!d.requiredVersion.empty()) d.requiredVersion += ",";
+                            d.requiredVersion += c.op + c.version.value;
+                        }
+                        d.availableVersion = installedVer->value;
+                        diags->push_back(std::move(d));
+                        return;
+                    }
                     throw error::MeowError(
                         error::ErrorCode::DependencyNotFound,
                         "installed " + dep.name.value + " " + installedVer->value
@@ -65,6 +92,20 @@ namespace meow::dependency {
             } else {
                 const auto* repoPkg = findPackageWithProvides(repo, dep.name);
                 if (!repoPkg) {
+                    if (diags) {
+                        // Distinguish a virtual name with no provider from a
+                        // concrete package that simply does not exist.
+                        ResolveDiagnostic d;
+                        bool hasProvider = !findProvider(repo, dep.name).empty();
+                        d.kind = hasProvider ? ResolveDiagnostic::Kind::MissingPackage
+                                             : ResolveDiagnostic::Kind::MissingProvider;
+                        d.package = dep.name;
+                        d.message = hasProvider
+                            ? "package not found: " + dep.name.value
+                            : "no provider found for: " + dep.name.value;
+                        diags->push_back(std::move(d));
+                        return;
+                    }
                     throw error::MeowError(
                         error::ErrorCode::DependencyNotFound,
                         "package not found: " + dep.name.value
@@ -82,6 +123,25 @@ namespace meow::dependency {
                 }
 
                 if (!bestVer) {
+                    if (diags) {
+                        ResolveDiagnostic d;
+                        d.kind = ResolveDiagnostic::Kind::VersionConflict;
+                        d.package = dep.name;
+                        d.message = "no version of " + dep.name.value + " satisfies constraints";
+                        for (const auto& c : dep.constraints) {
+                            if (!d.requiredVersion.empty()) d.requiredVersion += ",";
+                            d.requiredVersion += c.op + c.version.value;
+                        }
+                        // report the highest available version as "available"
+                        const types::PackageVersion* highest = nullptr;
+                        for (const auto& rv : repoPkg->versions) {
+                            if (!highest || repository::compareVersions(rv.version, *highest) > 0)
+                                highest = &rv.version;
+                        }
+                        if (highest) d.availableVersion = highest->value;
+                        diags->push_back(std::move(d));
+                        return;
+                    }
                     throw error::MeowError(
                         error::ErrorCode::VersionNotFound,
                         "no version of " + dep.name.value + " satisfies constraints"
@@ -92,7 +152,7 @@ namespace meow::dependency {
             }
 
             for (const auto& d : pkg.metadata.dependencies.value) {
-                resolveDependency(repo, d, db, tree, visited, lock);
+                resolveDependency(repo, d, db, tree, visited, lock, diags);
             }
 
             tree.packages.push_back(dep.name);
@@ -101,7 +161,8 @@ namespace meow::dependency {
         void checkConflicts(
             const repository::Repository& repo,
             const std::vector<types::PackageName>& toInstall,
-            database::Database& db
+            database::Database& db,
+            std::vector<ResolveDiagnostic>* diags
         ) {
             std::set<std::string> installing;
             for (const auto& n : toInstall) {
@@ -115,12 +176,28 @@ namespace meow::dependency {
 
                 for (const auto& conflict : rp->conflicts) {
                     if (installing.find(conflict.value) != installing.end()) {
+                        if (diags) {
+                            ResolveDiagnostic d;
+                            d.kind = ResolveDiagnostic::Kind::PackageConflict;
+                            d.package = name;
+                            d.message = name.value + " conflicts with " + conflict.value;
+                            diags->push_back(std::move(d));
+                            continue;
+                        }
                         throw error::MeowError(
                             error::ErrorCode::DependencyNotFound,
                             name.value + " conflicts with " + conflict.value
                         );
                     }
                     if (database::isInstalled(db, conflict)) {
+                        if (diags) {
+                            ResolveDiagnostic d;
+                            d.kind = ResolveDiagnostic::Kind::PackageConflict;
+                            d.package = name;
+                            d.message = name.value + " conflicts with installed " + conflict.value;
+                            diags->push_back(std::move(d));
+                            continue;
+                        }
                         throw error::MeowError(
                             error::ErrorCode::DependencyNotFound,
                             name.value + " conflicts with installed " + conflict.value
@@ -146,6 +223,25 @@ namespace meow::dependency {
         return providers;
     }
 
+    bool tryResolve(
+        const repository::Repository& repo,
+        const types::PackageName& top,
+        database::Database& db,
+        std::vector<ResolveDiagnostic>& diags,
+        const lock::Lockfile* lock
+    ) {
+        DependencyTree tree;
+        std::set<std::string> visited;
+        types::Dependency self;
+        self.name = top;
+        self.constraints = {};
+        resolveDependency(repo, self, db, tree, visited, lock, &diags);
+        if (diags.empty()) {
+            checkConflicts(repo, tree.packages, db, &diags);
+        }
+        return diags.empty();
+    }
+
     DependencyTree resolveDependencies(
         const repository::Repository& repo,
         const package::PackageMetadata& package,
@@ -158,9 +254,9 @@ namespace meow::dependency {
         types::Dependency self;
         self.name = package.name;
         self.constraints = {};
-        resolveDependency(repo, self, db, tree, visited, lock);
+        resolveDependency(repo, self, db, tree, visited, lock, nullptr);
 
-        checkConflicts(repo, tree.packages, db);
+        checkConflicts(repo, tree.packages, db, nullptr);
 
         return tree;
     }

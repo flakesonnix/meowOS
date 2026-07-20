@@ -28,6 +28,13 @@ set(MEOW_SOURCES
     meow/src/hooks/runner.cpp
     meow/src/dependency/resolver.cpp
     meow/src/dependency/constraint.cpp
+    meow/src/dependency/legacy_resolver.cpp
+    meow/src/dependency/sat_resolver.cpp
+    meow/src/dependency/resolver_factory.cpp
+    meow/src/sat/problem.cpp
+    meow/src/sat/solver.cpp
+    meow/src/sat/dpll.cpp
+    meow/src/sat/translate.cpp
     meow/src/transaction/transaction.cpp
     meow/src/remove/remove.cpp
     meow/src/upgrade/upgrade.cpp
@@ -88,6 +95,36 @@ add_executable(meow-unit-optional test/unit/optional_test.cpp)
 target_include_directories(meow-unit-optional
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-optional PRIVATE meow_core)
+
+# Translation-first SAT tests: package graph -> CNF clauses (no solving yet).
+add_executable(meow-unit-sat test/unit/sat_translate_test.cpp)
+target_include_directories(meow-unit-sat
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-sat PRIVATE meow_core)
+
+# Repository-free solver tests: DPLL on raw CNF (no packages involved).
+add_executable(meow-unit-sat-solver test/unit/sat_solver_test.cpp)
+target_include_directories(meow-unit-sat-solver
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-sat-solver PRIVATE meow_core)
+
+# Translation correctness: CNF semantics + clause counts + deterministic hash.
+add_executable(meow-unit-sat-translate-correctness test/unit/sat_translate_correctness_test.cpp)
+target_include_directories(meow-unit-sat-translate-correctness
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-sat-translate-correctness PRIVATE meow_core)
+
+# Parity: LegacyResolver vs SatResolver must select the same package set.
+add_executable(meow-unit-sat-parity test/unit/sat_parity_test.cpp)
+target_include_directories(meow-unit-sat-parity
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-sat-parity PRIVATE meow_core)
+
+# Resolver engine config switch (legacy / sat / auto).
+add_executable(meow-unit-resolver-config test/unit/resolver_config_test.cpp)
+target_include_directories(meow-unit-resolver-config
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-resolver-config PRIVATE meow_core)
 
 # Secure archive extraction regression tests (path traversal, symlink escape).
 add_executable(meow-unit-archive-security test/unit/archive_security_test.cpp)

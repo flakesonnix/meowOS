@@ -45,12 +45,22 @@ struct PackageGroup {
     std::vector<std::string> packages;  // package names (not versions)
 };
 
+// Which resolution backend to use. `Auto` keeps the legacy DFS resolver as the
+// default for now; `Sat` selects the SAT backend. This is an escape hatch: if a
+// SAT regression is reported, operators can pin `Legacy` without a rebuild.
+enum class ResolverEngine {
+    Legacy,
+    Sat,
+    Auto,
+};
+
 struct Config {
     std::filesystem::path root;
     std::filesystem::path cache;
     std::filesystem::path database;
     std::vector<RepositoryConfig> repositories;
     std::vector<PackageGroup> groups;
+    ResolverEngine resolverEngine = ResolverEngine::Auto;
     int downloadWorkers = 0; // 0 = default (min(hardware_concurrency, 8))
     int hookTimeout = 30;    // seconds; max runtime for a package script
     bool hookAllowNetwork = false; // network policy for hooks (advisory)
@@ -64,6 +74,12 @@ struct Config {
 };
 
 Config defaultConfig();
+
+// Parse a resolver engine string ("legacy" | "sat" | "auto"). Unknown values
+// fall back to Auto so a typo never silently disables the resolver.
+ResolverEngine parseResolverEngine(const std::string& s);
+
+
 
 // Load configuration from a TOML file. Recognizes:
 //   [[repositories]]

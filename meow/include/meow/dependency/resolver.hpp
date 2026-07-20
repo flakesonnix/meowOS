@@ -17,6 +17,25 @@ namespace meow::dependency {
         std::vector<types::PackageName> packages;
     };
 
+    // One reason a resolution could not be satisfied. Produced by the resolver
+    // at its internal decision points; the CLI (or any future API/JSON/GUI)
+    // decides how to present it. The resolver never formats human strings.
+    struct ResolveDiagnostic {
+        enum class Kind {
+            MissingPackage,
+            VersionConflict,
+            PackageConflict,
+            MissingProvider,
+            Cycle,
+        };
+
+        Kind kind = Kind::MissingPackage;
+        types::PackageName package;
+        std::string message;
+        std::string requiredVersion;   // e.g. ">=2.0" for VersionConflict
+        std::string availableVersion;  // best available version, if any
+    };
+
     // A fully-specified install request, independent of any CLI flag parsing.
     // `packages` are the user-requested roots. Optional packages are promoted to
     // additional roots via `includeAllOptional` (every declared optional) or
@@ -42,6 +61,18 @@ namespace meow::dependency {
         const repository::Repository& repo,
         const package::PackageMetadata& package,
         database::Database& db,
+        const lock::Lockfile* lock = nullptr
+    );
+
+    // Non-throwing resolution for diagnostics (e.g. `meow why-not`). Returns
+    // false when resolution cannot be satisfied and fills `diags` with the
+    // reasons discovered at the resolver's own decision points. The install
+    // path keeps using the throwing resolveDependencies().
+    bool tryResolve(
+        const repository::Repository& repo,
+        const types::PackageName& top,
+        database::Database& db,
+        std::vector<ResolveDiagnostic>& diags,
         const lock::Lockfile* lock = nullptr
     );
 

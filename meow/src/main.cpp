@@ -16,6 +16,7 @@
 #include <meow/download/queue.hpp>
 #include <meow/install/installer.hpp>
 #include <meow/dependency/resolver.hpp>
+#include <meow/dependency/iresolver.hpp>
 #include <meow/remove/remove.hpp>
 #include <meow/upgrade/upgrade.hpp>
 #include <meow/lock/lockfile.hpp>
@@ -179,6 +180,92 @@ namespace {
         }
     }
 
+    // Explain why a package is present: its install reason, what requires it,
+    // and the virtual names it provides. Queries the DB plus repository
+    // metadata; no resolution is performed.
+    void cmdExplain(const meow::repository::Repository& repo,
+                    meow::database::Database& db, const std::string& name) {
+        meow::types::PackageName pkg{name};
+        auto ver = meow::database::installedVersion(db, pkg);
+        auto reason = meow::database::installReason(db, pkg);
+
+        std::cout << name;
+        if (ver) std::cout << " " << ver->value;
+        std::cout << "\n\n";
+
+        std::cout << "Install reason:\n  ";
+        if (reason) {
+            switch (*reason) {
+                case meow::database::InstallReason::Explicit:    std::cout << "Explicit"; break;
+                case meow::database::InstallReason::GroupMember: std::cout << "GroupMember"; break;
+                case meow::database::InstallReason::Dependency:  std::cout << "Dependency"; break;
+            }
+        } else if (meow::database::isInstalled(db, pkg)) {
+            std::cout << "unknown";
+        } else {
+            std::cout << "not installed";
+        }
+        std::cout << "\n";
+
+        auto requiredBy = meow::database::requiredBy(db, pkg);
+        std::cout << "\nRequired by:\n";
+        if (requiredBy.empty()) {
+            std::cout << "  (nothing)\n";
+        } else {
+            for (const auto& r : requiredBy) {
+                std::cout << "  " << r.value << "\n";
+            }
+        }
+
+        const auto* rp = meow::repository::findPackage(repo, pkg);
+        std::cout << "\nProvides:\n";
+        if (rp && !rp->provides.empty()) {
+            for (const auto& p : rp->provides) {
+                std::cout << "  " << p.value << "\n";
+            }
+        } else {
+            std::cout << "  (nothing)\n";
+        }
+    }
+
+    // Explain why a package cannot be installed, using the resolver's own
+    // diagnostic decision points (no success/failure reimplementation).
+    void cmdWhyNot(const meow::repository::Repository& repo,
+                   meow::database::Database& db, const std::string& name) {
+        std::vector<meow::dependency::ResolveDiagnostic> diags;
+        bool ok = meow::dependency::tryResolve(repo, meow::types::PackageName{name}, db, diags);
+
+        if (ok) {
+            std::cout << "Can install " << name << "\n";
+            return;
+        }
+
+        std::cout << "Cannot install " << name << "\n\n";
+        for (const auto& d : diags) {
+            std::cout << "- ";
+            switch (d.kind) {
+                case meow::dependency::ResolveDiagnostic::Kind::MissingPackage:
+                    std::cout << "missing package: " << d.package.value;
+                    break;
+                case meow::dependency::ResolveDiagnostic::Kind::VersionConflict:
+                    std::cout << "version conflict: " << d.package.value
+                              << " requires " << d.requiredVersion
+                              << " but available " << d.availableVersion;
+                    break;
+                case meow::dependency::ResolveDiagnostic::Kind::PackageConflict:
+                    std::cout << "conflict: " << d.message;
+                    break;
+                case meow::dependency::ResolveDiagnostic::Kind::MissingProvider:
+                    std::cout << "no provider found for: " << d.package.value;
+                    break;
+                case meow::dependency::ResolveDiagnostic::Kind::Cycle:
+                    std::cout << "dependency cycle: " << d.package.value;
+                    break;
+            }
+            std::cout << "\n";
+        }
+    }
+
     // Resolve a dependency closure for several package names, download every
     // artifact in parallel, and return the resolved PackageFiles ready to
     // install. Shared by `meow install <pkg>` and `meow group install <grp>`,
@@ -188,9 +275,12 @@ namespace {
         const meow::config::Config& cfg,
         const std::vector<meow::types::PackageName>& names) {
         std::vector<meow::types::PackageName> closure;
+        std::set<std::string> seen;
         for (const auto& name : names) {
             auto nameset = meow::repository::resolveDependencyNames(repo, name);
-            closure.insert(closure.end(), nameset.begin(), nameset.end());
+            for (const auto& n : nameset) {
+                if (seen.insert(n.value).second) closure.push_back(n);
+            }
         }
 
         std::vector<meow::download::DownloadTask> tasks;
@@ -323,9 +413,11 @@ int main(int argc, char** argv) {
                << "  owns <file>\n"
                << "  required-by <package>\n"
                << "  history [package]\n"
-               << "  why <package>\n"
-               << "  explicitly-installed\n"
-               << "  keys list\n"
+              << "  why <package>\n"
+              << "  explicitly-installed\n"
+              << "  explain <package>\n"
+              << "  why-not <package>\n"
+              << "  keys list\n"
                << "  keys add <file>\n"
                << "  clean\n";
         return 1;
@@ -377,6 +469,12 @@ int main(int argc, char** argv) {
                 .id = "default",
                 .mirrors = {repositoryOverride},
                 .url = repositoryOverride});
+        }
+
+        // MEOW_RESOLVER overrides the configured engine so CI can exercise
+        // both backends against the same integration suite (legacy / sat / auto).
+        if (const char* r = std::getenv("MEOW_RESOLVER")) {
+            cfg.resolverEngine = meow::config::parseResolverEngine(r);
         }
 
         // Apply the repository security policy before any repository is opened.
@@ -507,17 +605,30 @@ int main(int argc, char** argv) {
                     requested.insert(name.value);
                 }
             } else {
-                // Expand optional dependencies into additional explicit roots
-                // before resolution. The resolver stays unaware of "optional".
-                meow::dependency::InstallRequest req;
-                req.packages.push_back(meow::types::PackageName{pkgName});
-                req.includeAllOptional = withOptional;
-                req.selectedOptional = selectedOptional;
-                auto roots = meow::dependency::expandInstallRequest(repo, req);
+                // Resolve through the configured backend (legacy DFS or SAT).
+                // Optional dependencies are promoted to roots inside the
+                // resolver; the engine stays unaware of "optional".
+                auto resolver = meow::dependency::makeResolver(cfg.resolverEngine);
+                meow::dependency::ResolveRequest rreq;
+                rreq.roots.push_back(meow::types::PackageName{pkgName});
+                rreq.includeAllOptional = withOptional;
+                rreq.selectedOptional = selectedOptional;
+                auto resolution = resolver->resolve(repo, rreq);
+
+                if (!resolution.ok) {
+                    std::cerr << "resolution failed:\n";
+                    for (const auto& d : resolution.diagnostics)
+                        std::cerr << "  " << d.message << "\n";
+                    return 1;
+                }
+
+                std::vector<meow::types::PackageName> roots;
+                for (const auto& p : resolution.packages)
+                    roots.push_back(p.name);
 
                 meow::log::log(meow::log::LogLevel::Info, "resolving dependency names");
                 toInstall = resolveAndStage(repo, cfg, roots);
-                for (const auto& r : roots) requested.insert(r.value);
+                for (const auto& r : rreq.roots) requested.insert(r.value);
             }
 
             meow::log::log(meow::log::LogLevel::Info, "installing packages");
@@ -715,6 +826,18 @@ int main(int argc, char** argv) {
             cmdWhy(db, cmdArgv[1]);
         } else if (cmd == "explicitly-installed") {
             cmdExplicitlyInstalled(db);
+        } else if (cmd == "explain") {
+            if (cmdArgc < 2) {
+                std::cerr << "usage: meow explain <package>\n";
+                return 1;
+            }
+            cmdExplain(repo, db, cmdArgv[1]);
+        } else if (cmd == "why-not") {
+            if (cmdArgc < 2) {
+                std::cerr << "usage: meow why-not <package>\n";
+                return 1;
+            }
+            cmdWhyNot(repo, db, cmdArgv[1]);
         } else if (cmd == "installed") {
             cmdInstalled(db);
         } else if (cmd == "clean") {

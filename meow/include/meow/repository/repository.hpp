@@ -25,7 +25,7 @@ struct RepositoryPackage {
     std::optional<types::Description> description;
     std::vector<types::PackageName> provides;
     std::vector<types::PackageName> conflicts;
-    std::vector<types::PackageName> depends;
+    std::vector<types::Dependency> depends;
     std::vector<types::OptionalDependency> optionalDepends;
     std::vector<RepositoryVersion> versions;
 };
