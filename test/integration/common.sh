@@ -1,10 +1,128 @@
 # Common helpers and setup for the integration test suite.
 # Sourced by test/integration.sh (not standalone).
 
-MEOW="$(cd "$(dirname "$0")/.." && pwd)/build/meow"
-TEST_DB="/tmp/meow-test-$$.db"
-export MEOW TEST_DB
+# Resolve the script directory reliably whether this file is sourced by
+# test/integration.sh ($0 points at the wrapper) or run standalone
+# (BASH_SOURCE is the empty string). $(dirname "$0") is wrong in the
+# sourced case, so derive everything from BASH_SOURCE[0] instead.
+_COMMON_SRC="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$_COMMON_SRC")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+MEOW="$ROOT_DIR/build/meow"
+KEYS_DIR="$ROOT_DIR/test/keys"
 : "${TMPDIR:=/tmp}"
+
+# ---------------------------------------------------------------------------
+# Fixture isolation
+#
+# Every helper below returns an isolated directory under a single run-scoped
+# root and registers it for automatic cleanup. Isolating repo / home / cache /
+# database state is what makes the suite safe to run in parallel later: no
+# section shares the canonical ./repo, the user's ~/.cache/meow, or
+# ~/.config/meow/keys with another section.
+# ---------------------------------------------------------------------------
+
+FIXTURE_ROOT="$TMPDIR/meow-fixtures-$$"
+FIXTURE_SEQ=0
+
+# Create the run-scoped fixture root and register an exit trap so every
+# fixture directory is removed automatically (no manual git clean required).
+init_fixtures() {
+    mkdir -p "$FIXTURE_ROOT"
+    trap cleanup_fixtures EXIT INT TERM
+}
+
+# Remove all fixtures created for this run. Idempotent and safe to call twice.
+cleanup_fixtures() {
+    rm -rf "$FIXTURE_ROOT"
+}
+
+# Copy the canonical ./repo into a private workdir that also contains a `repo`
+# entry, and print that workdir's path. Callers `cd` into the result so that
+# `./repo` resolves to the copy while absolute paths ($MEOW, keys,
+# http_fixture.py) keep working. This is the recommended replacement for
+# mutating the shared ./repo or for `cp -r repo repo-dual`.
+#
+# The copy method is selected by FIXTURE_COPY (default "cp -a"): see the
+# benchmark notes in the fixture audit. Supported: "cp -a", "rsync -a",
+# "cp -al" (hardlinks, where the filesystem allows them).
+create_repo_fixture() {
+    FIXTURE_SEQ=$((FIXTURE_SEQ + 1))
+    local work="$FIXTURE_ROOT/repo-work-$FIXTURE_SEQ"
+    rm -rf "$work"
+    mkdir -p "$work"
+    _copy_repo repo "$work/repo"
+    echo "$work"
+}
+
+# Copy the canonical ./repo into an explicit target directory (used by
+# bootstrapArtifacts when an isolated repo root is active). Honors FIXTURE_COPY.
+_copy_repo() {
+    local src="$1" dst="$2"
+    case "${FIXTURE_COPY:-cp -a}" in
+        rsync\ -a) rsync -a "$src/" "$dst/" ;;
+        cp\ -al)  cp -al "$src" "$dst" 2>/dev/null || cp -a "$src" "$dst" ;;
+        *)        cp -a "$src" "$dst" ;;
+    esac
+}
+
+# Build an isolated HOME directory containing a copy of the trusted keys and an
+# empty cache. Exporting HOME to the result isolates both ~/.cache/meow and
+# ~/.config/meow/keys for the remainder of the run. The trust store expects the
+# PUBLIC key, so the .pub file is installed as the trusted key.
+create_home_fixture() {
+    FIXTURE_SEQ=$((FIXTURE_SEQ + 1))
+    local home="$FIXTURE_ROOT/home-$FIXTURE_SEQ"
+    mkdir -p "$home/.config/meow/keys" "$home/.cache/meow"
+    cp "$KEYS_DIR/meow-release.pub" "$home/.config/meow/keys/meow-release.pem" 2>/dev/null || true
+    echo "$home"
+}
+
+# Return an isolated keys directory containing a copy of the trusted PUBLIC key.
+# Use this when a section needs to mutate ~/.config/meow/keys without adopting a
+# full isolated HOME (e.g. to drop or re-add a trusted key).
+create_keys_fixture() {
+    FIXTURE_SEQ=$((FIXTURE_SEQ + 1))
+    local keys="$FIXTURE_ROOT/keys-$FIXTURE_SEQ"
+    mkdir -p "$keys"
+    cp "$KEYS_DIR/meow-release.pub" "$keys/meow-release.pem" 2>/dev/null || true
+    echo "$keys"
+}
+
+# Return an isolated keys directory containing a copy of the trusted keys.
+# Use this when a section needs to mutate ~/.config/meow/keys without adopting a
+# full isolated HOME (e.g. to drop or re-add a trusted key).
+create_keys_fixture() {
+    FIXTURE_SEQ=$((FIXTURE_SEQ + 1))
+    local keys="$FIXTURE_ROOT/keys-$FIXTURE_SEQ"
+    mkdir -p "$keys"
+    # meow loads verification keys by matching *.pem, so copy the
+    # public key under a .pem name.
+    cp "$KEYS_DIR/meow-release.pub" "$keys/meow-release.pem" 2>/dev/null || true
+    echo "$keys"
+}
+
+# Return an isolated cache directory (used when a section needs its own
+# ~/.cache/meow without adopting a full isolated HOME).
+create_cache_fixture() {
+    FIXTURE_SEQ=$((FIXTURE_SEQ + 1))
+    local cache="$FIXTURE_ROOT/cache-$FIXTURE_SEQ"
+    mkdir -p "$cache"
+    echo "$cache"
+}
+
+# Return a unique, empty database path for a section. Replaces the shared
+# TEST_DB so concurrent sections never collide on the same file.
+create_db_fixture() {
+    FIXTURE_SEQ=$((FIXTURE_SEQ + 1))
+    mktemp -p "$FIXTURE_ROOT" "db-$FIXTURE_SEQ.XXXXXX"
+}
+
+# Default database for sections that still reference $TEST_DB. Kept unique per
+# run; individual sections may call create_db_fixture() for stronger isolation.
+TEST_DB="$(mktemp -p "$TMPDIR" "meow-test-$$.XXXXXX")"
+export MEOW TEST_DB
 
 pass=0
 fail=0
@@ -46,7 +164,7 @@ $optdeps
 EOF
     echo "#!/bin/sh" > "$src/files/$binpath"
     chmod +x "$src/files/$binpath"
-    ./build/meow-build --output /tmp/meow-artifacts "$src" >/dev/null 2>&1
+    "$ROOT_DIR/build/meow-build" --output /tmp/meow-artifacts "$src" >/dev/null 2>&1
     local arch="/tmp/meow-artifacts/$name-$version.pkg.tar.zst"
     sha256sum "$arch" | cut -d' ' -f1
 }
@@ -70,14 +188,14 @@ filename = "$name-$version.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/$name-$version.pkg.tar.zst"
 sha256 = "$sha"
 EOF
-    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    "$ROOT_DIR/build/meow-repo" sign --key "$KEYS_DIR/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
 }
 
 reproBuild() {
     local src="$1" out="$2" base="$3"; shift 3
     rm -rf "$out"
     mkdir -p "$out"
-    env "$@" ./build/meow-build --output "$out" "$src" >/dev/null 2>&1
+    env "$@" "$ROOT_DIR/build/meow-build" --output "$out" "$src" >/dev/null 2>&1
     sha256sum "$out/$base" 2>/dev/null | cut -d' ' -f1
 }
 
@@ -95,7 +213,7 @@ version = "$version"
 architecture = "AMD64"
 description = "hook fixture"
 EOF
-    ./build/meow-build --output /tmp/meow-artifacts "$src" >/dev/null 2>&1
+    "$ROOT_DIR/build/meow-build" --output /tmp/meow-artifacts "$src" >/dev/null 2>&1
     local arch="/tmp/meow-artifacts/$name-$version.pkg.tar.zst"
     local sha
     sha=$(sha256sum "$arch" | cut -d' ' -f1)
@@ -114,7 +232,7 @@ filename = "$name-$version.pkg.tar.zst"
 url = "file://$arch"
 sha256 = "$sha"
 EOF
-    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    "$ROOT_DIR/build/meow-repo" sign --key "$KEYS_DIR/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
 }
 
 bootstrapArtifacts() {
@@ -190,13 +308,13 @@ EOF
     rm -rf /tmp/meow-http-root
     mkdir -p /tmp/meow-http-root
     cp /tmp/meow-artifacts/*.pkg.tar.zst /tmp/meow-http-root/
-    ./build/meow-repo sign --key "$(dirname "$0")/keys/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    "$ROOT_DIR/build/meow-repo" sign --key "$KEYS_DIR/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
 }
 
 HTTP_PID=""
 HTTP_PORT=""
 startHttp() {
-    python3 "$(dirname "$0")/http_fixture.py" --root /tmp/meow-http-root --port 0 >/tmp/meow-http.log 2>&1 &
+    python3 "$SCRIPT_DIR/http_fixture.py" --root /tmp/meow-http-root --port 0 >/tmp/meow-http.log 2>&1 &
     HTTP_PID=$!
     for _ in $(seq 1 50); do
         if [ -s /tmp/meow-http.log ]; then
