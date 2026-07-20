@@ -126,6 +126,12 @@ target_include_directories(meow-unit-resolver-config
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-resolver-config PRIVATE meow_core)
 
+# SAT resolution benchmark (translation/solver timing baseline).
+add_executable(meow-bench bench/benchmark.cpp)
+target_include_directories(meow-bench
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-bench PRIVATE meow_core)
+
 # Secure archive extraction regression tests (path traversal, symlink escape).
 add_executable(meow-unit-archive-security test/unit/archive_security_test.cpp)
 target_include_directories(meow-unit-archive-security

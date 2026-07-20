@@ -45,7 +45,7 @@ Repository linearChain(int n) {
     for (int i = 0; i < n; ++i) {
         RepositoryPackage p;
         p.name = PackageName{"p" + std::to_string(i)};
-        if (i + 1 < n) p.depends.push_back(PackageName{"p" + std::to_string(i + 1)});
+        if (i + 1 < n) p.depends.push_back({PackageName{"p" + std::to_string(i + 1)}, {}});
         RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
         p.versions.push_back(rv);
         repo.packages.push_back(std::move(p));
@@ -79,7 +79,7 @@ Repository wideGraph(int depth, int fanout) {
                 mk(child);
                 for (auto& pkg : repo.packages) {
                     if (pkg.name.value == parent) {
-                        pkg.depends.push_back(PackageName{child});
+                        pkg.depends.push_back({PackageName{child}, {}});
                         break;
                     }
                 }
@@ -103,7 +103,7 @@ Repository manyProviders(int count) {
         p.versions.push_back(rv); repo.packages.push_back(std::move(p));
     };
     mk("root");
-    repo.packages.back().depends.push_back(PackageName{"service"});
+    repo.packages.back().depends.push_back({PackageName{"service"}, {}});
     for (int i = 0; i < count; ++i) mk("prov" + std::to_string(i), true);
     return repo;
 }
@@ -119,7 +119,7 @@ Repository manyVirtuals(int num, int providersPer) {
                   const std::vector<std::string>& deps = {},
                   const std::vector<std::string>& provides = {}) {
         RepositoryPackage p; p.name = PackageName{n};
-        for (auto& d : deps) p.depends.push_back(PackageName{d});
+        for (auto& d : deps) p.depends.push_back({PackageName{d}, {}});
         for (auto& pr : provides) p.provides.push_back(PackageName{pr});
         RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
         p.versions.push_back(rv); repo.packages.push_back(std::move(p));
@@ -136,9 +136,9 @@ Repository manyVirtuals(int num, int providersPer) {
     // Remove duplicate dependency entries from root
     auto& rootPkg = repo.packages[0];
     std::set<std::string> seen;
-    std::vector<PackageName> uniq;
+    std::vector<Dependency> uniq;
     for (auto& d : rootPkg.depends) {
-        if (seen.insert(d.value).second) uniq.push_back(d);
+        if (seen.insert(d.name.value).second) uniq.push_back(d);
     }
     rootPkg.depends = std::move(uniq);
     return repo;
@@ -152,7 +152,7 @@ Repository manyVersions(int packages, int versions) {
     for (int i = 0; i < packages; ++i) {
         RepositoryPackage p;
         p.name = PackageName{"v" + std::to_string(i)};
-        if (i + 1 < packages) p.depends.push_back(PackageName{"v" + std::to_string(i + 1)});
+        if (i + 1 < packages) p.depends.push_back({PackageName{"v" + std::to_string(i + 1)}, {}});
         for (int v = 1; v <= versions; ++v) {
             RepositoryVersion rv; rv.version = PackageVersion{std::to_string(v) + ".0"};
             p.versions.push_back(rv);
@@ -192,7 +192,7 @@ Repository randomDag(int nodes, double edgeProb, std::uint64_t seed) {
         // acyclic by construction.
         for (int j = i + 1; j < nodes; ++j) {
             if (pick(rng) < edgeProb)
-                p.depends.push_back(PackageName{"n" + std::to_string(j)});
+                p.depends.push_back({PackageName{"n" + std::to_string(j)}, {}});
         }
         RepositoryVersion rv; rv.version = PackageVersion{"1.0"};
         p.versions.push_back(rv); repo.packages.push_back(std::move(p));
