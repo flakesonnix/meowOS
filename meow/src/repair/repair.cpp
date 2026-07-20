@@ -5,6 +5,7 @@
 #include <meow/download/downloader.hpp>
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
+#include <meow/lock/install_lock.hpp>
 #include <filesystem>
 
 namespace meow::repair {
@@ -16,6 +17,10 @@ RepairResult repairPackage(
     const std::filesystem::path& root
 ) {
     RepairResult result;
+
+    // Serialize against any concurrent mutating operation (repair writes
+    // files to the install root and updates the database).
+    auto lock = lock::InstallLock(lock::defaultInstallLockPath(db.path));
 
     if (!database::isInstalled(db, name)) {
         throw error::MeowError(

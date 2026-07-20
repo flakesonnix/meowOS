@@ -53,6 +53,17 @@ namespace meow::transaction {
         for (auto it = tx.createdFiles.rbegin(); it != tx.createdFiles.rend(); ++it) {
             std::error_code ec;
             std::filesystem::remove(*it, ec);
+            // Best-effort cleanup of now-empty parent directories left behind
+            // by the rolled-back extraction, so a failed transaction does not
+            // leave dangling empty directories in the install root.
+            auto parent = it->parent_path();
+            for (int depth = 0; depth < 16 && !parent.empty(); ++depth) {
+                std::error_code pec;
+                if (!std::filesystem::is_empty(parent, pec) || pec) break;
+                std::filesystem::remove(parent, pec);
+                if (pec) break;
+                parent = parent.parent_path();
+            }
         }
     }
 }

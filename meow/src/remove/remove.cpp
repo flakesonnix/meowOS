@@ -2,9 +2,13 @@
 #include <meow/transaction/transaction.hpp>
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
+#include <meow/lock/install_lock.hpp>
 
 namespace meow::remove {
     void removePackage(const types::PackageName& name, database::Database& db) {
+        // Serialize against any concurrent mutating operation.
+        auto lock = lock::InstallLock(lock::defaultInstallLockPath(db.path));
+
         if (!database::isInstalled(db, name)) {
             throw error::MeowError(error::ErrorCode::PackageNotFound, "package not installed: " + name.value);
         }

@@ -91,3 +91,50 @@ verification, redirect following, timeouts, retries on transient errors,
 and a `Content-Length` size guard. Downloads are atomic (written to a
 `.part` file, then renamed) so a failed or interrupted transfer never
 leaves a corrupt cached archive.
+
+## Install locking
+
+Every mutating operation — `install`, `group install`, `remove`, `upgrade`,
+`update`, and `repair` — acquires a single process-level advisory lock
+(`meow::lock::InstallLock`) for the whole transaction + database-commit
+window. The lock is a `flock(2)` on `<db-dir>/install.lock`, so it is safe
+across processes and released automatically by the kernel when the holder
+exits (including on crash).
+
+- A second concurrent mutating operation fails cleanly with
+  `AlreadyLocked` and a diagnostic — it does **not** block and does **not**
+  race on the filesystem or the database.
+- All mutating paths share the same lock file and path logic, so they are
+  mutually exclusive with one another (an install cannot run while a remove
+  is in progress, etc.).
+- The lock is not held for read-only operations (`list`, `info`, `search`,
+  `sync` metadata refresh) — only for operations that write the install root
+  or the database.
+
+## Transaction rollback
+
+A mutating operation either commits fully or rolls back:
+
+- **Install / upgrade:** files are extracted to the install root, then the
+  database records + history are written in `commitTransaction`. On any
+  failure, `rollbackTransaction` deletes the extracted files in reverse order
+  and best-effort removes the now-empty parent directories they left, so a
+  failed operation does not leave dangling empty directories in the install
+  root.
+- **Remove:** the database record is removed only after the files are
+  deleted; a failure before commit leaves the record intact (fail-safe).
+- Downloads are atomic (`.part` → rename), so an interrupted transfer never
+  leaves a corrupt cached archive.
+
+### Remaining limitations (known, not blocked)
+
+- Rollback deletes recorded files and empty directories but is **file-delete
+  only**: hook side effects (run inside the per-package loop, outside the DB
+  commit) are **not** rolled back, and non-empty directories whose contents
+  predate the transaction are left in place.
+- The lock serializes `meow` processes against each other; it does not guard
+  against external tools editing the install root or database directly.
+- Package manifests and artifact `sha256` are still authenticated only by the
+  repository signature, not a per-package signed index (see
+  `docs/package-signing-design.md`, HIGH #1).
+

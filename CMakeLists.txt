@@ -158,6 +158,12 @@ target_include_directories(meow-unit-hash-lock
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-hash-lock PRIVATE meow_core)
 
+# Install-lock coverage across mutation paths + rollback release semantics.
+add_executable(meow-unit-tx-lock test/unit/transaction_lock_test.cpp)
+target_include_directories(meow-unit-tx-lock
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-tx-lock PRIVATE meow_core)
+
 target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-repo PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)

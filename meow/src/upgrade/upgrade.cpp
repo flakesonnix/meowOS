@@ -5,6 +5,7 @@
 #include <meow/transaction/transaction.hpp>
 #include <meow/error/error.hpp>
 #include <meow/log/logger.hpp>
+#include <meow/lock/install_lock.hpp>
 #include <filesystem>
 
 namespace meow::upgrade {
@@ -54,6 +55,9 @@ namespace meow::upgrade {
             result.upToDate = true;
             return result;
         }
+
+        // Serialize against any concurrent mutating operation.
+        auto lock = lock::InstallLock(lock::defaultInstallLockPath(db.path));
 
         auto latestPkg = repository::resolvePackage(repo, name, *latest);
         auto oldFiles = database::listPackageFiles(db, name);
