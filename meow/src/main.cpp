@@ -270,32 +270,31 @@ namespace {
     // artifact in parallel, and return the resolved PackageFiles ready to
     // install. Shared by `meow install <pkg>` and `meow group install <grp>`,
     // so both take the same atomic single-transaction path.
+    // Stage the exact (name, version) pairs a resolver selected. The version
+    // comes from the resolver's decision (e.g. a `=1.0` constraint), so we must
+    // not silently substitute the latest available version here.
     std::vector<meow::package::PackageFile> resolveAndStage(
         const meow::repository::Repository& repo,
         const meow::config::Config& cfg,
-        const std::vector<meow::types::PackageName>& names) {
-        std::vector<meow::types::PackageName> closure;
-        std::set<std::string> seen;
-        for (const auto& name : names) {
-            auto nameset = meow::repository::resolveDependencyNames(repo, name);
-            for (const auto& n : nameset) {
-                if (seen.insert(n.value).second) closure.push_back(n);
-            }
-        }
-
+        const std::vector<std::pair<meow::types::PackageName, meow::types::PackageVersion>>& selected) {
         std::vector<meow::download::DownloadTask> tasks;
-        for (const auto& name : closure) {
+        for (const auto& [name, version] : selected) {
             const auto* rp = meow::repository::findPackage(repo, name);
             if (!rp) {
                 throw meow::error::MeowError(meow::error::ErrorCode::PackageNotFound,
                                              "package not found: " + name.value);
             }
-            if (rp->versions.empty()) {
+            const meow::repository::RepositoryVersion* chosen = nullptr;
+            for (const auto& rv : rp->versions) {
+                if (rv.version.value == version.value) { chosen = &rv; break; }
+            }
+            if (!chosen) {
                 throw meow::error::MeowError(meow::error::ErrorCode::VersionNotFound,
-                                             "no version for: " + name.value);
+                                             "version " + version.value +
+                                                 " not available for: " + name.value);
             }
             meow::download::DownloadTask task;
-            task.artifact = rp->versions.back().artifact;
+            task.artifact = chosen->artifact;
             tasks.push_back(std::move(task));
         }
 
@@ -307,12 +306,42 @@ namespace {
         meow::download::downloadAll(queue, tasks);
 
         std::vector<meow::package::PackageFile> toInstall;
-        for (const auto& name : closure) {
-            auto pkg = meow::repository::resolvePackage(repo, name);
+        for (const auto& [name, version] : selected) {
+            auto pkg = meow::repository::resolvePackage(repo, name, version);
             std::cout << "  " << name.value << " " << pkg.metadata.version.value << "\n";
             toInstall.push_back(std::move(pkg));
         }
         return toInstall;
+    }
+
+    // Convenience overload for callers that have no explicit version decision
+    // (e.g. group expansion): resolve each name to its latest version first.
+    std::vector<meow::package::PackageFile> resolveAndStage(
+        const meow::repository::Repository& repo,
+        const meow::config::Config& cfg,
+        const std::vector<meow::types::PackageName>& names) {
+        std::vector<std::pair<meow::types::PackageName, meow::types::PackageVersion>> selected;
+        std::set<std::string> seen;
+        for (const auto& name : names) {
+            // Expand to the full dependency closure (by name), preserving the
+            // original behavior used for groups before version-aware staging.
+            auto nameset = meow::repository::resolveDependencyNames(repo, name);
+            for (const auto& n : nameset) {
+                if (!seen.insert(n.value).second) continue;
+                const auto* rp = meow::repository::findPackage(repo, n);
+                if (!rp) {
+                    throw meow::error::MeowError(meow::error::ErrorCode::PackageNotFound,
+                                                 "package not found: " + n.value);
+                }
+                const auto* ver = meow::repository::latestVersion(*rp);
+                if (!ver) {
+                    throw meow::error::MeowError(meow::error::ErrorCode::VersionNotFound,
+                                                 "no version for: " + n.value);
+                }
+                selected.emplace_back(n, *ver);
+            }
+        }
+        return resolveAndStage(repo, cfg, selected);
     }
 
     void cmdGroupList(const meow::config::Config& cfg) {
@@ -622,13 +651,21 @@ int main(int argc, char** argv) {
                     return 1;
                 }
 
-                std::vector<meow::types::PackageName> roots;
-                for (const auto& p : resolution.packages)
-                    roots.push_back(p.name);
+                std::vector<std::pair<meow::types::PackageName, meow::types::PackageVersion>> selected;
+                for (const auto& p : resolution.packages) {
+                    selected.emplace_back(p.name, p.version);
+                    // A package is "explicitly requested" when the resolver
+                    // reports it as a root: the CLI target plus any optional
+                    // dependencies the user promoted to roots via
+                    // --with-optional / --optional. Everything else in the
+                    // closure is a transitive dependency. Using the resolver's
+                    // isRoot keeps Legacy and SAT consistent and ensures
+                    // selected optionals are recorded with the Explicit reason.
+                    if (p.isRoot) requested.insert(p.name.value);
+                }
 
                 meow::log::log(meow::log::LogLevel::Info, "resolving dependency names");
-                toInstall = resolveAndStage(repo, cfg, roots);
-                for (const auto& r : rreq.roots) requested.insert(r.value);
+                toInstall = resolveAndStage(repo, cfg, selected);
             }
 
             meow::log::log(meow::log::LogLevel::Info, "installing packages");

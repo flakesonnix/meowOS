@@ -322,6 +322,7 @@ name = "myapp"
 version = "1.0.0"
 architecture = "AMD64"
 description = "version constraint fixture"
+depends = ["libbar>=2.0"]
 EOF
     cat > repo/by-name/my/myapp/versions/1.0.0.toml << EOF
 [artifact]
@@ -336,6 +337,7 @@ name = "myapp-exact"
 version = "1.0.0"
 architecture = "AMD64"
 description = "version constraint fixture"
+depends = ["libbar=1.0"]
 EOF
     cat > repo/by-name/my/myapp-exact/versions/1.0.0.toml << EOF
 [artifact]
