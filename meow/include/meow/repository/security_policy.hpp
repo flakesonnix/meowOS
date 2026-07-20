@@ -14,6 +14,14 @@ struct SecurityPolicy {
     //   - signature present but empty keyId  -> hard error
     //   - signature present but invalid      -> hard error (already enforced)
     bool requireRepositorySignature = false;
+
+    // v0.7 placeholder. When true (future), a repository must ship a signed
+    // package index (`packages.toml` + `packages.toml.sig`) and the client
+    // verifies every loaded package manifest/artifact hash against it. Default
+    // false keeps current behavior (unsigned per-package metadata accepted).
+    // Not yet wired into any production path — see
+    // docs/package-index-signing-implementation-plan.md.
+    bool requirePackageIndex = false;
 };
 
 // Set the global policy. Call once at startup from config.

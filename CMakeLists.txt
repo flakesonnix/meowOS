@@ -164,6 +164,23 @@ target_include_directories(meow-unit-tx-lock
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-tx-lock PRIVATE meow_core)
 
+# v0.7 signed-package-index boundary (groundwork only; not wired in).
+add_executable(meow-unit-pkgidx test/unit/package_index_test.cpp)
+target_include_directories(meow-unit-pkgidx
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+# toml++ ships in the nix store; expose its include dir so the placeholder
+# index header (which parses TOML) compiles in isolation. Other targets pick
+# it up transitively through meow_core's sources; this test is header-only.
+find_path(TOMLPP_INCLUDE NAMES toml++/toml.hpp
+    PATHS /nix/store/*/include NO_DEFAULT_PATH)
+if(NOT TOMLPP_INCLUDE)
+    find_path(TOMLPP_INCLUDE NAMES toml++/toml.hpp)
+endif()
+if(TOMLPP_INCLUDE)
+    target_include_directories(meow-unit-pkgidx PRIVATE ${TOMLPP_INCLUDE})
+endif()
+target_link_libraries(meow-unit-pkgidx PRIVATE meow_core)
+
 target_include_directories(meow PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-build PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_include_directories(meow-repo PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
