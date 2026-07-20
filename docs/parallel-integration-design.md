@@ -286,29 +286,20 @@ The real value of parallelization is not wall-clock speed but **developer iterat
 ```
 test/integration/
     common.sh          # shared helpers (sourced by each section)
-    run.sh             # sequential runner (sources sections in order)
     sections/
-        01_install.sh
-        02_repository.sh
+        01_basic_install.sh
+        02_repo_metadata.sh
         03_download.sh
-        04_http.sh
         ...
-        18_doctor.sh
-        19_reproducible_build.sh
-        ...
-        zz_units.sh
+        22_groups.sh
 ```
 
-Each section file is a standalone script (no function wrapper):
+Each section file defines a `run_section()` function and detects standalone
+execution via `[[ "${BASH_SOURCE[0]}" == "${0}" ]]`. When sourced by the legacy
+runner, only the function is defined; when run directly, it bootstraps + runs +
+reports.
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-. "$(cd "$(dirname "$0")/.." && pwd)/common.sh"
-# ... test code ...
-```
-
-`run.sh` sources them in numbered order for sequential execution.
+`test/integration.sh` sources them in the original module-execution order.
 
 **Duration**: 1 session. **Risk**: Low (pure mechanical split).
 
@@ -340,36 +331,33 @@ set -euo pipefail
 
 ---
 
-## Appendix: Section File Layout (draft)
+## Appendix: Section File Layout (final)
 
 ```
 test/integration/
-    common.sh               # Shared: check(), buildPkg(), bootstrapArtifacts(), etc.
-    run.sh                  # Sequential coordinator (sources sections in order)
+    common.sh               # Shared: check(), buildPkg(), makePrioRepo(), bootstrapArtifacts(), etc.
     sections/
         01_basic_install.sh     # §§1-10  — basic install/remove/verify chain
         02_repo_metadata.sh     # §§11-14 — format rejection, keys, expiry, identity
         03_download.sh          # §15     — download robustness
-        04_http_transport.sh    # §16     — HTTP transport (needs server)
-        05_parallel_dl.sh       # §17     — parallel downloads (needs server)
-        06_doctor.sh            # §18,21  — doctor diagnostics + security
-        07_reproducible.sh      # §19,24  — reproducibility (build + release)
-        08_hooks.sh             # §20     — restricted hook runner
-        09_fresh_install.sh     # §22     — fresh install from empty
-        10_db_migration.sh      # §23     — v0.3→v0.4 DB migration
-        11_server_hosting.sh    # §25     — meow-server
-        12_http_backend.sh      # §26     — HTTP repository backend
-        13_multi_repo.sh        # §27     — multiple repositories
-        14_doctor_repo.sh       # §28     — doctor per-repository
-        15_dual_backend.sh      # §29     — filesystem vs HTTP parity
-        16_resolver.sh          # §30     — version constraint regression
-        17_health_state.sh      # §31     — repository health
-        18_priority.sh          # §32     — repository priority
-        19_mirror_groups.sh     # §33     — mirror groups
-        20_mirror_failover.sh   # §34     — mirror failover
-        21_parallel_refresh.sh  # §35     — parallel refresh
-        22_history.sh           # §36     — package history
-        23_optionals.sh         # §37     — optional dependencies
-        24_groups.sh            # groups  — package groups
-        25_unit_tests.sh        # unit-*  — standalone test binaries
+        04_http.sh              # §§16-17 — HTTP transport + parallel downloads (needs python3)
+        05_doctor.sh            # §§18,21 — doctor diagnostics + security
+        06_reproducible.sh      # §§19,24 — reproducibility (build + release)
+        07_hooks.sh             # §20     — restricted hook runner
+        08_fresh_install.sh     # §§22-23 — fresh install + DB migration (needs python3)
+        09_server_hosting.sh    # §25     — meow-server (needs python3)
+        10_http_backend.sh      # §26     — HTTP repository backend (needs python3)
+        11_multi_repo.sh        # §27     — multiple repositories (needs python3)
+        12_doctor_repo.sh       # §28     — doctor per-repository (needs python3)
+        13_dual_backend.sh      # §29     — filesystem vs HTTP parity (needs python3)
+        14_resolver.sh          # §30-32  — version constraint regression + unit tests
+        15_health_state.sh      # §31     — repository health
+        16_priority.sh          # §32     — repository priority
+        17_mirror_groups.sh     # §33     — mirror groups
+        18_mirror_failover.sh   # §34     — mirror failover (needs python3)
+        19_parallel_refresh.sh  # §35     — parallel refresh (needs python3)
+        20_history.sh           # §36     — package history
+        21_optionals.sh         # §37     — optional dependencies
+        22_groups.sh            # groups  — package groups
+```
 ```

@@ -175,3 +175,77 @@ foreach(tgt meow meow-build meow-repo meow_core)
 endforeach()
 
 target_link_libraries(meow-server PRIVATE Threads::Threads)
+
+# ---------------------------------------------------------------------------
+# Testing infrastructure
+# ---------------------------------------------------------------------------
+enable_testing()
+
+# Unit test executables (compiled but also registered for ctest).
+set(UNIT_TESTS
+    meow-unit-backend
+    meow-unit-history
+    meow-unit-optional
+    meow-unit-sat
+    meow-unit-sat-solver
+    meow-unit-sat-translate-correctness
+    meow-unit-sat-parity
+    meow-unit-resolver-config
+    meow-unit-archive-security
+    meow-unit-security-policy
+)
+foreach(tgt ${UNIT_TESTS})
+    add_test(NAME unit.${tgt} COMMAND ${tgt})
+    set_tests_properties(unit.${tgt} PROPERTIES LABELS "unit")
+endforeach()
+
+# Integration test sections (standalone bash scripts).
+set(INTEGRATION_SECTIONS
+    01.basic_install
+    02.repo_metadata
+    03.download
+    04.http
+    05.doctor
+    06.reproducible
+    07.hooks
+    08.fresh_install
+    09.server_hosting
+    10.http_backend
+    11.multi_repo
+    12.doctor_repo
+    13.dual_backend
+    14.resolver
+    15.health_state
+    16.priority
+    17.mirror_groups
+    18.mirror_failover
+    19.parallel_refresh
+    20.history
+    21.optionals
+    22.groups
+)
+foreach(section ${INTEGRATION_SECTIONS})
+    string(REPLACE "." ";" parts "${section}")
+    list(GET parts 0 num)
+    list(GET parts 1 name)
+    add_test(
+        NAME integration.${section}
+        COMMAND ${CMAKE_SOURCE_DIR}/test/integration/sections/${num}_${name}.sh
+    )
+    set_tests_properties(integration.${section} PROPERTIES
+        LABELS "integration;serial"
+        RUN_SERIAL TRUE
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+endforeach()
+
+# Legacy sequential entry point (same assertions, different runner).
+add_test(
+    NAME integration.legacy
+    COMMAND ${CMAKE_SOURCE_DIR}/test/integration.sh
+)
+set_tests_properties(integration.legacy PROPERTIES
+    LABELS "integration;serial"
+    RUN_SERIAL TRUE
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+)

@@ -54,7 +54,7 @@ Repository makeRepo() {
                  const std::vector<std::string>& optionals) {
         RepositoryPackage p;
         p.name = PackageName{name};
-        for (const auto& d : deps) p.depends.push_back(PackageName{d});
+        for (const auto& d : deps) p.depends.push_back({PackageName{d}, {}});
         for (const auto& o : optionals) {
             OptionalDependency od;
             od.package = PackageName{o};

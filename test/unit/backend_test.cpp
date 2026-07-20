@@ -66,7 +66,7 @@ Repository makeRepo() {
     RepositoryPackage app;
     app.name = PackageName{"app"};
     app.description = Description{"app"};
-    app.depends.push_back(PackageName{"libfoo"});
+    app.depends.push_back({PackageName{"libfoo"}, {}});
     RepositoryVersion appv;
     appv.version = PackageVersion{"2.0.0"};
     appv.artifact = PackageArtifact{"app-2.0.0.pkg.tar.zst", "memory://app",
