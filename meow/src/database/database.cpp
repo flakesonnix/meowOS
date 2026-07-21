@@ -21,6 +21,16 @@ namespace meow::database {
 
     } // anonymous namespace
 
+    void execRaw(Database& db, const std::string& sql) {
+        auto* h = static_cast<sqlite3*>(db.handle);
+        char* err = nullptr;
+        if (sqlite3_exec(h, sql.c_str(), nullptr, nullptr, &err) != SQLITE_OK) {
+            std::string msg = err;
+            sqlite3_free(err);
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, msg);
+        }
+    }
+
         void migrateFilesTable(sqlite3* handle) {
             const char* check = "SELECT COUNT(*) FROM pragma_table_info('files') WHERE name='sha256';";
             sqlite3_stmt* stmt;

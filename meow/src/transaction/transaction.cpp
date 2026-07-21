@@ -37,16 +37,30 @@ namespace meow::transaction {
     }
 
     void commitTransaction(Transaction& tx, database::Database& db) {
-        std::string txId = generateTransactionId();
-        for (const auto& entry : tx.packages) {
-            database::registerPackage(db, entry.pkg, entry.installedFiles);
-            database::setInstallReason(db, entry.pkg.metadata.name, entry.reason);
-            database::recordHistory(db, "install",
-                                    entry.pkg.metadata.name,
-                                    entry.pkg.metadata.version,
-                                    entry.reason, txId);
+        // Wrap all DB writes in an SQLite transaction so that a partial failure
+        // (e.g. the N-th package's registerPackage throws) rolls back every
+        // earlier write, keeping DB and filesystem consistent.
+        database::execRaw(db, "BEGIN IMMEDIATE TRANSACTION");
+        bool began = true;
+        try {
+            std::string txId = generateTransactionId();
+            for (const auto& entry : tx.packages) {
+                database::registerPackage(db, entry.pkg, entry.installedFiles);
+                database::setInstallReason(db, entry.pkg.metadata.name, entry.reason);
+                database::recordHistory(db, "install",
+                                        entry.pkg.metadata.name,
+                                        entry.pkg.metadata.version,
+                                        entry.reason, txId);
+            }
+            database::execRaw(db, "COMMIT");
+            began = false;
+            tx.committed = true;
+        } catch (...) {
+            if (began) {
+                try { database::execRaw(db, "ROLLBACK"); } catch (...) {}
+            }
+            throw;
         }
-        tx.committed = true;
     }
 
     void rollbackTransaction(const Transaction& tx) {

@@ -65,15 +65,6 @@ namespace meow::install {
         }
     }
 
-    void installPackage(const package::PackageFile& package, const std::filesystem::path& root, database::Database& db) {
-        auto policy = defaultPolicy();
-        archive::Archive archive{package.archivePath};
-        runHookFor("pre_install", hooks::HookType::PreInstall, package, policy);
-        auto files = archive::extractPackageContent(archive, root);
-        database::registerPackage(db, package, files.value);
-        runHookFor("post_install", hooks::HookType::PostInstall, package, policy);
-    }
-
     void installPackages(const std::vector<package::PackageFile>& packages,
                           const std::set<std::string>& requested,
                           database::InstallReason requestReason,

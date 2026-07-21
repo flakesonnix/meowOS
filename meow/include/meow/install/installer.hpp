@@ -8,7 +8,6 @@
 #include <meow/database/database.hpp>
 
 namespace meow::install {
-    void installPackage(const package::PackageFile& package, const std::filesystem::path& root, database::Database& db);
     void installPackages(const std::vector<package::PackageFile>& packages,
                           const std::set<std::string>& requested,
                           database::InstallReason requestReason,

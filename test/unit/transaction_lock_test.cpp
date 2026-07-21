@@ -5,6 +5,9 @@
 
 #include <meow/lock/install_lock.hpp>
 #include <meow/error/error.hpp>
+#include <meow/transaction/transaction.hpp>
+#include <meow/database/database.hpp>
+#include <meow/types/types.hpp>
 
 #include <cassert>
 #include <cstdio>
@@ -13,6 +16,9 @@
 
 namespace fs = std::filesystem;
 using namespace meow::lock;
+using namespace meow::database;
+using namespace meow::transaction;
+using namespace meow::types;
 
 static int failures = 0;
 #define CHECK(cond) do { \
@@ -95,11 +101,71 @@ static void test_success_reacquires() {
     fs::remove(p);
 }
 
+// Transaction rollback removes extracted files on failure.
+static void test_rollback_removes_files() {
+    auto dir = fs::temp_directory_path() / "meow-test-rollback";
+    fs::create_directories(dir);
+    auto dbPath = dir / "test.db";
+    {
+        auto db = openDatabase(dbPath);
+        auto root = dir / "root";
+        fs::create_directories(root);
+
+        auto tx = beginTransaction();
+        auto testFile = root / "should_be_removed.txt";
+        {
+            std::ofstream of(testFile);
+            of << "content";
+        }
+        recordExtractedFiles(tx,
+            FileList{{testFile}});
+
+        // Rollback without commit — file must be removed.
+        rollbackTransaction(tx);
+        CHECK(!fs::exists(testFile));
+        closeDatabase(db);
+    }
+    fs::remove_all(dir);
+}
+
+// Double rollback is safe (no crash, no error).
+static void test_double_rollback_safe() {
+    auto dir = fs::temp_directory_path() / "meow-test-double-rollback";
+    fs::create_directories(dir);
+    auto root = dir / "root";
+    fs::create_directories(root);
+
+    auto tx = beginTransaction();
+    auto testFile = root / "double_rollback.txt";
+    {
+        std::ofstream of(testFile);
+        of << "content";
+    }
+    recordExtractedFiles(tx,
+        FileList{{testFile}});
+
+    rollbackTransaction(tx);
+    CHECK(!fs::exists(testFile));          // first rollback works
+    rollbackTransaction(tx);  // second must not crash
+    CHECK(!fs::exists(testFile));
+    fs::remove_all(dir);
+}
+
+// Empty transaction rollback is safe (no created files, nothing to remove).
+static void test_empty_rollback_safe() {
+    auto tx = beginTransaction();
+    rollbackTransaction(tx);  // no crash
+    CHECK(true);
+}
+
 int main() {
     test_concurrent_install_blocked();
     test_concurrent_remove_update_blocked();
     test_lock_released_after_failure();
     test_success_reacquires();
+    test_rollback_removes_files();
+    test_double_rollback_safe();
+    test_empty_rollback_safe();
 
     if (failures == 0) {
         std::printf("all transaction-lock tests passed\n");

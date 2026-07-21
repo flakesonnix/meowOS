@@ -48,6 +48,9 @@ void initializeDatabase(Database& db);
 // Returns true if all expected schema tables are present.
 bool checkSchema(Database& db);
 
+// Execute a raw SQL statement (no bindings). Throws on error.
+void execRaw(Database& db, const std::string& sql);
+
     void registerPackage(Database& db, const package::PackageFile& package, const std::vector<std::filesystem::path>& installedFiles);
     void updateFileHash(Database& db, const std::filesystem::path& path);
 bool isInstalled(Database& db, const types::PackageName& name);
