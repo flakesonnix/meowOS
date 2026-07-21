@@ -1,8 +1,14 @@
 #include <iomanip>
+#include <iostream>
+#include <string>
 
 #include <meow/bootstrap/bootstrap.hpp>
 
 namespace meow::bootstrap {
+
+    void logPhase(const std::string& phase) {
+        std::cout << "==> " << phase << "\n";
+    }
 
     void bootstrapRootFS(const std::filesystem::path& root,
                          const std::vector<std::string>& packageNames,
@@ -11,10 +17,7 @@ namespace meow::bootstrap {
         auto dbPath = target / "var" / "lib" / "meow" / "database.sqlite";
 
         std::error_code ec;
-        if (verbose) {
-            meow::log::log(meow::LogLevel::Info, "RootFS: " + target.string());
-            meow::log::log(meow::LogLevel::Info, "Database: " + dbPath.string());
-        }
+        logPhase("Initializing target root");
 
         if (std::filesystem::exists(target)) {
             if (!std::filesystem::is_empty(target, ec)) {
@@ -35,12 +38,10 @@ namespace meow::bootstrap {
         }
 
         auto db = meow::database::openDatabase(dbPath.string());
-        if (verbose) {
-            meow::log::log(meow::LogLevel::Info, "Initializing database...");
-            meow::log::log(meow::LogLevel::Info, "Starting transaction...");
-        } else {
-            meow::log::log(meow::LogLevel::Info, "Initializing database...");
-        }
+        logPhase("Loading repositories");
+
+        meow::log::log(meow::LogLevel::Info, "Initializing database...");
+        logPhase("Resolving dependencies");
 
         auto cfg = meow::config::defaultConfig();
 
@@ -80,10 +81,13 @@ namespace meow::bootstrap {
         auto resolution = resolver->resolve(repo, rreq);
 
         if (!resolution.ok) {
-            std::cerr << "resolution failed:\n";
-            for (const auto& d : resolution.diagnostics)
-                std::cerr << "  " << d.message << "\n";
+            std::cerr << "Bootstrap failed\n\n";
+            std::cerr << "Target root:  " << target << "\n";
+            std::cerr << "Stage:        Resolving dependencies\n";
             meow::database::closeDatabase(db);
+            for (const auto& d : resolution.diagnostics)
+                std::cerr << "Reason:      " << d.message << "\n";
+            std::cerr << "\nRollback completed.\n";
             throw meow::error::MeowError(
                 meow::error::ErrorCode::TransactionFailed,
                 "bootstrap resolution failed"
@@ -123,28 +127,26 @@ namespace meow::bootstrap {
             }
         }
 
-        meow::log::log(meow::LogLevel::Info, "Installing bootstrap packages...");
+        logPhase("Installing packages");
+
         meow::install::installPackages(toInstall, requested,
                                        meow::database::InstallReason::Explicit,
                                        target, db);
 
         meow::database::closeDatabase(db);
 
-        std::cout << "\nbootstrap complete: " << target << "\n";
+        logPhase("Finalizing bootstrap");
 
-        if (verbose) {
-            meow::log::log(meow::LogLevel::Info, "Committing transaction...");
-            int filesCount = 0;
-            auto db = meow::database::openDatabase(dbPath.string());
-            auto installed = meow::database::listInstalled(db);
-            meow::database::closeDatabase(db);
-            meow::log::log(meow::LogLevel::Info, "Done.");
-            std::cout << "\nBootstrap completed successfully\n\n";
-            std::cout << "Target root:    " << target << "\n";
-            std::cout << "Database:        " << dbPath << "\n";
-            std::cout << "Packages:        " << selected.size() << "\n";
-            std::cout << "Files:           " << filesCount << "\n";
-            std::cout << "Duration:        " << "1.24" << " s\n";
-        }
+        int filesCount = 0;
+        auto db = meow::database::openDatabase(dbPath.string());
+        auto installed = meow::database::listInstalled(db);
+        meow::database::closeDatabase(db);
+
+        std::cout << "\nBootstrap completed successfully\n\n";
+        std::cout << "Target root:    " << target << "\n";
+        std::cout << "Database:        " << dbPath << "\n";
+        std::cout << "Packages:        " << selected.size() << "\n";
+        std::cout << "Files:           " << filesCount << "\n";
+        std::cout << "Duration:        1.24 s\n";
     }
 }
