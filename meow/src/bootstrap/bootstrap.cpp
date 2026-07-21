@@ -75,7 +75,7 @@ namespace meow::bootstrap {
             toInstall.push_back(std::move(pkg));
         }
 
-        meow::log::log(meow::log::LogLevel::Info, "installing bootstrap packages");
+        meow::log::log(meow::LogLevel::Info, "installing bootstrap packages");
         meow::install::installPackages(toInstall, requested,
                                        meow::database::InstallReason::Explicit,
                                        target, db);
@@ -84,3 +84,4 @@ namespace meow::bootstrap {
         std::cout << "\nbootstrap complete: " << target << "\n";
     }
 }
+
