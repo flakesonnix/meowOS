@@ -3,10 +3,10 @@
 meow ships two resolution backends behind `ResolverEngine` (config) and the
 `MEOW_RESOLVER` environment override.
 
-- **sat** — the SAT-based `SatResolver` (recommended). DPLL over a CNF
+- **sat** (default since v0.7.0) — the SAT-based `SatResolver`. DPLL over a CNF
   translation. Full support for version constraints, virtual providers, and
   conflict detection. Select via `MEOW_RESOLVER=sat` or `ResolverEngine::Sat`.
-  Starting from v0.7.0, `ResolverEngine::Auto` maps to `Sat`.
+  `ResolverEngine::Auto` maps to `Sat`.
 - **legacy** — the DFS-based `LegacyResolver` (compatibility mode, default in
   v0.6.x). Provided for debugging and rollback during the transition period.
   Select via `MEOW_RESOLVER=legacy` or `ResolverEngine::Legacy`.

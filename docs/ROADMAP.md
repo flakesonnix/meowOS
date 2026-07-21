@@ -126,45 +126,71 @@ Features:
 
 ---
 
-## v0.5 Plan (prioritized)
+## v0.5 — Remote repositories & multi-repo infrastructure
 
-v0.4.0 shipped the core client (doctor, reproducible builds, restricted hooks,
-security diagnostics). v0.5 turns meowOS from a package format + client into a
-complete distribution pipeline by adding hosting and stronger isolation.
+v0.5 turned meowOS into a complete distribution pipeline:
 
-Priority order:
+- **Remote Binary Repository Service** — `meow-server` hosts a static repository
+  over HTTP; `HttpRepositoryBackend` consumes it with the same trust chain as
+  filesystem.
+- **Multi-repository config** (`[[repositories]]`), `RepositoryManager`, merged
+  view with priority-then-version selection.
+- **Dual-backend parity** tests + memory-backed unit tests (disk/network-free).
+- **Backend abstraction** (`IRepositoryBackend`) — filesystem, HTTP, in-memory.
 
-1. **Remote Binary Repository Service** — `meow-server` (done in v0.4.0
-   hardening) hosts a static repository over HTTP, and the client now consumes
-   it end-to-end via `HttpRepositoryBackend` (added in the v0.5 line):
-   `meow` can `list`/`info`/`install` over `http(s)://` with the same trust
-   chain as the filesystem backend. The repository abstraction
-   (`IRepositoryBackend`) is in place. **Done**: backend abstraction
-   (`FilesystemRepositoryBackend` + `HttpRepositoryBackend` + in-memory test
-   backend), multi-repository config + `RepositoryManager`, dual-backend parity
-   tests, and disk/network-free unit tests. See `docs/repository-selection.md`
-   for the next phase.
-2. **Repository availability & selection (v0.5.1)** — split out from raw mirror
-   work so the behavior is predictable before it is parallel:
-   - repository health state (`RepositoryStatus`: available / unavailable /
-     network error / expired / invalid signature / invalid metadata);
-   - documented priority-then-version selection rule;
-   - mirror groups (`mirrors = [...]` sharing one `repository_id`, signature,
-     metadata, and cache);
-   - failover on transport errors only (never on trust failures);
-   - parallel metadata refresh reusing the download-worker pool.
-   Design contract: `docs/repository-selection.md`.
-3. **Hook sandboxing (real isolation)** — extend the controlled runner with
-   Linux namespace isolation (mount namespace, read-only root, seccomp),
-   making the hook policy a true security boundary.
-4. **SAT solver / better dependency resolution** — conflict reporting for
-   constraints like `A requires B >=2` vs `C requires B <2`. Deferred until
-   remote repos exist and real larger dependency graphs are available.
-5. **Delta packages** — transfer only changed files between versions.
-6. **Build farm** — distributed `meow-build` over the repository service.
+## v0.6 — Repository availability, mirrors & diagnostics
 
-Note: item 1's server half shipped as `meow-server` in v0.4.0; the client
-HTTP wiring was the first v0.5 feature and is now complete.
+- **Repository health state** (`RepositoryStatus` enum: available, network error,
+  expired, invalid signature, invalid metadata).
+- **Mirror groups** (`mirrors = [...]` sharing `repository_id`, signature, cache).
+- **Transport-only failover** (never on trust failures).
+- **Parallel metadata refresh** (bounded worker pool).
+- **Package history** (append-only audit log, install reasons, `meow why`).
+- **Optional dependencies** (metadata-first, `--with-optional` / `--optional`).
+- **Package groups** (config-level expansion aliases, atomic install).
+- **Doctor diagnostics** (system + security checks).
+- **Install locking** (`flock`-based, cross-process).
+- **In-process hashing** (no shell execution for sha256).
+- **Transaction rollback improvements** (reverse-order file deletion, empty
+  directory cleanup).
+
+## v0.7 — Signed package index & SAT resolver
+
+v0.7 closed the per-package trust boundary and added a full SAT-based resolver.
+
+### Signed package index
+
+- `packages.toml` + `packages.toml.sig` authenticates every package manifest
+  and artifact hash with the same Ed25519 trusted key.
+- `require_package_index` config / env for strict mode.
+- Index generated automatically on `meow repo sign`.
+- Backwards-compatible (absent index → warn/continue; default `false`).
+- Closes `docs/security-audit-v0.5.md` §7 trust-boundary gap.
+
+### SAT resolver
+
+- Dual resolver architecture: `SatResolver` (DPLL over CNF) and
+  `LegacyResolver` (DFS-based, compatibility).
+- Full version constraint support (`=`, `>=`, `<=`, `>`, `<`).
+- Virtual provider resolution natively in SAT (deterministic selection).
+- UNSAT diagnostics: `PackageConflict`, `MissingProvider`,
+  `VersionConflict`, `Cycle`.
+- Correctness parity: 40 synthetic fixtures + full integration suite
+  passes under both backends.
+- Benchmark suite (`meow-bench`) with seeded, reproducible fixtures.
+- RC validation: deterministic large-repo parity check
+  (`test/rc/generate_realistic_repo.py` + `compare_resolvers.py`).
+- **0 unexpected regressions** in RC comparison.
+- `Auto` maps to `Sat` as of v0.7.0; `Legacy` remains selectable via
+  `MEOW_RESOLVER=legacy`.
+
+### Security hardening
+
+- Signed package index (closes HIGH #1).
+- Install locking (cross-process `flock`).
+- In-process checksum verification.
+- Transaction rollback hardening.
+- Security diagnostics (`doctor --security`).
 
 ---
 
@@ -176,11 +202,10 @@ belongs in each series. The integration suite (`./test/integration.sh`) is a
 
 | Series   | Scope                                                        |
 |----------|-------------------------------------------------------------|
-| v0.4.x   | Bug fixes, documentation, CI, and hardening only            |
 | v0.5.x   | Remote repositories (HTTP backend, end-to-end client)       |
-| v0.6.x   | Mirrors + transport improvements                            |
-| v0.7.x   | SAT solver / advanced dependency resolution                 |
-| v0.8.x   | Package signing & reproducible-build ecosystem improvements |
+| v0.6.x   | Mirrors, transport, diagnostics, locking, history           |
+| v0.7.x   | Signed package index + SAT resolver + RC validation         |
+| v0.8.x   | Mirror health, delta updates, binary cache, hook sandboxing |
 | v1.0.0   | Stable package/repository formats and CLI compatibility     |
 
 Rules:

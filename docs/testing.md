@@ -111,6 +111,38 @@ ctest -j8 --output-on-failure
 | `integration.XX.name`         | integration, serial   | yes        |
 | `integration.legacy`          | integration, serial   | yes        |
 
+## RC validation (deterministic large-repo parity)
+
+The `test/rc/` directory contains a deterministic, large-scale resolver parity
+check suitable for release-candidate validation:
+
+| Script | Purpose |
+|--------|---------|
+| `generate_realistic_repo.py` | Builds a signed repository with ~6000 package versions, dependencies, conflicts, virtual providers, and deterministic seeds |
+| `compare_resolvers.py` | Runs the same install request against both resolvers and compares results |
+
+Usage:
+
+```bash
+# 1. Generate the test repository (creates repo-main/, repo-extra/, artifacts/)
+python3 test/rc/generate_realistic_repo.py
+
+# 2. Run comparison under each resolver
+MEOW_RESOLVER=legacy python3 test/rc/compare_resolvers.py
+MEOW_RESOLVER=sat    python3 test/rc/compare_resolvers.py
+
+# 3. Check the report for regressions
+cat rc-comparison-report.md
+```
+
+Generated artifacts (`repo-main/`, `repo-extra/`, `artifacts/`) are
+gitignored — they are rebuilt on demand and not stored in version control.
+
+The comparison produces a report listing all differences. During the v0.7 RC
+validation, **0 unexpected regressions** were found; the only divergence is
+the documented semantic difference (SAT enforces version constraints, legacy
+ignores them).
+
 ## Labels
 
 - **unit** — C++ unit tests (no network, no disk fixtures).

@@ -25,3 +25,8 @@
 - [Cache & verification](cache.md)
 - [Package history & install reasons](package-history.md)
 - [Optional dependencies](optional-dependencies.md)
+- [Package groups](package-groups.md)
+- [Resolver backends: Legacy vs SAT](resolver-comparison.md)
+- [SAT-as-default transition criteria](sat-default-criteria.md)
+- [Benchmark methodology](benchmark-methodology.md)
+- [Testing](testing.md)

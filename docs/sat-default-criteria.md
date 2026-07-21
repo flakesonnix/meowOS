@@ -1,13 +1,12 @@
 # SAT-as-default resolver — transition criteria
 
 `SatResolver` is feature-complete and has reached correctness/performance
-parity with the legacy resolver (see the release-readiness report). It is
-**not yet the default**: `ResolverEngine::Auto` currently maps to
-`LegacyResolver` (see `meow/src/dependency/resolver_factory.cpp`), so the
-default engine remains the legacy DFS resolver. `Sat` is selectable via
-`MEOW_RESOLVER=sat` or `ResolverEngine::Sat`; `Legacy` remains selectable via
-`MEOW_RESOLVER=legacy` or `ResolverEngine::Legacy` for compatibility and
-rollout safety.
+parity with the legacy resolver (see the release-readiness report). Since
+**v0.7.0-rc1**, `ResolverEngine::Auto` maps to `SatResolver`
+(see `meow/src/dependency/resolver_factory.cpp`), making SAT the default
+resolver. `Legacy` remains selectable via `MEOW_RESOLVER=legacy` or
+`ResolverEngine::Legacy` for compatibility and rollout safety during the
+transition period.
 
 The following criteria were used to gate the flip:
 
@@ -82,13 +81,15 @@ The following criteria were used to gate the flip:
 | Step | Date | Commit |
 |------|------|--------|
 | `SatResolver` reaches parity (correctness + perf + robustness) | v0.7 | see release-readiness report |
-| `ResolverEngine::Auto` → `SatResolver` (the actual default flip) | **not yet done** | — |
-| Docs reflect SAT as default | pending the flip | — |
+| RC validation (0 unexpected regressions) | v0.7.0-rc1 | `1da61f9` |
+| `ResolverEngine::Auto` → `SatResolver` (default flip) | v0.7.0-rc1 | — |
+| Docs reflect SAT as default | v0.7.0-rc1 | current |
 | Legacy stays selectable via config/env | yes (today) | — |
 | Follow-up issue filed to remove Legacy | after a stabilization window | — |
 
-> **Status (last reviewed v0.7):** all blocking criteria (§1–§4) are met
-> *except* the actual `Auto → Sat` code change and its release-note paragraph.
-> The criteria doc previously claimed SAT had been the default since v0.7.0;
-> that was incorrect — the code default is still `Legacy`. The flip is a
-> deliberate, separate decision and has **not** been made automatically.
+> **Status (v0.7.0-rc1):** all blocking criteria (§1–§4) are met. The
+> `Auto → Sat` default flip is active as of the v0.7.0-rc1 tag. RC validation
+> confirmed **0 unexpected regressions** against the legacy resolver. The
+> only divergences are the documented semantic improvements (version
+> constraints, virtuals, UNSAT diagnostics). During the RC phase only
+> bugfixes are accepted; the flip will ship in the final v0.7.0 release.

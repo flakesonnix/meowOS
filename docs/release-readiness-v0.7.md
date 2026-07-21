@@ -1,6 +1,8 @@
 # Release-readiness report — v0.7 (signed package index) + SAT-default review
 
-_Last reviewed: v0.7 working tree (pre-tag, uncommitted feature work)._
+_Last reviewed: v0.7.0-rc1 (committed, tagged)._
+_See `git tag v0.7.0-rc1` (commit `1da61f9`, 2026-07-21)._
+_RC validation: test/rc/ — 0 unexpected regressions._
 
 ## 1. v0.7 — Signed package index
 
@@ -60,13 +62,12 @@ trusted key used for `repository.toml.sig`.
 
 ## 2. SAT resolver as default — review
 
-### Status: PARITY ACHIEVED; DEFAULT NOT FLIPPED (deliberate)
+### Status: DEFAULT FLIPPED (v0.7.0-rc1)
 
-The instruction was to **review** the default and report — not to change it. The
-default remains `Legacy` (`ResolverEngine::Auto → LegacyResolver` in
-`meow/src/dependency/resolver_factory.cpp:9-14`). This corrects a false claim
-in `docs/sat-default-criteria.md`, which stated SAT "has been the default since
-v0.7.0". That was wrong; the doc has been fixed.
+`ResolverEngine::Auto` now maps to `SatResolver`. The flip was made as a
+deliberate, separate decision after RC validation confirmed **0 unexpected
+regressions**. `Legacy` remains selectable via `MEOW_RESOLVER=legacy` or
+`ResolverEngine::Legacy` for the duration of the transition period.
 
 ### Criteria assessment (per `docs/sat-default-criteria.md`)
 
@@ -76,22 +77,26 @@ v0.7.0". That was wrong; the doc has been fixed.
 | §2 Performance (no pathological explosion) | **Met** — bench bounded; `manyvirt-1000x10` ≈ 13.4s (documented pure-DPLL expectation; CDCL is future work) |
 | §3 Robustness (UNSAT diagnostics) | **Met** — `PackageConflict`/`MissingProvider`/`VersionConflict`/`Cycle` reported |
 | §4 Rollout / escape hatch | **Met** — `MEOW_RESOLVER=legacy` and `ResolverEngine::Legacy` both work |
-| CHANGELOG/release notes for the flip | **Pending the flip** (not done because the flip is not done) |
+| CHANGELOG/release notes for the flip | **Pending v0.7.0 final** |
 | Follow-up issue to remove Legacy | Open (post-stabilization) |
 
-### Recommendation
+### Status
 
-Flip `ResolverEngine::Auto → SatResolver` in a **separate, deliberate** change
-(after this v0.7 work is tagged). All blocking criteria are satisfied; the only
-remaining items are the code flip itself and its release note. Keep `Legacy`
-selectable for at least one stabilization window.
+- [x] `ResolverEngine::Auto → SatResolver` — flipped as of `v0.7.0-rc1`.
+- [x] RC validation confirmed **0 unexpected regressions**.
+- [x] `Legacy` remains selectable via `MEOW_RESOLVER=legacy`.
+- [ ] Final v0.7.0 release after stabilization period.
 
-## 3. Summary of deliverables for this milestone
+## 3. Deliverables shipped in v0.7.0-rc1
 
-- Signed package index implemented, documented (`docs/security.md`), changelogged.
-- Tests added: `test/unit/package_index_test.cpp`, `test/integration/sections/23_signed_index.sh`.
-- Benchmarks: SAT suite run; no regression attributable to index work.
-- SAT default: reviewed, parity confirmed, default left unchanged per
-  instruction; criteria doc corrected; recommendation recorded above.
-- All changes currently **uncommitted** on the working tree (ready to split
-  into isolated commits).
+- Signed package index implemented, documented (`docs/security.md`).
+- Tests: `test/unit/package_index_test.cpp`, `test/integration/sections/23_signed_index.sh`.
+- SAT resolver: default flipped, parity confirmed, RC validated.
+- RC validation tooling: `test/rc/generate_realistic_repo.py` + `compare_resolvers.py`.
+- Benchmarks: SAT suite run; no regression attributable to index or resolver work.
+- Tagged as `v0.7.0-rc1` (commit `1da61f9`).
+
+### Known pre-existing issues (not blocking RC)
+
+- `test/integration/http_fixture.py` is absent from the tree — 3 HTTP-related
+  integration sections silently no-op. Not a regression.

@@ -1,52 +1,98 @@
-# meowOS v0.4.0 — Package Manager
+# meowOS v0.7.0-rc1 — Package Manager
 
-A transactional Linux package manager with signed repositories, dependency resolution, and verify/repair capabilities.
+A transactional Linux package manager with signed repositories, SAT-powered
+dependency resolution, signed package index, and verify/repair capabilities.
 
 ## Features
 
-- Sharded by-name repository layout (no global index)
-- Signed repositories (Ed25519)
-- Trusted local key store (`~/.config/meow/keys/`)
+### Resolver
+
+- **Dual resolver architecture** — SAT-based (`SatResolver`) and DFS-based
+  (`LegacyResolver`) backends, selectable via `MEOW_RESOLVER` env / config
+- **SAT as default** (`ResolverEngine::Auto → SatResolver`) — DPLL over
+  CNF with full version-constraint enforcement (`=`, `>=`, `<=`, `>`, `<`)
+- **Virtual provider resolution** — SAT resolves virtual dependencies
+  natively (no special-casing), with deterministic provider selection
+- **UNSAT diagnostics** — structured `PackageConflict` / `MissingProvider` /
+  `VersionConflict` / `Cycle` reporting
+- **Correctness parity** — 40 synthetic fixtures + full integration suite
+  passes under both backends; intentional divergences documented
+
+### Security
+
+- Signed repositories (Ed25519) with trusted key store
+- **Signed package index (v0.7)** — `packages.toml` + `packages.toml.sig`
+  authenticates every package manifest and artifact hash end-to-end
+- `require_package_index` config / env — optional strict mode
 - Repository metadata expiry (`generated` / `expires`)
 - Stable `repository_id` for cache and trust anchoring
 - Verified metadata cache (`~/.cache/meow/repos/`)
+- In-process SHA256 verification (no shell execution)
+- Install locking (`flock`-based, cross-process)
+- Atomic transaction with rollback
+- `doctor --security` (keys, trust chain, cache, lockfile, hook policy)
+
+### Packaging
+
 - `.tar.zst` package archives with metadata + scripts
+- Sharded by-name repository layout (no global index)
 - Reproducible builds (deterministic archives, `metadata/build.json`)
-- Restricted hook runner (isolated cwd, minimal env, timeout, logged output)
-- Pre/post-install scripts
-- Download abstraction with timeout/TLS options
+- Optional dependencies (metadata-first, opt-in install)
+- Package groups (config-level expansion aliases)
+
+### Transport
+
+- libcurl-based download (no shell execution)
+- TLS verification, timeouts, retries on transient failures
+- Atomic `.part` + rename writes
+- HTTP `ETag` / `304` support for caching
 - Parallel package downloads (bounded worker pool; serial install)
-- Package download + SHA256 verification
-- Dependency resolution with cycle detection
-- Atomic transactions with rollback
-- Lockfile support for reproducible installs
-- SQLite package database
-- Install / Remove / Upgrade
+- Filesystem + HTTP repository backends
+- Mirror groups with transport-only failover
+- Parallel metadata refresh
+
+### Operations
+
+- Install / Remove / Upgrade / Sync / Update
 - Verify (detect missing/modified files)
 - Repair (restore individual files)
-- Sync (check for upstream updates)
-- Update (bulk upgrade)
 - Doctor (system diagnostics: config, db, trust, cache, integrity, disk)
-- `doctor --security` (keys, trust chain, cache, lockfile, hook policy)
-- `meow-server`: minimal static HTTP server to host a signed repository
-  (`docs/repository-server.md`)
+- Lockfile support for reproducible installs (`--locked`)
+- SQLite package database with install-reason tracking
+- Package history (append-only audit log)
+- `meow-server`: minimal static HTTP server for signed repositories
+- `meow-repo`: repository builder with automatic index signing
+- `meow-build`: reproducible package builder
+
+### Quality assurance
+
+- Full integration test suite (CTest `-L integration`)
+- C++ unit tests (CTest `-L unit`, disk/network-free)
+- SAT resolver benchmark (`meow-bench`)
+- **RC validation** — deterministic, large-scale resolver parity testing
+  (`test/rc/generate_realistic_repo.py` + `compare_resolvers.py`)
 
 ## Architecture
 
 ```
-Repository (index.toml + packages/)
+Repository (by-name layout)
    │
    ▼
 Repository signature verification (Ed25519)
    │
    ▼
-Dependency resolver (topological, cycle detection)
+Signed package index verification (packages.toml.sig)
+   │
+   ▼
+Dependency resolver
+   ├── SAT (default) — DPLL over CNF, version constraints, UNSAT diagnostics
+   └── Legacy (fallback) — DFS-based, cycle detection
    │
    ▼
 Downloader (file:// / http(s):// via curl)
    │
    ▼
-SHA256 checksum verification
+SHA256 checksum verification (against signed index)
    │
    ▼
 Atomic transaction (extract → db commit → rollback on failure)
@@ -55,10 +101,10 @@ Atomic transaction (extract → db commit → rollback on failure)
 Archive extraction (libarchive, .tar.zst)
    │
    ▼
-SQLite database (packages + files metadata)
+SQLite database (packages + files metadata + history)
    │
    ▼
-Verify / Repair / Sync / Update
+Verify / Repair / Sync / Update / Doctor
 ```
 
 ## Distribution pipeline
@@ -81,6 +127,8 @@ See `docs/repository-server.md` for hosting a repository with `meow-server`.
 | `meow info <pkg>` | Package details |
 | `meow install <pkg>` | Install package (runs pre/post install scripts) |
 | `meow install --locked <pkg>` | Install from lockfile |
+| `meow install --with-optional` | Install with optional dependencies |
+| `meow install --optional <name>` | Install specific optional deps |
 | `meow remove <pkg>` | Remove package |
 | `meow upgrade <pkg>` | Upgrade package |
 | `meow installed` | List installed packages |
@@ -89,6 +137,15 @@ See `docs/repository-server.md` for hosting a repository with `meow-server`.
 | `meow sync` | Check for updates |
 | `meow update [--dry-run]` | Upgrade all packages |
 | `meow clean` | Clear the local repository metadata cache |
+| `meow history [pkg]` | Show install/remove audit log |
+| `meow why <pkg>` | Show install reason and reverse deps |
+| `meow explicitly-installed` | List explicitly installed packages |
+| `meow group list` | List defined package groups |
+| `meow group install <group>` | Install a package group atomically |
+| `meow doctor` | System diagnostics |
+| `meow doctor --security` | Security-focused diagnostics |
+| `meow keys list` | List trusted signing keys |
+| `meow keys add <key>` | Add a trusted signing key |
 
 ## Transport
 
@@ -115,12 +172,38 @@ cmake -B build
 cmake --build build
 ```
 
+## Testing
+
+```bash
+# full suite (both resolvers)
+MEOW_RESOLVER=sat    ctest --output-on-failure
+MEOW_RESOLVER=legacy ctest --output-on-failure
+
+# unit tests only
+ctest -L unit
+
+# integration tests only
+ctest -L integration
+
+# RC validation (deterministic large-repo parity check)
+python3 test/rc/generate_realistic_repo.py
+MEOW_RESOLVER=legacy python3 test/rc/compare_resolvers.py
+MEOW_RESOLVER=sat    python3 test/rc/compare_resolvers.py
+```
+
+## Resolver selection
+
+Set `MEOW_RESOLVER=sat` or `MEOW_RESOLVER=legacy` to switch. The default
+(`Auto`) maps to SAT starting from v0.7.0.
+
 ## Repository
 
 A repository contains:
 
 - `repository.toml` — repository metadata (name, schema version)
 - `repository.toml.sig` — Ed25519 signature
+- `packages.toml` — signed package index (v0.7+, authenticates every manifest + artifact hash)
+- `packages.toml.sig` — Ed25519 signature for the package index
 - `public.pem` — Signing public key
 - `by-name/<shard>/<package>/package.toml` — Package metadata
 - `by-name/<shard>/<package>/versions/<version>.toml` — Per-version artifact metadata (url, sha256, filename)
@@ -146,8 +229,11 @@ metadata/changelog    — Change history
 Location: `~/.local/share/meow/database.db` (SQLite)
 
 Tables:
-- `packages` — name, version, architecture, install_time
+- `packages` — name, version, architecture, install_time, install_reason
 - `files` — path, sha256, size (per installed package)
+- `package_history` — append-only audit log (action, timestamp, transaction_id)
+- `package_deps` — recorded dependency edges
+- `package_provides` — recorded provides edges
 
 ## Lockfile
 

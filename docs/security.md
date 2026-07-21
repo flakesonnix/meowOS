@@ -172,6 +172,13 @@ A mutating operation either commits fully or rolls back:
 - Downloads are atomic (`.part` → rename), so an interrupted transfer never
   leaves a corrupt cached archive.
 
+### Security history
+
+- **v0.7 (signed package index)** — closed HIGH #1. Package manifests and
+  artifact hashes are now individually authenticated via `packages.toml.sig`,
+  removing the trust-boundary gap noted in `docs/security-audit-v0.5.md` §7.
+  See the [Signed package index](#signed-package-index-v07) section above.
+
 ### Remaining limitations (known, not blocked)
 
 - Rollback deletes recorded files and empty directories but is **file-delete
@@ -180,7 +187,4 @@ A mutating operation either commits fully or rolls back:
   predate the transaction are left in place.
 - The lock serializes `meow` processes against each other; it does not guard
   against external tools editing the install root or database directly.
-- Package manifests and artifact `sha256` are still authenticated only by the
-  repository signature, not a per-package signed index (see
-  `docs/package-signing-design.md`, HIGH #1).
 

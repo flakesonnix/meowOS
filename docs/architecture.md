@@ -15,6 +15,9 @@ deterministic artifact (.pkg.tar.zst)     ← reproducible builds
 repository metadata (by-name layout)      ← sharded, signed (Ed25519)
     │  signature + repository_id + expiry
     ▼
+signed package index (packages.toml.sig)  ← authenticates every manifest + artifact hash
+    │
+    ▼
 trusted key store (~/.config/meow/keys/)  ← trust anchor
     │
     ▼
@@ -30,11 +33,12 @@ meow install <pkg>
 config + database open
     │
     ▼
-repository open  ──► signature verify ──► identity ──► expiry
+    repository open  ──► signature verify ──► signed index verify ──► identity ──► expiry
     │
     ▼
 resolveDependencyNames        ← repo metadata only, no downloads
-    │  (topological, cycle detection, version-constraint stripping)
+    │  (SAT: DPLL over CNF, version constraints, UNSAT diagnostics)
+    │  (Legacy: topological, cycle detection, no version constraints)
     ▼
 downloadAll (parallel)        ← bounded worker pool, atomic .part + rename
     │  retries / resume / ETag / timeout / size guard
@@ -57,8 +61,10 @@ commit → register in SQLite database
 | CLI             | `main.cpp`                | command dispatch, config/db/repo wiring    |
 | Config          | `config`                  | paths, repositories, workers, hook policy   |
 | Crypto          | `crypto`                  | Ed25519 signatures + trusted key store      |
-| Repository      | `repository`              | by-name scan, open/verify, cache, closure   |
-| Resolver        | `repository/resolver`     | download + load a concrete package          |
+| Repository      | `repository`              | by-name scan, open/verify, index verify     |
+| Resolver (SAT)  | `dependency/sat`          | DPLL over CNF, version constraints, UNSAT   |
+| Resolver (Legacy)| `dependency/legacy`      | DFS-based, cycle detection, compatibility   |
+| Resolver factory| `dependency`              | `Auto → Sat` routing, factory switch       |
 | Download        | `download`                | libcurl transport, atomic writes, retries   |
 | Download queue  | `download/queue`          | bounded parallel fetch of artifacts         |
 | Builder         | `builder`                 | reproducible `.pkg.tar.zst` generation       |
@@ -71,6 +77,7 @@ commit → register in SQLite database
 | Verify/Repair   | `verify`, `repair`        | integrity check / restore                    |
 | Sync/Update     | `sync`, `update`          | upstream diff / bulk upgrade                 |
 | Doctor          | `doctor`                  | system + security diagnostics               |
+| Repo builder    | `repo-builder`            | repo sign + package index generation        |
 
 ## Layering
 
@@ -82,13 +89,14 @@ about HTTP; the downloader never parses manifests).
 CLI (main.cpp)
     │  config + database open
     ▼
-Repository  ──── open / verify signature / identity / expiry / cache
+Repository  ──── open / verify signature / verify package index / identity / expiry / cache
     │
-    ├── FilesystemRepositoryBackend   (local checkout)        [current]
-    └── HttpRepositoryBackend         (remote server)         [v0.5, planned]
+    ├── FilesystemRepositoryBackend   (local checkout)
+    ├── HttpRepositoryBackend         (remote server)
+    └── MemoryRepositoryBackend       (tests only)
     │
     ▼
-Resolver  ──── resolveDependencyNames (metadata only) + resolvePackage (download + load)
+Resolver  ──── SAT (DPLL over CNF) or Legacy (DFS) / metadata only
     │
     ▼
 Downloader / Download queue  ──── libcurl transport, atomic writes, retries
@@ -98,7 +106,7 @@ Transaction  ──── begin / record / commit / rollback
     │
     ├── Hooks            (isolated, timed, logged; Hook ABI v1)
     ├── Archive extract  (libarchive)
-    └── Database         (SQLite package/file registry)
+    └── Database         (SQLite package/file registry + history)
     │
     ▼
 Lockfile / Verify / Repair / Sync / Update / Doctor  (operate on DB + cache)
