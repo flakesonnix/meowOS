@@ -1,23 +1,10 @@
 #include <meow/bootstrap/bootstrap.hpp>
 
 namespace meow::bootstrap {
-    namespace {
-        const std::vector<std::string> skeletonSubdirs = {
-            "dev", "proc", "sys", "run", "etc",
-            "usr", "var", "home",
-            "var/lib/meow", "var/log"
-        };
-    }
-
-    void createRootFSSkeleton(const std::filesystem::path& root) {
-        std::error_code ec;
-        for (const auto& sub : skeletonSubdirs) {
-            std::filesystem::create_directories(root / sub, ec);
-        }
-    }
 
     void bootstrapRootFS(const std::filesystem::path& root,
-                         const std::vector<std::string>& packageNames) {
+                         const std::vector<std::string>& packageNames,
+                         bool verbose) {
         auto target = std::filesystem::absolute(root);
 
         std::error_code ec;
@@ -32,13 +19,20 @@ namespace meow::bootstrap {
             std::filesystem::create_directories(target, ec);
         }
 
-        createRootFSSkeleton(target);
+        std::string skeletonSubdirs[] = {"dev", "proc", "sys", "run", "etc",
+                                          "usr", "var", "home",
+                                          "var/lib/meow", "var/log"};
+        for (const auto& sub : skeletonSubdirs) {
+            std::filesystem::create_directories(target / sub, ec);
+        }
 
         auto dbPath = target / "var" / "lib" / "meow" / "database.sqlite";
         auto db = meow::database::openDatabase(dbPath.string());
         meow::database::initializeDatabase(db);
 
-        meow::log::log(meow::LogLevel::Info, "bootstrap database initialized");
+        if (verbose) {
+            meow::log::log(meow::LogLevel::Info, "bootstrap database initialized");
+        }
 
         auto cfg = meow::config::defaultConfig();
         auto repo = meow::repository::openRepository(".");
@@ -58,6 +52,16 @@ namespace meow::bootstrap {
                 meow::error::ErrorCode::TransactionFailed,
                 "bootstrap resolution failed"
             );
+        }
+
+        if (verbose) {
+            meow::log::log(meow::LogLevel::Info, "target rootfs: " + target.string());
+            meow::log::log(meow::LogLevel::Info, "requested packages:");
+            for (const auto& n : packageNames)
+                meow::log::log(meow::LogLevel::Info, "  " + n);
+            meow::log::log(meow::LogLevel::Info, "resolved packages:");
+            for (const auto& p : resolution.packages)
+                meow::log::log(meow::LogLevel::Info, "  " + p.name.value + " " + p.version.value);
         }
 
         std::vector<std::pair<meow::types::PackageName, meow::types::PackageVersion>> selected;
@@ -82,5 +86,9 @@ namespace meow::bootstrap {
 
         meow::database::closeDatabase(db);
         std::cout << "\nbootstrap complete: " << target << "\n";
+
+        if (verbose) {
+            meow::log::log(meow::LogLevel::Info, "bootstrap transaction committed");
+        }
     }
 }
