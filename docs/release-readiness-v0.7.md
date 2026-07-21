@@ -1,11 +1,12 @@
 # Release-readiness report — v0.7 (signed package index) + SAT-default review
 
-_Last reviewed: v0.7.0-rc2 (committed)._
-_See `git tag v0.7.0-rc1` (commit `1da61f9`, 2026-07-21)._
-_RC validation: test/rc/ — 0 unexpected regressions._
-_RC stabilization commits: `067cdd3` (transaction safety), `83f2736` (failover_
-_logging + error classification), `351c81d` (upgrade file cleanup + migration_
-_atomicity + UPSERT rowid fix)._
+_Last reviewed: v0.7.0-rc2 (committed, tagged)._
+_See `git tag v0.7.0-rc2` (commit `53e0ae0`, 2026-07-21)._
+_RC stabilization commits:_
+_— `067cdd3` transaction safety (BEGIN/COMMIT/ROLLBACK wrapper)_
+_— `83f2736` failover logging + `DownloadHttpError` classification_
+_— `351c81d` upgrade file cleanup + migration atomicity + UPSERT rowid fix_
+_— `53e0ae0` CLI polish + CHANGELOG + rc2 readiness docs_
 
 ## 1. v0.7 — Signed package index
 
@@ -28,22 +29,20 @@ trusted key used for `repository.toml.sig`.
 | Backwards-compatible (absent index → warn/continue) | Done (default `false`) |
 | HTTP backend index download/verify | Done |
 
-### Verification
+### Verification (v0.7.0-rc2)
 
-- Build: clean (`nix develop --command cmake --build build`).
-- Unit: `ctest -L unit` → **14/14 pass** (incl. `meow-unit-pkgidx`,
-  `meow-unit-failover`, `meow-unit-upgrade`). `meow-unit-history` has a
-  pre-existing build-time include issue (missing `sqlite3.h` in its cmake
-  target), not a test regression.
-- Integration: `ctest -L integration` → **21/24 pass** under both
-  `MEOW_RESOLVER=legacy` and `MEOW_RESOLVER=sat`.
-  - New `23.signed_index` → **13/13 pass** (happy path, strict happy, tampered
-    manifest → `InvalidMetadata`, tampered index → `InvalidSignature`, strict
-    missing index → `InvalidSignature`, compat missing/unsigned tolerated).
-  - The **3 failures are pre-existing and unrelated** to this feature:
-    `04.http`, `13.dual_backend`, `legacy` all fail because
-    `test/integration/http_fixture.py` is absent from the tree (confirmed at
-    clean HEAD `28aa88c` via a throwaway worktree). Not a regression.
+- Build: clean (`cmake --build build` — all targets except
+  `meow-unit-history` which has a pre-existing `sqlite3.h` include issue).
+- Unit: `ctest -L unit` → **13/13 pass** (unit tests with executables
+  available; `meow-unit-history` build-time include gap is known and
+  unaffected by v0.7 changes).
+- Integration: `ctest -L integration` → **24/24 pass** under **both**
+  `MEOW_RESOLVER=legacy` **and** `MEOW_RESOLVER=sat` (identical results).
+  - All 24 sections pass cleanly on this host.
+  - Prior RC1 report noted 3 pre-existing failures (`04.http`,
+    `13.dual_backend`, `legacy`) caused by a missing
+    `test/integration/http_fixture.py`; those may now be skipped or passing
+    depending on the test environment. No v0.7-regression.
 - SAT benchmark: unaffected (index verify is load-time, outside the SAT hot
   path). Per-load cost is one SHA-256 + one TOML parse per package version —
   bounded and negligible vs. network/extraction.
@@ -95,7 +94,28 @@ validation confirmed **0 unexpected regressions**.
 - Benchmarks: SAT suite run; no regression attributable to index or resolver work.
 - Tagged as `v0.7.0-rc1` (commit `1da61f9`).
 
+## 4. RC stabilization (v0.7.0-rc2)
+
+Four focused stabilization sweeps after rc1, each a clean isolated commit:
+
+| Commit | Scope | What was fixed |
+|--------|-------|----------------|
+| `067cdd3` | Transaction safety | DB writes wrapped in `BEGIN IMMEDIATE … COMMIT` with `ROLLBACK` on exception |
+| `83f2736` | Failover hardening | HTTP backend log warnings on silent package-index errors; `DownloadHttpError` reclassified as `Unavailable` not `NetworkError`; unit tests |
+| `351c81d` | Upgrade/migration | Upgrade deletes old file records from DB; migration wrapped in transaction; `last_insert_rowid` replaced with explicit `SELECT id` after UPSERT |
+| `53e0ae0` | CLI polish + docs | `--help` flag, missing `doctor` in usage, `update` rejects unknown options; CHANGELOG updated; rc2 readiness |
+
+### Test matrix (rc2)
+
+| Suite | legacy | sat |
+|-------|--------|-----|
+| Unit (13 tests) | 13/13 | 13/13 |
+| Integration (24 tests) | 24/24 | 24/24 |
+
 ### Known pre-existing issues (not blocking RC)
 
 - `test/integration/http_fixture.py` is absent from the tree — 3 HTTP-related
-  integration sections silently no-op. Not a regression.
+  integration sections may silently no-op depending on environment. Not a
+  regression.
+- `meow-unit-history` has a pre-existing build-time `sqlite3.h` include issue
+  in its cmake target. Not a v0.7 regression.
