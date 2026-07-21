@@ -9,8 +9,10 @@ dependency resolution, signed package index, and verify/repair capabilities.
 
 - **Dual resolver architecture** — SAT-based (`SatResolver`) and DFS-based
   (`LegacyResolver`) backends, selectable via `MEOW_RESOLVER` env / config
-- **SAT as default** (`ResolverEngine::Auto → SatResolver`) — DPLL over
-  CNF with full version-constraint enforcement (`=`, `>=`, `<=`, `>`, `<`)
+- **SAT resolver** — DPLL over CNF with full version-constraint enforcement
+  (`=`, `>=`, `<=`, `>`, `<`), virtual provider resolution, UNSAT diagnostics
+- **Dual backend** — select via `MEOW_RESOLVER=sat` or `MEOW_RESOLVER=legacy`;
+  `Auto` currently maps to `Legacy` (default flip planned after v0.7.0)
 - **Virtual provider resolution** — SAT resolves virtual dependencies
   natively (no special-casing), with deterministic provider selection
 - **UNSAT diagnostics** — structured `PackageConflict` / `MissingProvider` /
@@ -85,8 +87,8 @@ Signed package index verification (packages.toml.sig)
    │
    ▼
 Dependency resolver
-   ├── SAT (default) — DPLL over CNF, version constraints, UNSAT diagnostics
-   └── Legacy (fallback) — DFS-based, cycle detection
+   ├── SAT (selectable) — DPLL over CNF, version constraints, UNSAT diagnostics
+   └── Legacy (current default) — DFS-based, cycle detection
    │
    ▼
 Downloader (file:// / http(s):// via curl)
@@ -194,7 +196,8 @@ MEOW_RESOLVER=sat    python3 test/rc/compare_resolvers.py
 ## Resolver selection
 
 Set `MEOW_RESOLVER=sat` or `MEOW_RESOLVER=legacy` to switch. The default
-(`Auto`) maps to SAT starting from v0.7.0.
+(`Auto`) currently maps to `LegacyResolver`. SAT is recommended and can be
+selected via `MEOW_RESOLVER=sat`; the default flip is planned after v0.7.0.
 
 ## Repository
 

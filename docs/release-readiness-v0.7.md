@@ -62,12 +62,12 @@ trusted key used for `repository.toml.sig`.
 
 ## 2. SAT resolver as default — review
 
-### Status: DEFAULT FLIPPED (v0.7.0-rc1)
+### Status: PARITY ACHIEVED; DEFAULT NOT YET FLIPPED (deliberate)
 
-`ResolverEngine::Auto` now maps to `SatResolver`. The flip was made as a
-deliberate, separate decision after RC validation confirmed **0 unexpected
-regressions**. `Legacy` remains selectable via `MEOW_RESOLVER=legacy` or
-`ResolverEngine::Legacy` for the duration of the transition period.
+The default remains `Legacy` (`ResolverEngine::Auto → LegacyResolver` in
+`meow/src/dependency/resolver_factory.cpp:12-14`). The flip is deferred to a
+separate commit after the v0.7.0 release. All parity criteria are met; RC
+validation confirmed **0 unexpected regressions**.
 
 ### Criteria assessment (per `docs/sat-default-criteria.md`)
 
@@ -80,18 +80,11 @@ regressions**. `Legacy` remains selectable via `MEOW_RESOLVER=legacy` or
 | CHANGELOG/release notes for the flip | **Pending v0.7.0 final** |
 | Follow-up issue to remove Legacy | Open (post-stabilization) |
 
-### Status
-
-- [x] `ResolverEngine::Auto → SatResolver` — flipped as of `v0.7.0-rc1`.
-- [x] RC validation confirmed **0 unexpected regressions**.
-- [x] `Legacy` remains selectable via `MEOW_RESOLVER=legacy`.
-- [ ] Final v0.7.0 release after stabilization period.
-
 ## 3. Deliverables shipped in v0.7.0-rc1
 
 - Signed package index implemented, documented (`docs/security.md`).
 - Tests: `test/unit/package_index_test.cpp`, `test/integration/sections/23_signed_index.sh`.
-- SAT resolver: default flipped, parity confirmed, RC validated.
+- SAT resolver: parity confirmed, RC validated, default flip deferred to separate commit.
 - RC validation tooling: `test/rc/generate_realistic_repo.py` + `compare_resolvers.py`.
 - Benchmarks: SAT suite run; no regression attributable to index or resolver work.
 - Tagged as `v0.7.0-rc1` (commit `1da61f9`).

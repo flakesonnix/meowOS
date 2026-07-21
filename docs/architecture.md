@@ -64,7 +64,7 @@ commit → register in SQLite database
 | Repository      | `repository`              | by-name scan, open/verify, index verify     |
 | Resolver (SAT)  | `dependency/sat`          | DPLL over CNF, version constraints, UNSAT   |
 | Resolver (Legacy)| `dependency/legacy`      | DFS-based, cycle detection, compatibility   |
-| Resolver factory| `dependency`              | `Auto → Sat` routing, factory switch       |
+| Resolver factory| `dependency`              | `Auto → Legacy` routing (flip deferred)    |
 | Download        | `download`                | libcurl transport, atomic writes, retries   |
 | Download queue  | `download/queue`          | bounded parallel fetch of artifacts         |
 | Builder         | `builder`                 | reproducible `.pkg.tar.zst` generation       |
