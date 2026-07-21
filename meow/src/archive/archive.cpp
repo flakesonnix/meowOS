@@ -264,7 +264,7 @@ namespace meow::archive {
             ensureSafePerm(rel, archive_entry_perm(entry));
             if (archive_entry_filetype(entry) == AE_IFLNK) {
                 ensureSafeLink(destination, rel, archive_entry_symlink(entry));
-            } else if (archive_entry_hardlink_is_set(entry)) {
+            } else if (archive_entry_hardlink(entry) != nullptr) {
                 ensureSafeLink(destination, rel, archive_entry_hardlink(entry));
             }
 
@@ -297,7 +297,7 @@ namespace meow::archive {
                 ensureSafePerm(rel, archive_entry_perm(entry));
                 if (archive_entry_filetype(entry) == AE_IFLNK) {
                     ensureSafeLink(destination, rel, archive_entry_symlink(entry));
-                } else if (archive_entry_hardlink_is_set(entry)) {
+            } else if (archive_entry_hardlink(entry) != nullptr) {
                     ensureSafeLink(destination, rel, archive_entry_hardlink(entry));
                 }
 

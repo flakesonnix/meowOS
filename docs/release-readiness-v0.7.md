@@ -69,10 +69,10 @@ trusted key used for `repository.toml.sig`.
 
 ### Status: PARITY ACHIEVED; DEFAULT NOT YET FLIPPED (deliberate)
 
-The default remains `Legacy` (`ResolverEngine::Auto → LegacyResolver` in
-`meow/src/dependency/resolver_factory.cpp:12-14`). The flip is deferred to a
-separate commit after the v0.7.0 release. All parity criteria are met; RC
-validation confirmed **0 unexpected regressions**.
+The default is now `Sat` (`ResolverEngine::Auto → SatResolver` in
+`meow/src/dependency/resolver_factory.cpp`). `Legacy` remains available
+via `MEOW_RESOLVER=legacy` or `ResolverEngine::Legacy`. All parity criteria
+were met before the flip; RC validation confirmed **0 unexpected regressions**.
 
 ### Criteria assessment (per `docs/sat-default-criteria.md`)
 

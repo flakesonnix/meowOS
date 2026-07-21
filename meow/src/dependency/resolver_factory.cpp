@@ -9,9 +9,10 @@ std::unique_ptr<IResolver> makeResolver(config::ResolverEngine engine) {
         case config::ResolverEngine::Sat:
             return std::make_unique<SatResolver>();
         case config::ResolverEngine::Legacy:
+            return std::make_unique<LegacyResolver>();
         case config::ResolverEngine::Auto:
         default:
-            return std::make_unique<LegacyResolver>();
+            return std::make_unique<SatResolver>();
     }
 }
 

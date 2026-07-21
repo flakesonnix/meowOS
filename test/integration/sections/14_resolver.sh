@@ -4,8 +4,8 @@ set -euo pipefail
 
 run_section() {
 # The legacy runner and direct ctest invocation don't always export
-# MEOW_RESOLVER. Default to legacy (matching the Auto -> legacy mapping).
-: "${MEOW_RESOLVER:=legacy}"
+# MEOW_RESOLVER. Default to sat (matching the Auto -> sat mapping).
+: "${MEOW_RESOLVER:=sat}"
 
 
 echo "=== 30. Version constraint regression (real repo fixtures) ==="

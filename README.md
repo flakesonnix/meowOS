@@ -12,7 +12,7 @@ dependency resolution, signed package index, and verify/repair capabilities.
 - **SAT resolver** — DPLL over CNF with full version-constraint enforcement
   (`=`, `>=`, `<=`, `>`, `<`), virtual provider resolution, UNSAT diagnostics
 - **Dual backend** — select via `MEOW_RESOLVER=sat` or `MEOW_RESOLVER=legacy`;
-  `Auto` currently maps to `Legacy` (default flip planned after v0.7.0)
+  `Auto` maps to `Sat` (default); `Legacy` available as escape hatch
 - **Virtual provider resolution** — SAT resolves virtual dependencies
   natively (no special-casing), with deterministic provider selection
 - **UNSAT diagnostics** — structured `PackageConflict` / `MissingProvider` /

@@ -303,4 +303,5 @@ set_tests_properties(integration.legacy PROPERTIES
     LABELS "integration;serial"
     RUN_SERIAL TRUE
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    ENVIRONMENT "MEOW_RESOLVER=legacy"
 )
