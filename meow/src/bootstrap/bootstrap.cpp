@@ -41,13 +41,18 @@ namespace meow::bootstrap {
         }
 
         auto cfg = meow::config::defaultConfig();
-        auto repo = meow::repository::openRepository(".");
 
         if (verbose) {
             meow::log::log(meow::LogLevel::Info, "Resolver: " + 
                 (cfg.resolverEngine == meow::config::ResolverEngine::Sat ? "SAT" : "legacy"));
+        }
+
+        meow::repository::RepositoryManager manager(cfg);
+        auto repo = manager.mergedRepository();
+
+        if (verbose) {
             meow::log::log(meow::LogLevel::Info, "Loaded " + 
-                std::to_string(meow::repository::listRepositories(cfg).size()) + 
+                std::to_string(manager.availableCount()) + 
                 " repositories");
         }
 
