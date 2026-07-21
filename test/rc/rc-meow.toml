@@ -1,0 +1,9 @@
+[[repositories]]
+id = "extra"
+mirrors = ["file:///home/lucy/CLionProjects/meowOS/test/rc/repo-extra"]
+priority = 100
+
+[[repositories]]
+id = "main"
+mirrors = ["file:///home/lucy/CLionProjects/meowOS/test/rc/repo-main"]
+priority = 10

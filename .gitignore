@@ -10,3 +10,8 @@ meow.lock
 # test-generated sample repo packages
 repo/by-name/ho/
 repo/by-name/hs/
+
+# RC validation — generated artifacts, not committed
+test/rc/artifacts/
+test/rc/repo-main/
+test/rc/repo-extra/
