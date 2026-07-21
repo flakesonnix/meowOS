@@ -13,7 +13,6 @@ RepositoryStatus classifyRepositoryError(const error::MeowError& e) {
     switch (e.code) {
         case error::ErrorCode::DownloadTimeout:
         case error::ErrorCode::DownloadInterrupted:
-        case error::ErrorCode::DownloadHttpError:
         case error::ErrorCode::DownloadHttp5xx:
         case error::ErrorCode::DownloadFailed:
         case error::ErrorCode::RepositoryNotFound:

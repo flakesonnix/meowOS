@@ -165,6 +165,12 @@ target_include_directories(meow-unit-tx-lock
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-tx-lock PRIVATE meow_core)
 
+# Failover policy: isFailoverAllowed + classifyRepositoryError.
+add_executable(meow-unit-failover test/unit/failover_test.cpp)
+target_include_directories(meow-unit-failover
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-failover PRIVATE meow_core)
+
 # v0.7 signed-package-index boundary (groundwork only; not wired in).
 add_executable(meow-unit-pkgidx test/unit/package_index_test.cpp)
 target_include_directories(meow-unit-pkgidx
@@ -232,6 +238,7 @@ set(UNIT_TESTS
     meow-unit-archive-security
     meow-unit-security-policy
     meow-unit-signature-policy
+    meow-unit-failover
     meow-unit-pkgidx
 )
 foreach(tgt ${UNIT_TESTS})

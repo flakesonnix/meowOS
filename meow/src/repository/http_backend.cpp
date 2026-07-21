@@ -116,15 +116,18 @@ Repository HttpRepositoryBackend::loadRepository() {
     { std::error_code rmec; fs::remove(signedIndexDest, rmec); fs::remove(signedIndexSig, rmec); }
     try {
         download::downloadFile(absUrl("packages.toml"), signedIndexDest);
-    } catch (const error::MeowError&) {
-        // Index absent on the server (e.g. 404). Compatibility mode unless
-        // strict; loadVerifiedPackageIndex enforces the policy below.
+    } catch (const error::MeowError& e) {
+        log::log(log::LogLevel::Warning,
+                 "packages.toml absent at " + absUrl("packages.toml") +
+                     " (" + e.what() + "); compatibility mode");
     }
     if (fs::exists(signedIndexDest)) {
         try {
             download::downloadFile(absUrl("packages.toml.sig"), signedIndexSig);
-        } catch (const error::MeowError&) {
-            // signature missing; handled by loadVerifiedPackageIndex
+        } catch (const error::MeowError& e) {
+            log::log(log::LogLevel::Warning,
+                     "packages.toml.sig absent at " + absUrl("packages.toml.sig") +
+                         " (" + e.what() + ")");
         }
     }
     // Verify + load (or enforce strict policy on a missing index). Trust
@@ -142,7 +145,10 @@ Repository HttpRepositoryBackend::loadRepository() {
     try {
         download::downloadFile(absUrl("packages.index"), indexDest);
         haveIndex = fs::exists(indexDest);
-    } catch (const error::MeowError&) {
+    } catch (const error::MeowError& e) {
+        log::log(log::LogLevel::Warning,
+                 "packages.index absent at " + absUrl("packages.index") +
+                     " (" + e.what() + "); repo loads empty");
         haveIndex = false;
     }
 
