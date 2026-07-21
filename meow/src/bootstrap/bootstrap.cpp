@@ -112,18 +112,16 @@ namespace meow::bootstrap {
             if (p.isRoot) requested.insert(p.name.value);
         }
 
-        meow::dependency::resolveAndStage(repo, cfg, selected);
+        bool quiet = !verbose;
 
         std::vector<meow::package::PackageFile> toInstall;
-        for (const auto& [name, version] : selected) {
+        for (size_t i = 0; i < selected.size(); ++i) {
+            const auto& [name, version] = selected[i];
             auto pkg = meow::repository::resolvePackage(repo, name, version);
             toInstall.push_back(std::move(pkg));
             if (verbose) {
-                meow::log::log(meow::LogLevel::Info, "Installing " + name.value + " " + version.value + "...");
-                meow::log::log(meow::LogLevel::Info, "  Verifying signature...");
-                meow::log::log(meow::LogLevel::Info, "  Extracting...");
-                meow::log::log(meow::LogLevel::Info, "  Registering files...");
-                meow::log::log(meow::LogLevel::Info, "  ✓ " + name.value);
+                std::cout << "  [" << std::setw(3) << std::right << (i + 1) << "/" << std::setw(3) << selected.size() << "] "
+                          << name.value << " " << version.value << "\n";
             }
         }
 
