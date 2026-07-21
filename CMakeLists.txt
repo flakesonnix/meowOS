@@ -171,6 +171,12 @@ target_include_directories(meow-unit-failover
     PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 target_link_libraries(meow-unit-failover PRIVATE meow_core)
 
+# Upgrade/downgrade + database migration safety.
+add_executable(meow-unit-upgrade test/unit/upgrade_test.cpp)
+target_include_directories(meow-unit-upgrade
+    PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
+target_link_libraries(meow-unit-upgrade PRIVATE meow_core SQLite::SQLite3)
+
 # v0.7 signed-package-index boundary (groundwork only; not wired in).
 add_executable(meow-unit-pkgidx test/unit/package_index_test.cpp)
 target_include_directories(meow-unit-pkgidx
@@ -239,6 +245,7 @@ set(UNIT_TESTS
     meow-unit-security-policy
     meow-unit-signature-policy
     meow-unit-failover
+    meow-unit-upgrade
     meow-unit-pkgidx
 )
 foreach(tgt ${UNIT_TESTS})

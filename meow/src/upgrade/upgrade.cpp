@@ -81,6 +81,7 @@ namespace meow::upgrade {
             transaction::Transaction::PackageEntry entry;
             entry.pkg = std::move(latestPkg);
             entry.installedFiles = newFiles.value;
+            entry.clearExistingFiles = true;
             tx.packages.push_back(std::move(entry));
             transaction::commitTransaction(tx, db);
             result.success = true;

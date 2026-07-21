@@ -58,7 +58,8 @@ std::vector<types::PackageName> listInstalled(Database& db);
 std::optional<types::PackageVersion> installedVersion(Database& db, const types::PackageName& name);
 std::vector<std::filesystem::path> listPackageFiles(Database& db, const types::PackageName& name);
 std::vector<FileEntry> listPackageFileEntries(Database& db, const types::PackageName& name);
-void removePackageRecord(Database& db, const types::PackageName& name);
+    void removePackageFiles(Database& db, const types::PackageName& name);
+    void removePackageRecord(Database& db, const types::PackageName& name);
 
 std::optional<types::PackageName> owns(Database& db, const std::filesystem::path& filePath);
 std::vector<types::PackageName> requiredBy(Database& db, const types::PackageName& name);

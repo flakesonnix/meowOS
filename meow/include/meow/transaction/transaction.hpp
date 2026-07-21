@@ -14,6 +14,7 @@ namespace meow::transaction {
             package::PackageFile pkg;
             std::vector<std::filesystem::path> installedFiles;
             database::InstallReason reason = database::InstallReason::Explicit;
+            bool clearExistingFiles = false;
         };
 
         std::vector<PackageEntry> packages;

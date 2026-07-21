@@ -165,59 +165,70 @@ namespace meow::database {
 
         if (schemaVersion != format::CurrentDatabaseSchema) {
             if (schemaVersion == 1) {
-                // Migrate v1 -> v2: add per-package install reason and the
-                // append-only history table. Existing packages default to
-                // Dependency until a future reason is recorded.
-                const char* alterPkg =
-                    "ALTER TABLE packages ADD COLUMN install_reason TEXT NOT NULL DEFAULT 'Dependency';";
-                char* merr = nullptr;
-                sqlite3_exec(handle, alterPkg, nullptr, nullptr, &merr);
-                if (merr) sqlite3_free(merr);
-                const char* mkHist =
-                    "CREATE TABLE IF NOT EXISTS package_history ("
-                    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    "  timestamp INTEGER NOT NULL,"
-                    "  action TEXT NOT NULL,"
-                    "  package TEXT NOT NULL,"
-                    "  version TEXT,"
-                    "  reason TEXT,"
-                    "  transaction_id TEXT"
-                    ");";
-                sqlite3_exec(handle, mkHist, nullptr, nullptr, &merr);
-                if (merr) sqlite3_free(merr);
-                // A v1 database may predate the files / deps / provides tables
-                // entirely. Create them idempotently so the schema is complete
-                // and checkSchema() passes after migration.
-                const char* mkMissing =
-                    "CREATE TABLE IF NOT EXISTS files ("
-                    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    "  package_id INTEGER NOT NULL,"
-                    "  path TEXT NOT NULL,"
-                    "  sha256 TEXT DEFAULT '',"
-                    "  size INTEGER DEFAULT 0,"
-                    "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
-                    ");"
-                    "CREATE TABLE IF NOT EXISTS package_deps ("
-                    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    "  package_id INTEGER NOT NULL,"
-                    "  dep_name TEXT NOT NULL,"
-                    "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
-                    ");"
-                    "CREATE TABLE IF NOT EXISTS package_provides ("
-                    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    "  package_id INTEGER NOT NULL,"
-                    "  provide_name TEXT NOT NULL,"
-                    "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
-                    ");";
-                sqlite3_exec(handle, mkMissing, nullptr, nullptr, &merr);
-                if (merr) sqlite3_free(merr);
-                const char* setVer =
-                    "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', ?);";
-                if (sqlite3_prepare_v2(handle, setVer, -1, &vstmt, nullptr) == SQLITE_OK) {
-                    auto verStr = std::to_string(format::CurrentDatabaseSchema);
-                    sqlite3_bind_text(vstmt, 1, verStr.c_str(), -1, SQLITE_TRANSIENT);
-                    sqlite3_step(vstmt);
-                    sqlite3_finalize(vstmt);
+                // Wrap migration in a transaction so a crash mid-way does not
+                // leave the database in a half-migrated state.
+                const char* beginSQL = "BEGIN IMMEDIATE TRANSACTION;";
+                sqlite3_exec(handle, beginSQL, nullptr, nullptr, nullptr);
+                bool began = true;
+                try {
+                    const char* alterPkg =
+                        "ALTER TABLE packages ADD COLUMN install_reason TEXT NOT NULL DEFAULT 'Dependency';";
+                    char* merr = nullptr;
+                    sqlite3_exec(handle, alterPkg, nullptr, nullptr, &merr);
+                    if (merr) sqlite3_free(merr);
+                    const char* mkHist =
+                        "CREATE TABLE IF NOT EXISTS package_history ("
+                        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        "  timestamp INTEGER NOT NULL,"
+                        "  action TEXT NOT NULL,"
+                        "  package TEXT NOT NULL,"
+                        "  version TEXT,"
+                        "  reason TEXT,"
+                        "  transaction_id TEXT"
+                        ");";
+                    char* herr = nullptr;
+                    sqlite3_exec(handle, mkHist, nullptr, nullptr, &herr);
+                    if (herr) sqlite3_free(herr);
+                    // A v1 database may predate the files / deps / provides tables
+                    // entirely. Create them idempotently so the schema is complete
+                    // and checkSchema() passes after migration.
+                    const char* mkMissing =
+                        "CREATE TABLE IF NOT EXISTS files ("
+                        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        "  package_id INTEGER NOT NULL,"
+                        "  path TEXT NOT NULL,"
+                        "  sha256 TEXT DEFAULT '',"
+                        "  size INTEGER DEFAULT 0,"
+                        "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+                        ");"
+                        "CREATE TABLE IF NOT EXISTS package_deps ("
+                        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        "  package_id INTEGER NOT NULL,"
+                        "  dep_name TEXT NOT NULL,"
+                        "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+                        ");"
+                        "CREATE TABLE IF NOT EXISTS package_provides ("
+                        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        "  package_id INTEGER NOT NULL,"
+                        "  provide_name TEXT NOT NULL,"
+                        "  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE"
+                        ");";
+                    char* merr2 = nullptr;
+                    sqlite3_exec(handle, mkMissing, nullptr, nullptr, &merr2);
+                    if (merr2) sqlite3_free(merr2);
+                    const char* setVer =
+                        "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', ?);";
+                    if (sqlite3_prepare_v2(handle, setVer, -1, &vstmt, nullptr) == SQLITE_OK) {
+                        auto verStr = std::to_string(format::CurrentDatabaseSchema);
+                        sqlite3_bind_text(vstmt, 1, verStr.c_str(), -1, SQLITE_TRANSIENT);
+                        sqlite3_step(vstmt);
+                        sqlite3_finalize(vstmt);
+                    }
+                    sqlite3_exec(handle, "COMMIT;", nullptr, nullptr, nullptr);
+                    began = false;
+                } catch (...) {
+                    if (began) sqlite3_exec(handle, "ROLLBACK;", nullptr, nullptr, nullptr);
+                    throw;
                 }
             } else {
                 throw error::MeowError(error::ErrorCode::DatabaseMigrationFailed,
@@ -258,7 +269,24 @@ namespace meow::database {
         }
         sqlite3_finalize(stmt);
 
-        auto packageId = sqlite3_last_insert_rowid(handle);
+        // SELECT the id explicitly — sqlite3_last_insert_rowid does not
+        // reliably return the existing rowid when the UPSERT fires a DO
+        // UPDATE, and the behavior varies across SQLite versions.
+        int64_t packageId = 0;
+        {
+            const char* getId = "SELECT id FROM packages WHERE name = ?;";
+            sqlite3_stmt* idStmt;
+            if (sqlite3_prepare_v2(handle, getId, -1, &idStmt, nullptr) != SQLITE_OK) {
+                throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+            }
+            sqlite3_bind_text(idStmt, 1, package.metadata.name.value.c_str(), -1, SQLITE_TRANSIENT);
+            if (sqlite3_step(idStmt) != SQLITE_ROW) {
+                sqlite3_finalize(idStmt);
+                throw error::MeowError(error::ErrorCode::Internal, "package not found after INSERT");
+            }
+            packageId = sqlite3_column_int64(idStmt, 0);
+            sqlite3_finalize(idStmt);
+        }
 
         const char* insertFile = "INSERT INTO files (package_id, path, sha256, size) VALUES (?, ?, ?, ?);";
         if (sqlite3_prepare_v2(handle, insertFile, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -434,6 +462,22 @@ namespace meow::database {
         sqlite3_bind_int64(stmt, 2, fileSize);
         sqlite3_bind_text(stmt, 3, path.c_str(), -1, SQLITE_TRANSIENT);
 
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            sqlite3_finalize(stmt);
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    void removePackageFiles(Database& db, const types::PackageName& name) {
+        auto* handle = h(db);
+        const char* delFiles =
+            "DELETE FROM files WHERE package_id = (SELECT id FROM packages WHERE name = ?);";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(handle, delFiles, -1, &stmt, nullptr) != SQLITE_OK) {
+            throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
+        }
+        sqlite3_bind_text(stmt, 1, name.value.c_str(), -1, SQLITE_TRANSIENT);
         if (sqlite3_step(stmt) != SQLITE_DONE) {
             sqlite3_finalize(stmt);
             throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));

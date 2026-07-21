@@ -45,6 +45,9 @@ namespace meow::transaction {
         try {
             std::string txId = generateTransactionId();
             for (const auto& entry : tx.packages) {
+                if (entry.clearExistingFiles) {
+                    database::removePackageFiles(db, entry.pkg.metadata.name);
+                }
                 database::registerPackage(db, entry.pkg, entry.installedFiles);
                 database::setInstallReason(db, entry.pkg.metadata.name, entry.reason);
                 database::recordHistory(db, "install",
