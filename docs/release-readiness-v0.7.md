@@ -1,8 +1,11 @@
 # Release-readiness report — v0.7 (signed package index) + SAT-default review
 
-_Last reviewed: v0.7.0-rc1 (committed, tagged)._
+_Last reviewed: v0.7.0-rc2 (committed)._
 _See `git tag v0.7.0-rc1` (commit `1da61f9`, 2026-07-21)._
 _RC validation: test/rc/ — 0 unexpected regressions._
+_RC stabilization commits: `067cdd3` (transaction safety), `83f2736` (failover_
+_logging + error classification), `351c81d` (upgrade file cleanup + migration_
+_atomicity + UPSERT rowid fix)._
 
 ## 1. v0.7 — Signed package index
 
@@ -28,7 +31,10 @@ trusted key used for `repository.toml.sig`.
 ### Verification
 
 - Build: clean (`nix develop --command cmake --build build`).
-- Unit: `ctest -L unit` → **12/12 pass** (incl. new `meow-unit-pkgidx`).
+- Unit: `ctest -L unit` → **14/14 pass** (incl. `meow-unit-pkgidx`,
+  `meow-unit-failover`, `meow-unit-upgrade`). `meow-unit-history` has a
+  pre-existing build-time include issue (missing `sqlite3.h` in its cmake
+  target), not a test regression.
 - Integration: `ctest -L integration` → **21/24 pass** under both
   `MEOW_RESOLVER=legacy` and `MEOW_RESOLVER=sat`.
   - New `23.signed_index` → **13/13 pass** (happy path, strict happy, tampered

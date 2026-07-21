@@ -429,30 +429,32 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (argi >= argc) {
-    std::cerr << "usage: meow [--db-path <path>] <command> [args]\n"
-              << "  info   <package>\n"
-              << "  list\n"
-              << "  search <query>\n"
-              << "  install [--with-optional] [--optional <name>]... [--locked] <package>\n"
-              << "  group <list|install> [name]\n"
-              << "  upgrade <package>\n"
-              << "  remove <package>\n"
-              << "  installed\n"
-              << "  verify\n"
-              << "  repair [<package>]\n"
-              << "  sync\n"
-              << "  update [--dry-run]\n"
-               << "  owns <file>\n"
-               << "  required-by <package>\n"
-               << "  history [package]\n"
-              << "  why <package>\n"
-              << "  explicitly-installed\n"
-              << "  explain <package>\n"
-              << "  why-not <package>\n"
-              << "  keys list\n"
-               << "  keys add <file>\n"
-               << "  clean\n";
+    if (argi >= argc || std::string_view(argv[argi]) == "--help") {
+        std::cerr << "usage: meow [--db-path <path>] [--config <file>] [--repository <url>] <command> [args]\n"
+                  << "\n"
+                  << "Commands:\n"
+                  << "  info       <package>       show package details\n"
+                  << "  list                       list available packages\n"
+                  << "  search     <query>         search packages\n"
+                  << "  install    [flags] <pkg>   install a package and dependencies\n"
+                  << "  group      list|install    manage package groups\n"
+                  << "  upgrade    <package>       upgrade a package\n"
+                  << "  remove     <package>       remove a package\n"
+                  << "  installed                  list installed packages\n"
+                  << "  verify                     check installed file integrity\n"
+                  << "  repair     [<package>]     repair missing or modified files\n"
+                  << "  sync                       refresh repositories and check updates\n"
+                  << "  update     [--dry-run]     upgrade all packages\n"
+                  << "  owns       <file>          find which package owns a file\n"
+                  << "  required-by <package>      show reverse dependencies\n"
+                  << "  history    [package]       show install/remove history\n"
+                  << "  why        <package>       show why a package is installed\n"
+                  << "  explicitly-installed       list explicitly-installed packages\n"
+                  << "  explain    <package>       detailed package info (reason, requires, provides)\n"
+                  << "  why-not    <package>       show why a package cannot be installed\n"
+                  << "  doctor     [--json] [--security]  system diagnostics\n"
+                  << "  keys       list|add        manage trusted signing keys\n"
+                  << "  clean                      clear repository cache\n";
         return 1;
     }
 
@@ -804,7 +806,20 @@ int main(int argc, char** argv) {
                     std::to_string(updates.size()) + " update" + (updates.size() == 1 ? "" : "s") + " available");
             }
         } else if (cmd == "update") {
-            if (cmdArgc >= 2 && cmdArgv[1] == std::string_view("--dry-run")) {
+            bool dryRun = false;
+            if (cmdArgc >= 2) {
+                if (std::string_view(cmdArgv[1]) == "--dry-run") {
+                    dryRun = true;
+                } else if (std::string_view(cmdArgv[1]) == "--help") {
+                    std::cerr << "usage: meow update [--dry-run]\n";
+                    return 1;
+                } else {
+                    std::cerr << "error: unknown option: " << cmdArgv[1] << "\n"
+                              << "usage: meow update [--dry-run]\n";
+                    return 1;
+                }
+            }
+            if (dryRun) {
                 auto updates = meow::sync::checkUpdates(repo, db);
                 if (updates.empty()) {
                     std::cout << "All packages up to date\n";
