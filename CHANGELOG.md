@@ -2,46 +2,11 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **Database consistency after upgrade**: old file records in the `files` table
-  are now deleted before inserting the new version's file entries. Previously,
-  `upgradePackage` removed old files from disk but left their database records
-  in place, causing stale entries to persist after every upgrade.
-  (`meow/src/transaction/transaction.cpp` — new `clearExistingFiles` flag on
-  `Transaction::PackageEntry`; set in `upgrade.cpp`.)
-- **`registerPackage` rowid bug**: replaced `sqlite3_last_insert_rowid()` with
-  an explicit `SELECT id` after UPSERT. `last_insert_rowid` returned an
-  incorrect rowid when `INSERT … ON CONFLICT DO UPDATE` fired the UPDATE path
-  (observed on SQLite 3.51.2), causing new file entries to be linked to a
-  non-existent package row. (`meow/src/database/database.cpp:272`)
-- **Database migration atomicity**: the v1→v2 migration in `initializeDatabase`
-  now runs inside `BEGIN IMMEDIATE … COMMIT` with `ROLLBACK` on exception.
-  Previously, bare `sqlite3_exec` calls could leave the database half-migrated
-  if the process crashed mid-migration. (`meow/src/database/database.cpp:166-226`)
-- **HTTP backend log transparency**: `packages.toml`, `packages.toml.sig`, and
-  `packages.index` download failures now produce `log::Warning` messages instead
-  of being silently swallowed. (`meow/src/repository/http_backend.cpp:119-152`)
-- **`DownloadHttpError` classification**: HTTP 4xx errors are now mapped to
-  `RepositoryStatus::Unavailable` instead of `RepositoryStatus::NetworkError`,
-  since 4xx is a protocol rejection, not a transport fault.
-  (`meow/src/repository/status.cpp:14-19`)
-- **CLI usage text**: added missing `doctor` command to the help output;
-  `update` now rejects unknown options with a clear error message.
-  (`meow/src/main.cpp`)
-
 ### Added
 
-- `clearExistingFiles` field on `Transaction::PackageEntry` for upgrade
-  database-housekeeping (`meow/include/meow/transaction/transaction.hpp:17`)
-- `database::removePackageFiles()` to delete a package's file entries without
-  removing the package record (`meow/src/database/database.cpp`,
-  `meow/include/meow/database/database.hpp`)
-- `removePackageFiles` declared in `database.hpp` for use in the upgrade path.
-- Unit tests: `test/unit/failover_test.cpp` (9 tests covering
-  `isFailoverAllowed` and `classifyRepositoryError`),
-  `test/unit/upgrade_test.cpp` (4 tests covering upgrade file cleanup, fresh
-  no-clear, v1→v2 migration, idempotent reopen).
+*(next release)*
+
+## [0.7.0] - 2026-07-21
 
 ### Security
 

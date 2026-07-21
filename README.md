@@ -1,4 +1,4 @@
-# meowOS v0.7.0-rc1 — Package Manager
+# meowOS v0.7.0 — Package Manager
 
 A transactional Linux package manager with signed repositories, SAT-powered
 dependency resolution, signed package index, and verify/repair capabilities.

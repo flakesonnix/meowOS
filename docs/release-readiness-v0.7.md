@@ -1,7 +1,7 @@
 # Release-readiness report — v0.7 (signed package index) + SAT-default review
 
-_Last reviewed: v0.7.0-rc2 (committed, tagged)._
-_See `git tag v0.7.0-rc2` (commit `53e0ae0`, 2026-07-21)._
+_Last reviewed: v0.7.0 (final release)._
+_See `git tag v0.7.0`._
 _RC stabilization commits:_
 _— `067cdd3` transaction safety (BEGIN/COMMIT/ROLLBACK wrapper)_
 _— `83f2736` failover logging + `DownloadHttpError` classification_
@@ -29,7 +29,7 @@ trusted key used for `repository.toml.sig`.
 | Backwards-compatible (absent index → warn/continue) | Done (default `false`) |
 | HTTP backend index download/verify | Done |
 
-### Verification (v0.7.0-rc2)
+### Verification (v0.7.0)
 
 - Build: clean (`cmake --build build` — all targets except
   `meow-unit-history` which has a pre-existing `sqlite3.h` include issue).

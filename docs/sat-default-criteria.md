@@ -81,13 +81,13 @@ The following criteria were used to gate the flip:
 | Step | Date | Commit |
 |------|------|--------|
 | `SatResolver` reaches parity (correctness + perf + robustness) | v0.7 | see release-readiness report |
-| RC validation (0 unexpected regressions) | v0.7.0-rc1 | `1da61f9` |
+| RC validation (0 unexpected regressions) | v0.7.0 | `1da61f9` |
 | `ResolverEngine::Auto` → `SatResolver` (the actual default flip) | **not yet done** | planned after v0.7.0 |
 | Docs reflect SAT as default | pending the flip | — |
 | Legacy stays selectable via config/env | yes (today) | — |
 | Follow-up issue filed to remove Legacy | after a stabilization window | — |
 
-> **Status (v0.7.0-rc1):** all blocking criteria (§1–§4) are met
+> **Status (v0.7.0):** all blocking criteria (§1–§4) are met
 > *except* the actual `Auto → Sat` code change and its release-note paragraph.
 > RC validation confirmed **0 unexpected regressions** — the flip is safe but
 > deliberately deferred to a separate commit after v0.7.0 final.
