@@ -905,6 +905,32 @@ int main(int argc, char** argv) {
         } else if (cmd == "clean") {
             meow::repository::clearRepositoryCache();
             std::cout << "cache cleared\n";
+        } else if (cmd == "bootstrap") {
+            bool verbose = false;
+            std::string rootfsPath;
+            std::vector<std::string> packageNames;
+
+            for (int i = 1; i < cmdArgc; ++i) {
+                if (std::string_view(cmdArgv[i]) == "--verbose") {
+                    verbose = true;
+                } else if (rootfsPath.empty()) {
+                    rootfsPath = cmdArgv[i];
+                } else {
+                    packageNames.push_back(cmdArgv[i]);
+                }
+            }
+
+            if (rootfsPath.empty()) {
+                std::cerr << "usage: meow bootstrap [--verbose] <rootfs> <packages...>\n";
+                return 1;
+            }
+
+            if (packageNames.empty()) {
+                std::cerr << "usage: meow bootstrap [--verbose] <rootfs> <packages...>\n";
+                return 1;
+            }
+
+            meow::bootstrap::bootstrapRootFS(rootfsPath, packageNames, verbose);
         } else {
             std::cerr << "unknown command: " << cmd << "\n";
             return 1;

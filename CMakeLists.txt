@@ -57,6 +57,57 @@ set(MEOW_SOURCES
 
 # Shared core library (everything except the CLI entry points) so unit tests
 # can link the backend, resolver, and package loader without a main().
+set(MEOW_SOURCES
+    meow/src/archive/archive.cpp
+    meow/src/package/parser.cpp
+    meow/src/package/load.cpp
+    meow/src/repository/repository.cpp
+    meow/src/repository/backend.cpp
+    meow/src/repository/http_backend.cpp
+    meow/src/repository/manager.cpp
+    meow/src/repository/security_policy.cpp
+    meow/src/repository/package_index.cpp
+    meow/src/repository/status.cpp
+    meow/src/repository/failover.cpp
+    meow/src/repository/refresh.cpp
+    meow/src/repository/version.cpp
+    meow/src/repository/resolver.cpp
+    meow/src/install/installer.cpp
+    meow/src/download/downloader.cpp
+    meow/src/download/queue.cpp
+    meow/src/error/printer.cpp
+    meow/src/database/database.cpp
+    meow/src/doctor/doctor.cpp
+    meow/src/hooks/runner.cpp
+    meow/src/dependency/resolver.cpp
+    meow/src/dependency/constraint.cpp
+    meow/src/dependency/legacy_resolver.cpp
+    meow/src/dependency/sat_resolver.cpp
+    meow/src/dependency/resolver_factory.cpp
+    meow/src/sat/problem.cpp
+    meow/src/sat/solver.cpp
+    meow/src/sat/dpll.cpp
+    meow/src/sat/translate.cpp
+    meow/src/transaction/transaction.cpp
+    meow/src/remove/remove.cpp
+    meow/src/upgrade/upgrade.cpp
+    meow/src/lock/lockfile.cpp
+    meow/src/lock/install_lock.cpp
+    meow/src/verify/verifier.cpp
+    meow/src/repair/repair.cpp
+    meow/src/sync/sync.cpp
+    meow/src/update/updater.cpp
+    meow/src/log/logger.cpp
+    meow/src/config/config.cpp
+    meow/src/crypto/signature.cpp
+    meow/src/crypto/keystore.cpp
+    meow/src/builder/builder.cpp
+    meow/src/repo-builder/repo_builder.cpp
+    meow/src/format/version.cpp
+    meow/src/database/migration.cpp
+    meow/src/bootstrap/bootstrap.cpp
+)
+
 add_library(meow_core STATIC ${MEOW_SOURCES})
 target_include_directories(meow_core PRIVATE ${PROJECT_SOURCE_DIR}/meow/include)
 

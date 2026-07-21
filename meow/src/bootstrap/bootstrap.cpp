@@ -28,9 +28,10 @@ namespace meow::bootstrap {
 
         auto dbPath = target / "var" / "lib" / "meow" / "database.sqlite";
         auto db = meow::database::openDatabase(dbPath.string());
-        meow::database::initializeDatabase(db);
-
         if (verbose) {
+            meow::log::log(meow::LogLevel::Info, "bootstrap database initialized");
+            meow::log::log(meow::LogLevel::Info, "bootstrap transaction started");
+        } else {
             meow::log::log(meow::LogLevel::Info, "bootstrap database initialized");
         }
 
