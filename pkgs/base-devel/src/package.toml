@@ -1,0 +1,6 @@
+format_version = 1
+name = "base-devel"
+version = "1.0.0"
+architecture = "AMD64"
+description = "Build toolchain meta package (gcc, binutils, make, cmake, ...)"
+depends = []

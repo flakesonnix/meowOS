@@ -1,0 +1,4 @@
+[artifact]
+filename = "base-devel-1.0.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/base-devel-1.0.0.pkg.tar.zst"
+sha256 = "3b3f9fc99876aa3f815f9430378f68366a796e68caf04c12a039d4e0bdde0143"
