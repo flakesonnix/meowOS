@@ -1,11 +1,18 @@
 format_version = 1
-generated = "2026-07-22T08:01:28Z"
+generated = "2026-07-22T08:15:06Z"
 
 [[package]]
 name = "gtk4"
 version = "1.0.0"
 manifest_hash = "sha256:cb931e87724be3a3f227f2874ba077637f8fa691e1378b71cecd2a2e5ad92070"
 artifact_hash = "sha256:5eda3d652b347f108b00ca27dc567bb876763227c31cd56978a4944b5c7d6859"
+size = 0
+
+[[package]]
+name = "base-devel"
+version = "1.0.0"
+manifest_hash = "sha256:64cbc24f233d3cd0ba0f45eb6e7dc9ce87c3de0b61651d6e13c0afacaea89ad4"
+artifact_hash = "sha256:3b3f9fc99876aa3f815f9430378f68366a796e68caf04c12a039d4e0bdde0143"
 size = 0
 
 [[package]]
