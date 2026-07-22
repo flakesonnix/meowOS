@@ -1,5 +1,5 @@
 format_version = 1
-generated = "2026-07-22T08:52:52Z"
+generated = "2026-07-22T14:39:54Z"
 
 [[package]]
 name = "base-devel"
@@ -9,9 +9,23 @@ artifact_hash = "sha256:3b3f9fc99876aa3f815f9430378f68366a796e68caf04c12a039d4e0
 size = 0
 
 [[package]]
+name = "binutils"
+version = "2.46.1"
+manifest_hash = "sha256:1dba7c32ff451b64c0387f282d1b9be4ca8b5400293afa0fb22a447b7b214c44"
+artifact_hash = "sha256:a2f37f597139e1ff8cc34becd147aaff9ba808bfc8f19b0b8b66870ccb127716"
+size = 776
+
+[[package]]
 name = "filesystem"
 version = "1.0.0"
 manifest_hash = "sha256:cd0a39f3a6e217aa5e91ba4add167dec21882df7d9d6e4193e3fbcce6259d385"
 artifact_hash = "sha256:16bba8ec3e5994f8fdad43c47f53c1121876bfa9805e085054bd244f75e97c6c"
+size = 0
+
+[[package]]
+name = "linux"
+version = "6.14.11"
+manifest_hash = "sha256:2b2c7ccebbd8273e9c69b1aa952f80f90e3c9092bb5b6ef40c3156fbeecd0515"
+artifact_hash = "sha256:fc50738e748d79ef5ad5d8ca856d489a5e9424bdc5fa206d7c533fca9c12c8c1"
 size = 0
 
