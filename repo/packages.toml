@@ -1,12 +1,5 @@
 format_version = 1
-generated = "2026-07-22T08:15:06Z"
-
-[[package]]
-name = "gtk4"
-version = "1.0.0"
-manifest_hash = "sha256:cb931e87724be3a3f227f2874ba077637f8fa691e1378b71cecd2a2e5ad92070"
-artifact_hash = "sha256:5eda3d652b347f108b00ca27dc567bb876763227c31cd56978a4944b5c7d6859"
-size = 0
+generated = "2026-07-22T08:52:52Z"
 
 [[package]]
 name = "base-devel"
@@ -16,100 +9,9 @@ artifact_hash = "sha256:3b3f9fc99876aa3f815f9430378f68366a796e68caf04c12a039d4e0
 size = 0
 
 [[package]]
-name = "app"
-version = "1.0.0"
-manifest_hash = "sha256:79858ca371fd7ab71dda7d431090f100dbaf21627bf9dc8205e15ac221bd14fc"
-artifact_hash = "sha256:360202efb344c516c16e0947c18d021bc3beba299bbffdacd754919af9e5252d"
-size = 0
-
-[[package]]
-name = "qt6"
-version = "1.0.0"
-manifest_hash = "sha256:06739de51f76d9d1cf443a6f8f899270741cc3d7b11e68f84dd936856d85feb1"
-artifact_hash = "sha256:b9a77281461b7a3890b170fa2e91175a1e56ed983ac49f249627eaf7c473b573"
-size = 0
-
-[[package]]
-name = "hello"
-version = "1.0.0"
-manifest_hash = "sha256:c574bffe0335772676d0368655f360bb4b2f7131658188f46907fec88ab12088"
-artifact_hash = "sha256:7ab2ef9b67701a2265e804d0964740550de72c9b4ddc9c70afdf0396906c1e68"
-size = 0
-
-[[package]]
-name = "hello"
-version = "1.1.0"
-manifest_hash = "sha256:04b2a58f781330daa0fb6dc3a5981200be40769d8aa6675b1a5060709d2dc0fc"
-artifact_hash = "sha256:d7965a1aa93ae9943938009bbd4be2f51948e0d52652b883548d8c6ca4fd7b61"
-size = 336
-
-[[package]]
 name = "filesystem"
 version = "1.0.0"
 manifest_hash = "sha256:cd0a39f3a6e217aa5e91ba4add167dec21882df7d9d6e4193e3fbcce6259d385"
 artifact_hash = "sha256:16bba8ec3e5994f8fdad43c47f53c1121876bfa9805e085054bd244f75e97c6c"
-size = 0
-
-[[package]]
-name = "myapp"
-version = "1.0.0"
-manifest_hash = "sha256:edb74a74017ff994102ae64cdcba3c99cc4bb063890dde66cb83c8772e7d2f5b"
-artifact_hash = "sha256:bfc28a3c3ad0157b644a9a4eec610001f0b4f2c844f1c7b7391902a29d751540"
-size = 0
-
-[[package]]
-name = "myapp-exact"
-version = "1.0.0"
-manifest_hash = "sha256:969df067e2bee6ed5dbd5b831819d34a6023531f29349204b6de93e012ae2c44"
-artifact_hash = "sha256:45aa74cdda200705d0d82e2b001226cb77419a18aa8e68046095280e533499b6"
-size = 0
-
-[[package]]
-name = "libfoo"
-version = "1.0.0"
-manifest_hash = "sha256:f437e89e47bf6ed43668cfcab2062338ee4e853a3ad27190f71dc46c2e0cf892"
-artifact_hash = "sha256:286d0bd356fb22f47f63760c4775d507c7089fba6f6860ba37e885005217f787"
-size = 0
-
-[[package]]
-name = "libbar"
-version = "1.0.0"
-manifest_hash = "sha256:a997e7c840cf996612f90876d55aaba55f9705c957fbe8ca963a15b63a7c35ce"
-artifact_hash = "sha256:c5e16f3abb6e314330e4ff88786dded3aeed14346fbb614307559fbe4ee3e84b"
-size = 0
-
-[[package]]
-name = "libbar"
-version = "3.0.0"
-manifest_hash = "sha256:3af98f7c7a69212dfcbaac667430b549c257b864955608ba26627bb6ea776171"
-artifact_hash = "sha256:9af8be87731c09386c5370610739ddff5846f5831b9e0d2302aec9ce807ff7f3"
-size = 0
-
-[[package]]
-name = "libbar"
-version = "2.0.0"
-manifest_hash = "sha256:c9f83eca061a3ae95408c3fc7cb11e7d8d9f40bc1d133fa5f67c5d70c024674f"
-artifact_hash = "sha256:8d8d315caf65f24f6ad11831d9654b85a1ff1670287464e3c0fc944c11938150"
-size = 0
-
-[[package]]
-name = "hookslow"
-version = "1.0.0"
-manifest_hash = "sha256:11847c0c483f13eeeadef5de05d7afc8bfcb636818267ad54e8a9b62595e0369"
-artifact_hash = "sha256:653dad324c923cf8112caeba7cc700d377364776de460734c15a946d676b85ff"
-size = 0
-
-[[package]]
-name = "hookbad"
-version = "1.0.0"
-manifest_hash = "sha256:7fe35bdbbcbb321a3fe8bcbc5d837e7fa0dcce794bdfd9e40ed974cf2c99cbcc"
-artifact_hash = "sha256:7f9b97650ccd9c41ef1d8e7540eb7ed5a00e0cf47deadcd1609ebc4edb0f8504"
-size = 0
-
-[[package]]
-name = "hookok"
-version = "1.0.0"
-manifest_hash = "sha256:cf3ca1712182aa91e848dfc6acc31e9d79d05bc097ac1844e75a36c0e780cd11"
-artifact_hash = "sha256:1efb6c0a8e2fe1fc555283dbf43eccc0abd356a52ee2123353515f942b85f114"
 size = 0
 

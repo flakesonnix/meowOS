@@ -52,7 +52,10 @@ create_repo_fixture() {
     local work="$FIXTURE_ROOT/repo-work-$FIXTURE_SEQ"
     rm -rf "$work"
     mkdir -p "$work"
-    _copy_repo repo "$work/repo"
+    _copy_repo "$ROOT_DIR/repo" "$work/repo"
+    if [ -d "$ROOT_DIR/test/repo" ]; then
+        rsync -a "$ROOT_DIR/test/repo/" "$work/repo/"
+    fi
     echo "$work"
 }
 
@@ -65,6 +68,19 @@ _copy_repo() {
         cp\ -al)  cp -al "$src" "$dst" 2>/dev/null || cp -a "$src" "$dst" ;;
         *)        cp -a "$src" "$dst" ;;
     esac
+}
+
+# Sync test fixture packages from test/repo/ into the canonical repo/ so that
+# sections referencing repo/ directly see fixture packages. Runs after any
+# function that modifies test/repo/by-name/.
+_sync_test_repo() {
+    if [ -d "$ROOT_DIR/test/repo/by-name" ]; then
+        rsync -a "$ROOT_DIR/test/repo/by-name/" "$ROOT_DIR/repo/by-name/"
+    fi
+    "$ROOT_DIR/build/meow-repo" sign --key "$KEYS_DIR/meow-release.pem" \
+        --key-id meow-release --repo "$ROOT_DIR/repo" >/dev/null 2>&1 || true
+    "$ROOT_DIR/build/meow-repo" sign --key "$KEYS_DIR/meow-release.pem" \
+        --key-id meow-release --repo "$ROOT_DIR/test/repo" >/dev/null 2>&1 || true
 }
 
 # Build an isolated HOME directory containing a copy of the trusted keys and an
@@ -187,8 +203,8 @@ registerOptPkg() {
     local name="$1" version="$2" binpath="$3"
     local sha
     sha=$(buildPkg "$name" "$version" "$binpath")
-    mkdir -p "repo/by-name/${name:0:2}/$name/versions"
-    cat > "repo/by-name/${name:0:2}/$name/package.toml" << EOF
+    mkdir -p "$ROOT_DIR/test/repo/by-name/${name:0:2}/$name/versions"
+    cat > "$ROOT_DIR/test/repo/by-name/${name:0:2}/$name/package.toml" << EOF
 format_version = 1
 [metadata]
 name = "$name"
@@ -196,13 +212,13 @@ version = "$version"
 architecture = "AMD64"
 description = "optional fixture"
 EOF
-    cat > "repo/by-name/${name:0:2}/$name/versions/$version.toml" << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/${name:0:2}/$name/versions/$version.toml" << EOF
 [artifact]
 filename = "$name-$version.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/$name-$version.pkg.tar.zst"
 sha256 = "$sha"
 EOF
-    "$ROOT_DIR/build/meow-repo" sign --key "$KEYS_DIR/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    _sync_test_repo
 }
 
 reproBuild() {
@@ -231,8 +247,8 @@ EOF
     local arch="/tmp/meow-artifacts/$name-$version.pkg.tar.zst"
     local sha
     sha=$(sha256sum "$arch" | cut -d' ' -f1)
-    mkdir -p "repo/by-name/${name:0:2}/$name/versions"
-    cat > "repo/by-name/${name:0:2}/$name/package.toml" << EOF
+    mkdir -p "$ROOT_DIR/test/repo/by-name/${name:0:2}/$name/versions"
+    cat > "$ROOT_DIR/test/repo/by-name/${name:0:2}/$name/package.toml" << EOF
 format_version = 1
 [metadata]
 name = "$name"
@@ -240,13 +256,13 @@ version = "$version"
 architecture = "AMD64"
 description = "hook fixture"
 EOF
-    cat > "repo/by-name/${name:0:2}/$name/versions/$version.toml" << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/${name:0:2}/$name/versions/$version.toml" << EOF
 [artifact]
 filename = "$name-$version.pkg.tar.zst"
 url = "file://$arch"
 sha256 = "$sha"
 EOF
-    "$ROOT_DIR/build/meow-repo" sign --key "$KEYS_DIR/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    _sync_test_repo
 }
 
 bootstrapArtifacts() {
@@ -262,34 +278,34 @@ bootstrapArtifacts() {
     mya=$(buildPkg myapp 1.0.0 usr/bin/myapp 'depends = ["libbar>=2.0"]')
     mx=$(buildPkg myapp-exact 1.0.0 usr/bin/myapp-exact 'depends = ["libbar=1.0"]')
 
-    cat > repo/by-name/he/hello/versions/1.0.0.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/he/hello/versions/1.0.0.toml" << EOF
 [artifact]
 filename = "hello-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/hello-1.0.0.pkg.tar.zst"
 sha256 = "$h10"
 EOF
-    cat > repo/by-name/he/hello/versions/1.1.0.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/he/hello/versions/1.1.0.toml" << EOF
 [artifact]
 filename = "hello-1.1.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/hello-1.1.0.pkg.tar.zst"
 sha256 = "$h11"
 EOF
-    cat > repo/by-name/li/libfoo/versions/1.0.0.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/li/libfoo/versions/1.0.0.toml" << EOF
 [artifact]
 filename = "libfoo-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/libfoo-1.0.0.pkg.tar.zst"
 sha256 = "$lf"
 EOF
-    cat > repo/by-name/ap/app/versions/1.0.0.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/ap/app/versions/1.0.0.toml" << EOF
 [artifact]
 filename = "app-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/app-1.0.0.pkg.tar.zst"
 sha256 = "$a10"
 EOF
-    mkdir -p repo/by-name/li/libbar/versions \
-             repo/by-name/my/myapp/versions \
-             repo/by-name/my/myapp-exact/versions
-    cat > repo/by-name/li/libbar/package.toml << EOF
+    mkdir -p "$ROOT_DIR/test/repo/by-name/li/libbar/versions" \
+             "$ROOT_DIR/test/repo/by-name/my/myapp/versions" \
+             "$ROOT_DIR/test/repo/by-name/my/myapp-exact/versions"
+    cat > "$ROOT_DIR/test/repo/by-name/li/libbar/package.toml" << EOF
 format_version = 1
 [metadata]
 name = "libbar"
@@ -297,25 +313,25 @@ version = "1.0.0"
 architecture = "AMD64"
 description = "version constraint fixture"
 EOF
-    cat > repo/by-name/li/libbar/versions/1.0.0.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/li/libbar/versions/1.0.0.toml" << EOF
 [artifact]
 filename = "libbar-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/libbar-1.0.0.pkg.tar.zst"
 sha256 = "$lb10"
 EOF
-    cat > repo/by-name/li/libbar/versions/2.0.0.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/li/libbar/versions/2.0.0.toml" << EOF
 [artifact]
 filename = "libbar-2.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/libbar-2.0.0.pkg.tar.zst"
 sha256 = "$lb20"
 EOF
-    cat > repo/by-name/li/libbar/versions/3.0.0.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/li/libbar/versions/3.0.0.toml" << EOF
 [artifact]
 filename = "libbar-3.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/libbar-3.0.0.pkg.tar.zst"
 sha256 = "$lb30"
 EOF
-    cat > repo/by-name/my/myapp/package.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/my/myapp/package.toml" << EOF
 format_version = 1
 [metadata]
 name = "myapp"
@@ -324,13 +340,13 @@ architecture = "AMD64"
 description = "version constraint fixture"
 depends = ["libbar>=2.0"]
 EOF
-    cat > repo/by-name/my/myapp/versions/1.0.0.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/my/myapp/versions/1.0.0.toml" << EOF
 [artifact]
 filename = "myapp-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/myapp-1.0.0.pkg.tar.zst"
 sha256 = "$mya"
 EOF
-    cat > repo/by-name/my/myapp-exact/package.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/my/myapp-exact/package.toml" << EOF
 format_version = 1
 [metadata]
 name = "myapp-exact"
@@ -339,7 +355,7 @@ architecture = "AMD64"
 description = "version constraint fixture"
 depends = ["libbar=1.0"]
 EOF
-    cat > repo/by-name/my/myapp-exact/versions/1.0.0.toml << EOF
+    cat > "$ROOT_DIR/test/repo/by-name/my/myapp-exact/versions/1.0.0.toml" << EOF
 [artifact]
 filename = "myapp-exact-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/myapp-exact-1.0.0.pkg.tar.zst"
@@ -348,7 +364,7 @@ EOF
     rm -rf /tmp/meow-http-root
     mkdir -p /tmp/meow-http-root
     cp /tmp/meow-artifacts/*.pkg.tar.zst /tmp/meow-http-root/
-    "$ROOT_DIR/build/meow-repo" sign --key "$KEYS_DIR/meow-release.pem" --key-id meow-release --repo repo >/dev/null 2>&1 || true
+    _sync_test_repo
 }
 
 HTTP_PID=""

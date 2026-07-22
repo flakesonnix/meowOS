@@ -7,9 +7,10 @@ cmake-build-debug/
 .DS_Store
 meow.lock
 
-# test-generated sample repo packages
-repo/by-name/ho/
-repo/by-name/hs/
+# test fixture repo — generated files
+test/repo/packages.toml
+test/repo/packages.toml.sig
+test/repo/repository.toml.sig
 
 # RC validation — generated artifacts, not committed
 test/rc/artifacts/
