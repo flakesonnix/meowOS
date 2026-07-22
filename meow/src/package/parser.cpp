@@ -65,6 +65,13 @@ namespace meow::package {
             }
         }
 
+        // Bootstrap stage metadata (0=normal, 1=stage1, 2=stage2, 3=final)
+        if (auto stage = tbl["bootstrapStage"].value<int>()) {
+            if (*stage >= 0 && *stage <= 3) {
+                metadata.bootstrapStage = *stage;
+            }
+        }
+
         return metadata;
     }
 }

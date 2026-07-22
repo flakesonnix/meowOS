@@ -28,6 +28,7 @@ namespace meow::package {
         meow::types::Dependencies replaces;
         std::vector<meow::types::OptionalDependency> optionalDependencies;
         BuildInfo build;
+        std::optional<int> bootstrapStage; // 0=normal, 1=stage1, 2=stage2, 3=final
     };
 
     struct PackageFile {
