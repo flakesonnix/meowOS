@@ -1,0 +1,10 @@
+format_version = 1
+name = "test"
+repository_id = "test"
+
+generated = "2026-07-22T00:00:00Z"
+expires = "2099-01-01T00:00:00Z"
+
+[[mirror]]
+url = "./repo"
+priority = 10
