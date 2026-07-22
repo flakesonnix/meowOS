@@ -39,6 +39,8 @@ namespace meow::builder {
             std::string content;
             bool executable{false};
             bool isDir{false};
+            bool isSymlink{false};
+            std::string symlinkTarget;
         };
 
         std::string readFileContent(const std::filesystem::path& path) {
@@ -61,9 +63,15 @@ namespace meow::builder {
                         std::vector<ArchiveEntry>& files) {
             if (!std::filesystem::is_directory(diskDir)) return;
             for (const auto& e : std::filesystem::recursive_directory_iterator(diskDir)) {
-                auto rel = std::filesystem::relative(e.path(), diskDir).string();
+                auto rel = e.path().lexically_relative(diskDir).string();
                 auto archiveName = prefix + "/" + rel;
-                if (e.is_directory()) {
+                if (e.is_symlink()) {
+                    ArchiveEntry se;
+                    se.name = archiveName;
+                    se.isSymlink = true;
+                    se.symlinkTarget = std::filesystem::read_symlink(e.path()).string();
+                    files.push_back(std::move(se));
+                } else if (e.is_directory()) {
                     ArchiveEntry de;
                     de.name = archiveName + "/";
                     de.isDir = true;
@@ -96,11 +104,16 @@ namespace meow::builder {
             archive_entry_set_ctime(entry, static_cast<time_t>(mtime), 0);
             archive_entry_set_atime(entry, static_cast<time_t>(mtime), 0);
 
-            if (!e.isDir) {
+            if (e.isSymlink) {
+                archive_entry_set_filetype(entry, AE_IFLNK);
+                archive_entry_set_symlink(entry, e.symlinkTarget.c_str());
+            } else if (e.isDir) {
+                archive_entry_set_size(entry, 0);
+            } else {
                 archive_entry_set_size(entry, static_cast<la_int64_t>(e.content.size()));
             }
             archive_write_header(a, entry);
-            if (!e.isDir && !e.content.empty()) {
+            if (!e.isDir && !e.isSymlink && !e.content.empty()) {
                 archive_write_data(a, e.content.data(), e.content.size());
             }
             archive_entry_free(entry);

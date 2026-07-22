@@ -26,6 +26,7 @@
 #include <meow/sync/sync.hpp>
 #include <meow/update/updater.hpp>
 #include <meow/crypto/keystore.hpp>
+#include <meow/bootstrap/bootstrap.hpp>
 
 namespace {
     const auto lockfilePath = std::filesystem::path("meow.lock");
@@ -907,12 +908,15 @@ int main(int argc, char** argv) {
             std::cout << "cache cleared\n";
         } else if (cmd == "bootstrap") {
             bool verbose = false;
+            bool quiet = false;
             std::string rootfsPath;
             std::vector<std::string> packageNames;
 
             for (int i = 1; i < cmdArgc; ++i) {
                 if (std::string_view(cmdArgv[i]) == "--verbose") {
                     verbose = true;
+                } else if (std::string_view(cmdArgv[i]) == "--quiet") {
+                    quiet = true;
                 } else if (rootfsPath.empty()) {
                     rootfsPath = cmdArgv[i];
                 } else {
@@ -920,13 +924,18 @@ int main(int argc, char** argv) {
                 }
             }
 
+            if (verbose && quiet) {
+                std::cerr << "error: --verbose and --quiet are mutually exclusive\n";
+                return 1;
+            }
+
             if (rootfsPath.empty()) {
-                std::cerr << "usage: meow bootstrap [--verbose] <rootfs> <packages...>\n";
+                std::cerr << "usage: meow bootstrap [--verbose] [--quiet] <rootfs> <packages...>\n";
                 return 1;
             }
 
             if (packageNames.empty()) {
-                std::cerr << "usage: meow bootstrap [--verbose] <rootfs> <packages...>\n";
+                std::cerr << "usage: meow bootstrap [--verbose] [--quiet] <rootfs> <packages...>\n";
                 return 1;
             }
 

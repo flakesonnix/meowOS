@@ -1,8 +1,18 @@
 #include <iomanip>
 #include <iostream>
+#include <set>
 #include <string>
 
 #include <meow/bootstrap/bootstrap.hpp>
+#include <meow/config/config.hpp>
+#include <meow/database/database.hpp>
+#include <meow/dependency/iresolver.hpp>
+#include <meow/error/error.hpp>
+#include <meow/install/installer.hpp>
+#include <meow/log/logger.hpp>
+#include <meow/repository/manager.hpp>
+#include <meow/repository/resolver.hpp>
+#include <meow/types/types.hpp>
 
 namespace meow::bootstrap {
 
@@ -30,35 +40,27 @@ namespace meow::bootstrap {
             std::filesystem::create_directories(target, ec);
         }
 
-        std::string skeletonSubdirs[] = {"dev", "proc", "sys", "run", "etc",
-                                          "usr", "var", "home",
-                                          "var/lib/meow", "var/log"};
-        for (const auto& sub : skeletonSubdirs) {
-            std::filesystem::create_directories(target / sub, ec);
-        }
+        // Only create what must exist before the first package install:
+        // the target root and the database directory.
+        std::filesystem::create_directories(target / "var/lib/meow", ec);
 
-        auto db = meow::database::openDatabase(dbPath.string());
         logPhase("Loading repositories");
-
-        meow::log::log(meow::LogLevel::Info, "Initializing database...");
-        logPhase("Resolving dependencies");
 
         auto cfg = meow::config::defaultConfig();
 
-        if (verbose) {
-            meow::log::log(meow::LogLevel::Info, "Resolver: " + 
-                (cfg.resolverEngine == meow::config::ResolverEngine::Sat ? "SAT" : "legacy"));
-        }
-
         meow::repository::RepositoryManager manager(cfg);
-        auto repo = manager.mergedRepository();
+        auto& repo = manager.mergedRepository();
 
         if (verbose) {
+            meow::log::log(meow::log::LogLevel::Info,
+                           std::string("Resolver: ") +
+                           (cfg.resolverEngine == meow::config::ResolverEngine::Sat
+                                ? "SAT" : "legacy"));
             std::cout << "Repositories:\n";
             for (const auto& s : manager.repositories()) {
-                if (s.status == meow::repository::RepositoryStatus::Available && 
+                if (s.status == meow::repository::RepositoryStatus::Available &&
                     !s.config.id.empty()) {
-                    std::cout << "  " << std::left << std::setw(10) 
+                    std::cout << "  " << std::left << std::setw(10)
                               << s.config.id << " (priority " << s.config.priority << ")\n";
                 }
             }
@@ -66,13 +68,7 @@ namespace meow::bootstrap {
             std::cout << "Loaded " << manager.availableCount() << " repositories\n";
         }
 
-        if (verbose) {
-            std::cout << "\nResolved packages:\n";
-            for (const auto& p : resolution.packages) {
-                std::cout << "  " << std::left << std::setw(15) 
-                          << p.name.value << " " << p.version.value << "\n";
-            }
-        }
+        logPhase("Resolving dependencies");
 
         auto resolver = meow::dependency::makeResolver(cfg.resolverEngine);
         meow::dependency::ResolveRequest rreq;
@@ -80,11 +76,24 @@ namespace meow::bootstrap {
             rreq.roots.push_back(meow::types::PackageName{n});
         auto resolution = resolver->resolve(repo, rreq);
 
+        if (verbose && resolution.ok) {
+            meow::log::log(meow::log::LogLevel::Info, "target rootfs: " + target.string());
+            meow::log::log(meow::log::LogLevel::Info, "requested packages:");
+            for (const auto& n : packageNames)
+                meow::log::log(meow::log::LogLevel::Info, "  " + n);
+            meow::log::log(meow::log::LogLevel::Info, "Resolving dependencies...");
+            meow::log::log(meow::log::LogLevel::Info, "Resolved install order:");
+            std::cout << "\nResolved packages:\n";
+            for (const auto& p : resolution.packages) {
+                std::cout << "  " << std::left << std::setw(15)
+                          << p.name.value << " " << p.version.value << "\n";
+            }
+        }
+
         if (!resolution.ok) {
             std::cerr << "Bootstrap failed\n\n";
             std::cerr << "Target root:  " << target << "\n";
             std::cerr << "Stage:        Resolving dependencies\n";
-            meow::database::closeDatabase(db);
             for (const auto& d : resolution.diagnostics)
                 std::cerr << "Reason:      " << d.message << "\n";
             std::cerr << "\nRollback completed.\n";
@@ -94,25 +103,12 @@ namespace meow::bootstrap {
             );
         }
 
-        if (verbose) {
-            meow::log::log(meow::LogLevel::Info, "target rootfs: " + target.string());
-            meow::log::log(meow::LogLevel::Info, "requested packages:");
-            for (const auto& n : packageNames)
-                meow::log::log(meow::LogLevel::Info, "  " + n);
-            meow::log::log(meow::LogLevel::Info, "Resolving dependencies...");
-            meow::log::log(meow::LogLevel::Info, "Resolved install order:");
-            for (const auto& p : resolution.packages)
-                meow::log::log(meow::LogLevel::Info, "  " + p.name.value);
-        }
-
         std::vector<std::pair<meow::types::PackageName, meow::types::PackageVersion>> selected;
         std::set<std::string> requested;
         for (const auto& p : resolution.packages) {
             selected.emplace_back(p.name, p.version);
             if (p.isRoot) requested.insert(p.name.value);
         }
-
-        bool quiet = !verbose;
 
         std::vector<meow::package::PackageFile> toInstall;
         for (size_t i = 0; i < selected.size(); ++i) {
@@ -127,16 +123,21 @@ namespace meow::bootstrap {
 
         logPhase("Installing packages");
 
-        meow::install::installPackages(toInstall, requested,
-                                       meow::database::InstallReason::Explicit,
-                                       target, db);
-
-        meow::database::closeDatabase(db);
+        auto db = meow::database::openDatabase(dbPath.string());
+        try {
+            meow::install::installPackages(toInstall, requested,
+                                           meow::database::InstallReason::Explicit,
+                                           target, db);
+            meow::database::closeDatabase(db);
+        } catch (...) {
+            meow::database::closeDatabase(db);
+            throw;
+        }
 
         logPhase("Finalizing bootstrap");
 
         int filesCount = 0;
-        auto db = meow::database::openDatabase(dbPath.string());
+        db = meow::database::openDatabase(dbPath.string());
         auto installed = meow::database::listInstalled(db);
         meow::database::closeDatabase(db);
 
