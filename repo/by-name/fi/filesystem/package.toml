@@ -1,0 +1,7 @@
+format_version = 1
+
+[metadata]
+name = "filesystem"
+version = "1.0.0"
+architecture = "AMD64"
+description = "Base filesystem hierarchy (usr-merged)"

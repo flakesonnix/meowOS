@@ -1,5 +1,5 @@
 format_version = 1
-generated = "2026-07-20T20:47:55Z"
+generated = "2026-07-22T08:01:28Z"
 
 [[package]]
 name = "gtk4"
@@ -35,6 +35,13 @@ version = "1.1.0"
 manifest_hash = "sha256:04b2a58f781330daa0fb6dc3a5981200be40769d8aa6675b1a5060709d2dc0fc"
 artifact_hash = "sha256:d7965a1aa93ae9943938009bbd4be2f51948e0d52652b883548d8c6ca4fd7b61"
 size = 336
+
+[[package]]
+name = "filesystem"
+version = "1.0.0"
+manifest_hash = "sha256:cd0a39f3a6e217aa5e91ba4add167dec21882df7d9d6e4193e3fbcce6259d385"
+artifact_hash = "sha256:16bba8ec3e5994f8fdad43c47f53c1121876bfa9805e085054bd244f75e97c6c"
+size = 0
 
 [[package]]
 name = "myapp"
@@ -81,21 +88,21 @@ size = 0
 [[package]]
 name = "hookslow"
 version = "1.0.0"
-manifest_hash = "sha256:4ebc7c081918b924c8c6b4d9eae5a8cbf5ca58eb5ec1a2a93f2f17bd8492e674"
-artifact_hash = "sha256:0064b72215173ca80edb7a9d78597ac97e1f40ce9ff25fa78d1cf4e2b421cf43"
+manifest_hash = "sha256:11847c0c483f13eeeadef5de05d7afc8bfcb636818267ad54e8a9b62595e0369"
+artifact_hash = "sha256:653dad324c923cf8112caeba7cc700d377364776de460734c15a946d676b85ff"
 size = 0
 
 [[package]]
 name = "hookbad"
 version = "1.0.0"
-manifest_hash = "sha256:5a5cc772b098d5572ed920a4b76f537669be7d47f6391f24e9152799c694dc85"
-artifact_hash = "sha256:b95410fa61434c4f7a889b8916b17cb3676b7ab2df75e6a6bf6f2430cf7ae2a1"
+manifest_hash = "sha256:7fe35bdbbcbb321a3fe8bcbc5d837e7fa0dcce794bdfd9e40ed974cf2c99cbcc"
+artifact_hash = "sha256:7f9b97650ccd9c41ef1d8e7540eb7ed5a00e0cf47deadcd1609ebc4edb0f8504"
 size = 0
 
 [[package]]
 name = "hookok"
 version = "1.0.0"
-manifest_hash = "sha256:a266ccc5407068d1f27de3af4fe9ac04afb3ce475b527c52bf7099ceff76f96e"
-artifact_hash = "sha256:d33d8ea5952dfa4f36144592603cec1fdac0c31366a7c72a1fb2173a569741e8"
+manifest_hash = "sha256:cf3ca1712182aa91e848dfc6acc31e9d79d05bc097ac1844e75a36c0e780cd11"
+artifact_hash = "sha256:1efb6c0a8e2fe1fc555283dbf43eccc0abd356a52ee2123353515f942b85f114"
 size = 0
 
