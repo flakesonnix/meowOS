@@ -34,6 +34,9 @@ for _meow_url in \
   fi
 done
 
+export CFLAGS="-Wno-error=format-security"
+export CXXFLAGS="-Wno-error=format-security"
+
 mkdir -p "${build}"
 cd "${build}"
 "${src}/configure" \
@@ -65,8 +68,27 @@ cd "${build}"
 '''
 
 build = '''
+_meow_root="/tmp/meow-install"
+
+# Populate sysroot with target tools and headers
+mkdir -p "$_meow_root/lib"
+for _d in /nix/store/*-gcc-wrapper-*/bin/cpp; do
+  [ -f "$_d" ] && ln -sf "$_d" "$_meow_root/lib/cpp" && break
+done
+
+mkdir -p "$_meow_root/usr/x86_64-pc-linux-gnu/bin"
+for _tool in as ld ar nm objdump ranlib readelf strip; do
+  _src=$(PATH="/nix/store/*-binutils-*/bin:/nix/store/*-gcc-wrapper-*/bin:$PATH" which $_tool 2>/dev/null | head -1)
+  [ -n "$_src" ] && [ -f "$_src" ] && ln -sf "$_src" "$_meow_root/usr/x86_64-pc-linux-gnu/bin/$_tool"
+done
+
+for _d in /nix/store/*-linux-headers-*/include; do
+  [ -d "$_d" ] && cp -a "$_d/." "$_meow_root/usr/include/" && break
+done
+
+# Nix gcc-wrapper adds -Werror=format-security via spec file; GCC 15.2.0 hits that.
 cd "${build}"
-make -j"${MEOW_JOBS}" all-gcc all-target-libgcc
+make -j"${MEOW_JOBS}" CFLAGS="-Wno-error=format-security" CXXFLAGS="-Wno-error=format-security" all-gcc all-target-libgcc
 '''
 
 install = '''

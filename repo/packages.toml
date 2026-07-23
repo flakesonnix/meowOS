@@ -1,5 +1,5 @@
 format_version = 1
-generated = "2026-07-23T12:52:51Z"
+generated = "2026-07-23T15:19:29Z"
 
 [[package]]
 name = "gcc-stage1"
@@ -7,6 +7,13 @@ version = "15.2.0"
 manifest_hash = "sha256:44ebbf10edaf65cf92cdd2a4e77b410cb7ede2738f088c783bd73464ee29f131"
 artifact_hash = "sha256:2257d8e0e25670b5835b69eb548077fc5f4fad9eb98f71cee87edcde404f9595"
 size = 314693367
+
+[[package]]
+name = "gcc-stage2"
+version = "15.2.0"
+manifest_hash = "sha256:cc751e97bf378097b48474f0d4d39c62f343ad6e47ec7e94e17c8b892d11f3a5"
+artifact_hash = "sha256:10f98177751651013c6cc645754882004e956275f660a31cbcedeb67297a0b9a"
+size = 49359792
 
 [[package]]
 name = "base-devel"
