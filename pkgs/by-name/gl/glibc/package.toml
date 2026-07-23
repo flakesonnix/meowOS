@@ -1,0 +1,69 @@
+format_version = 1
+name = "glibc"
+version = "2.42"
+architecture = "AMD64"
+description = "GNU C Library (bootstrap stage 2)"
+license = "LGPL-2.1-or-later"
+depends = ["binutils"]
+
+[source]
+url = "https://ftp.gnu.org/gnu/glibc/glibc-2.42.tar.xz"
+sha256 = "d1775e32e4628e64ef930f435b67bb63af7599acb6be2b335b9f19f16509f17f"
+
+[phases]
+configure = '''
+# On NixOS, find required tools in nix store
+for _d in /nix/store/*-bison-*/bin/bison; do
+  [ -f "$_d" ] && PATH="${_d%/bison}:$PATH" && break
+done
+for _d in /nix/store/*-python3-*/bin/python3; do
+  [ -f "$_d" ] && PATH="${_d%/python3}:$PATH" && break
+done
+export PATH
+
+# Find kernel headers on NixOS
+for _d in /nix/store/*-linux-headers-*/include; do
+  [ -d "$_d" ] && export C_INCLUDE_PATH="$_d" && break
+done
+
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+    --prefix=/usr \
+    --libdir=/usr/lib \
+    --libexecdir=/usr/libexec \
+    --enable-kernel=6.14.0 \
+    --disable-werror \
+    --disable-profile \
+    --without-selinux \
+    --without-cap \
+    --without-ldconfig \
+    --disable-nscd \
+    --disable-build-nscd \
+    --disable-crypt
+'''
+
+build = '''
+for _d in /nix/store/*-bison-*/bin/bison; do
+  [ -f "$_d" ] && PATH="${_d%/bison}:$PATH" && break
+done
+for _d in /nix/store/*-python3-*/bin/python3; do
+  [ -f "$_d" ] && PATH="${_d%/python3}:$PATH" && break
+done
+export PATH
+
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+rm -f "${out}/usr/share/info/dir"
+'''
+
+[build.environment]
+requires = ["gcc", "make", "bison", "flex", "python3", "gettext"]
+
+[package]
+bootstrapStage = 2

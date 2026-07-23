@@ -1,0 +1,4 @@
+[artifact]
+filename = "binutils-2.46.1.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/binutils-2.46.1.pkg.tar.zst"
+sha256 = "2b363e3241108b53a66df3770ae446ff43437e80fb0b9496f5a68e14fdcf3357"

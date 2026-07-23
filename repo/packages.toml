@@ -1,5 +1,12 @@
 format_version = 1
-generated = "2026-07-22T14:39:54Z"
+generated = "2026-07-23T12:52:51Z"
+
+[[package]]
+name = "gcc-stage1"
+version = "15.2.0"
+manifest_hash = "sha256:44ebbf10edaf65cf92cdd2a4e77b410cb7ede2738f088c783bd73464ee29f131"
+artifact_hash = "sha256:2257d8e0e25670b5835b69eb548077fc5f4fad9eb98f71cee87edcde404f9595"
+size = 314693367
 
 [[package]]
 name = "base-devel"
@@ -11,9 +18,9 @@ size = 0
 [[package]]
 name = "binutils"
 version = "2.46.1"
-manifest_hash = "sha256:1dba7c32ff451b64c0387f282d1b9be4ca8b5400293afa0fb22a447b7b214c44"
-artifact_hash = "sha256:a2f37f597139e1ff8cc34becd147aaff9ba808bfc8f19b0b8b66870ccb127716"
-size = 776
+manifest_hash = "sha256:5ff9efd9df8cf4920b9cb3288c5f54295e9333c9e578cb2854eae46b4658b4be"
+artifact_hash = "sha256:2b363e3241108b53a66df3770ae446ff43437e80fb0b9496f5a68e14fdcf3357"
+size = 50375863
 
 [[package]]
 name = "filesystem"
@@ -25,7 +32,14 @@ size = 0
 [[package]]
 name = "linux"
 version = "6.14.11"
-manifest_hash = "sha256:2b2c7ccebbd8273e9c69b1aa952f80f90e3c9092bb5b6ef40c3156fbeecd0515"
+manifest_hash = "sha256:c492c2c68bd5dbb746f0483f132083717372c4cb23c79da6f1aa90d53254d127"
 artifact_hash = "sha256:fc50738e748d79ef5ad5d8ca856d489a5e9424bdc5fa206d7c533fca9c12c8c1"
-size = 0
+size = 13781943
+
+[[package]]
+name = "glibc"
+version = "2.42"
+manifest_hash = "sha256:bc6912d39d793f5d20e050cb168cde3e1202c8bc8a765a384433030d6f0d6420"
+artifact_hash = "sha256:d63871f39dc9928c6a6619846f5fd9ddce9c44fa5cdc10e672f0a9d9d998b5be"
+size = 25226602
 

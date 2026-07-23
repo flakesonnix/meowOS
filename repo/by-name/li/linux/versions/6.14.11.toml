@@ -1,0 +1,4 @@
+[artifact]
+filename = "linux-6.14.11.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/linux-6.14.11.pkg.tar.zst"
+sha256 = "fc50738e748d79ef5ad5d8ca856d489a5e9424bdc5fa206d7c533fca9c12c8c1"

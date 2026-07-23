@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "glibc"
+version = "2.42"
+architecture = "AMD64"
+description = "GNU C Library (bootstrap stage 2)"
+depends = ["binutils"]
