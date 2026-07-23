@@ -1,0 +1,49 @@
+name: glibc
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pkgs/by-name/gl/glibc/**'
+      - 'build/**'
+      - 'CMakeLists.txt'
+      - 'flake.nix'
+      - '.github/workflows/glibc.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'pkgs/by-name/gl/glibc/**'
+      - 'build/**'
+      - 'CMakeLists.txt'
+      - 'flake.nix'
+      - '.github/workflows/glibc.yml'
+
+jobs:
+  build-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: meow-build-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt', 'meow/src/**/*', 'flake.nix') }}
+          restore-keys: |
+            meow-build-${{ runner.os }}-
+
+      - name: Build meow tool
+        run: nix develop --command bash -c 'cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j"$(nproc)"'
+
+      - name: Build glibc
+        run: nix develop --command bash -c './build/meow-build-pkg pkgs/by-name/gl/glibc/'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: glibc-2.42
+          path: repo/packages/glibc-*.pkg.tar.zst
