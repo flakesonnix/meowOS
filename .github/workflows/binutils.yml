@@ -41,9 +41,9 @@ jobs:
         run: nix develop --command bash -c 'cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j"$(nproc)"'
 
       - name: Build binutils
-        run: nix develop --command bash -c './build/meow-build-pkg pkgs/by-name/bi/binutils/'
+        run: nix develop --command bash -c 'bash build/build-package.sh pkgs/by-name/bi/binutils/'
 
       - uses: actions/upload-artifact@v4
         with:
           name: binutils-2.46.1
-          path: repo/packages/binutils-*.pkg.tar.zst
+          path: /tmp/meow-pkg-out/binutils-*.pkg.tar.zst
