@@ -1,0 +1,4 @@
+[artifact]
+filename = "gcc-stage2-15.2.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/gcc-stage2-15.2.0.pkg.tar.zst"
+sha256 = "10f98177751651013c6cc645754882004e956275f660a31cbcedeb67297a0b9a"
