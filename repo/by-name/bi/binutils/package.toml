@@ -1,0 +1,6 @@
+format_version = 1
+[metadata]
+name = "binutils"
+version = "2.46.1"
+architecture = "AMD64"
+description = "GNU binary utilities (assembler, linker, etc.)"

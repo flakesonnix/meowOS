@@ -1,0 +1,4 @@
+[artifact]
+filename = "glibc-2.42.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/glibc-2.42.pkg.tar.zst"
+sha256 = "d63871f39dc9928c6a6619846f5fd9ddce9c44fa5cdc10e672f0a9d9d998b5be"
