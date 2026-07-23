@@ -1,0 +1,104 @@
+format_version = 1
+name = "gcc"
+version = "15.2.0"
+architecture = "AMD64"
+description = "GNU C compiler (final, with libgcc, against new glibc)"
+license = "GPL-3.0-or-later WITH GCC-exception-3.1"
+depends = ["glibc", "binutils"]
+
+[source]
+url = "https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.xz"
+sha256 = "438fd996826b0c82485a29da03a72d71d6e3541a83ec702df4271f6fe025d24e"
+
+[phases]
+configure = '''
+_meow_root="/tmp/meow-install"
+
+# Download and extract GMP, MPFR, MPC, ISL into source tree
+cd "${src}"
+for _meow_url in \
+  "https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz" \
+  "https://www.mpfr.org/mpfr-4.2.1/mpfr-4.2.1.tar.xz" \
+  "https://ftp.gnu.org/gnu/mpc/mpc-1.3.1.tar.gz" \
+  "https://libisl.sourceforge.io/isl-0.27.tar.xz"; do
+  _meow_tar=$(basename "$_meow_url")
+  if [ ! -f "$_meow_tar" ]; then
+    curl -sL "$_meow_url" -o "$_meow_tar" || true
+  fi
+  if [ -f "$_meow_tar" ]; then
+    _meow_dir=$(tar -tf "$_meow_tar" 2>/dev/null | { IFS=/ read -r _meow_first _meow_rest; echo "$_meow_first"; }) || true
+    if [ -n "$_meow_dir" ] && [ ! -d "$_meow_dir" ]; then
+      tar -xf "$_meow_tar" 2>/dev/null || true
+      ln -sf "$_meow_dir" "${_meow_dir%%-*}" 2>/dev/null || true
+    fi
+  fi
+done
+
+export CFLAGS="-Wno-error=format-security"
+export CXXFLAGS="-Wno-error=format-security"
+
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+    --prefix=/usr \
+    --target=x86_64-pc-linux-gnu \
+    --enable-languages=c \
+    --disable-bootstrap \
+    --disable-libstdcxx \
+    --disable-libada \
+    --disable-libfortran \
+    --disable-libgo \
+    --disable-libobjc \
+    --disable-libphobos \
+    --disable-libgomp \
+    --disable-libatomic \
+    --disable-libquadmath \
+    --disable-libssp \
+    --disable-libsanitizer \
+    --disable-libvtv \
+    --disable-plugin \
+    --disable-nls \
+    --disable-werror \
+    --with-sysroot="$_meow_root" \
+    --with-build-sysroot="$_meow_root" \
+    --with-native-system-header-dir=/usr/include \
+    --enable-default-hash-style=gnu \
+    --disable-multilib \
+    --disable-fixincludes
+'''
+
+build = '''
+_meow_root="/tmp/meow-install"
+
+# Populate sysroot with target tools and headers
+mkdir -p "$_meow_root/lib"
+for _d in /nix/store/*-gcc-wrapper-*/bin/cpp; do
+  [ -f "$_d" ] && ln -sf "$_d" "$_meow_root/lib/cpp" && break
+done
+
+mkdir -p "$_meow_root/usr/x86_64-pc-linux-gnu/bin"
+for _tool in as ld ar nm objdump ranlib readelf strip; do
+  _src=$(PATH="/nix/store/*-binutils-*/bin:/nix/store/*-gcc-wrapper-*/bin:$PATH" which $_tool 2>/dev/null | head -1)
+  [ -n "$_src" ] && [ -f "$_src" ] && ln -sf "$_src" "$_meow_root/usr/x86_64-pc-linux-gnu/bin/$_tool"
+done
+
+for _d in /nix/store/*-linux-headers-*/include; do
+  [ -d "$_d" ] && cp -a "$_d/." "$_meow_root/usr/include/" && break
+done
+
+# Nix gcc-wrapper adds -Werror=format-security via spec file; GCC 15.2.0 hits that.
+cd "${build}"
+make -j"${MEOW_JOBS}" CFLAGS="-Wno-error=format-security" CXXFLAGS="-Wno-error=format-security" all-gcc all-target-libgcc
+'''
+
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install-gcc install-target-libgcc
+rm -f "${out}/usr/share/info/dir"
+'''
+
+[build.environment]
+requires = ["gcc", "make", "gmp", "mpfr", "libmpc"]
+
+[package]
+bootstrapStage = 3

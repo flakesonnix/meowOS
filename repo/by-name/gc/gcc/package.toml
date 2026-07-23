@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "gcc"
+version = "15.2.0"
+architecture = "AMD64"
+description = "GNU C compiler (final, with libgcc, against new glibc)"
+depends = ["glibc", "binutils"]

@@ -506,16 +506,24 @@ namespace meow::database {
 
     std::optional<types::PackageName> owns(Database& db, const std::filesystem::path& filePath) {
         auto* handle = h(db);
+
+        // Files are stored as absolute paths (e.g. /rootfs/usr/bin/gcc).
+        // Accept both absolute and relative queries. Use LIKE with a trailing
+        // wildcard so that a query like /usr/bin/gcc matches the stored path
+        // regardless of the install root prefix.
         const char* sql =
             "SELECT p.name FROM files f "
             "JOIN packages p ON f.package_id = p.id "
-            "WHERE f.path = ? LIMIT 1;";
+            "WHERE f.path = ? OR f.path LIKE ? LIMIT 1;";
         sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             throw error::MeowError(error::ErrorCode::DatabaseQueryFailed, sqlite3_errmsg(handle));
         }
 
-        sqlite3_bind_text(stmt, 1, filePath.c_str(), -1, SQLITE_TRANSIENT);
+        auto pathStr = filePath.string();
+        auto likeStr = "%" + pathStr;
+        sqlite3_bind_text(stmt, 1, pathStr.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, likeStr.c_str(), -1, SQLITE_TRANSIENT);
 
         std::optional<types::PackageName> result;
         if (sqlite3_step(stmt) == SQLITE_ROW) {
