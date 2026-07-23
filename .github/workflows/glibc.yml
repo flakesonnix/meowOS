@@ -41,9 +41,9 @@ jobs:
         run: nix develop --command bash -c 'cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j"$(nproc)"'
 
       - name: Build glibc
-        run: nix develop --command bash -c './build/meow-build-pkg pkgs/by-name/gl/glibc/'
+        run: nix develop --command bash -c 'bash build/build-package.sh pkgs/by-name/gl/glibc/'
 
       - uses: actions/upload-artifact@v4
         with:
           name: glibc-2.42
-          path: repo/packages/glibc-*.pkg.tar.zst
+          path: /tmp/meow-pkg-out/glibc-*.pkg.tar.zst

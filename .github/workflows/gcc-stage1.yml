@@ -41,9 +41,9 @@ jobs:
         run: nix develop --command bash -c 'cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j"$(nproc)"'
 
       - name: Build gcc-stage1
-        run: nix develop --command bash -c './build/meow-build-pkg pkgs/by-name/gc/gcc-stage1/'
+        run: nix develop --command bash -c 'bash build/build-package.sh pkgs/by-name/gc/gcc-stage1/'
 
       - uses: actions/upload-artifact@v4
         with:
           name: gcc-stage1-15.2.0
-          path: repo/packages/gcc-stage1-*.pkg.tar.zst
+          path: /tmp/meow-pkg-out/gcc-stage1-*.pkg.tar.zst
