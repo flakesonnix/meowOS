@@ -1,0 +1,4 @@
+[artifact]
+filename = "grep-3.11.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/grep-3.11.pkg.tar.zst"
+sha256 = "dc49ecbe723bedf6859e4ff299c8dcebe91ddaddc1fe229752019213241295b7"

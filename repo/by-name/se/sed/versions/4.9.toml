@@ -1,0 +1,4 @@
+[artifact]
+filename = "sed-4.9.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/sed-4.9.pkg.tar.zst"
+sha256 = "6d23ffcfc65938575effbcd18e810b0b4a94fd71537aca638283511b042b324e"

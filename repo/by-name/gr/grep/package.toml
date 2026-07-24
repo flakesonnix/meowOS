@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "grep"
+version = "3.11"
+architecture = "AMD64"
+description = "GNU grep - print lines matching a pattern"
+depends = ["glibc"]

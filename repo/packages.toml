@@ -1,5 +1,5 @@
 format_version = 1
-generated = "2026-07-24T01:39:44Z"
+generated = "2026-07-24T07:46:57Z"
 
 [[package]]
 name = "gcc-stage1"
@@ -21,6 +21,13 @@ version = "15.2.0"
 manifest_hash = "sha256:859d0e63437da05e293798bd1ebb5ceb58218ef8acac66bb6d137c56f49c109f"
 artifact_hash = "sha256:89719d9fd592e1b8e41d6a426f01ab5237140660c43cbf0a52f8598fa3c21321"
 size = 49343936
+
+[[package]]
+name = "grep"
+version = "3.11"
+manifest_hash = "sha256:db6b2c8326a276706fbb9182d9a375b03d72e86feca5f500e2b094f002ab0ace"
+artifact_hash = "sha256:dc49ecbe723bedf6859e4ff299c8dcebe91ddaddc1fe229752019213241295b7"
+size = 121137
 
 [[package]]
 name = "bash"
@@ -51,11 +58,25 @@ artifact_hash = "sha256:2b363e3241108b53a66df3770ae446ff43437e80fb0b9496f5a68e14
 size = 50375863
 
 [[package]]
+name = "sed"
+version = "4.9"
+manifest_hash = "sha256:35bcede3c41401854816e9e643980602be163c6dbdca30d12732de391a0f5569"
+artifact_hash = "sha256:6d23ffcfc65938575effbcd18e810b0b4a94fd71537aca638283511b042b324e"
+size = 113723
+
+[[package]]
 name = "filesystem"
 version = "1.0.0"
 manifest_hash = "sha256:cd0a39f3a6e217aa5e91ba4add167dec21882df7d9d6e4193e3fbcce6259d385"
 artifact_hash = "sha256:16bba8ec3e5994f8fdad43c47f53c1121876bfa9805e085054bd244f75e97c6c"
 size = 0
+
+[[package]]
+name = "gawk"
+version = "5.3.0"
+manifest_hash = "sha256:9e3376ed035a9c8a6004003c8160bf05efeb6bbf0f87b4b3eec868d2fd004fb4"
+artifact_hash = "sha256:6a72a206fa1a2eb29b3cd40540a37a30f285434c361c4075982b9d86749a4b89"
+size = 891510
 
 [[package]]
 name = "pkgconf"
