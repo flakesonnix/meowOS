@@ -25,94 +25,90 @@ export CC="gcc --sysroot=$_SYSROOT"
 export CFLAGS="-O2 -fwrapv -fno-strict-aliasing -pipe -fstack-protector-strong -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64"
 export LDFLAGS="-fstack-protector-strong"
 
-cd "${build}"
+cd "${src}"
 
-# Create a Policy.sh to pre-answer all Configure questions
-cat > Policy.sh << 'EOF'
-#!/bin/sh
-# Policy.sh for non-interactive Perl configuration
-cc="gcc --sysroot=/tmp/meow-install"
-ccflags="-O2 -fwrapv -fno-strict-aliasing -pipe -fstack-protector-strong -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64"
-ld="gcc --sysroot=/tmp/meow-install"
-ldflags="-fstack-protector-strong"
-prefix="/usr"
-use64bitall="define"
-useshrplib="define"
-usesoname="define"
-vendorprefix="/usr"
-optimize="-O2"
-usesitecustomize="define"
-usevendorprefix="define"
-usethreads="undef"
-usemultiplicity="undef"
-useperlio="define"
-uselargefiles="define"
-usesocks="undef"
-usequadmath="undef"
-userelocatableinc="undef"
-archname="x86_64-linux"
-myarchname="x86_64-linux"
-libperl="libperl.so"
-libpth="/usr/lib"
-glibpth="/usr/lib"
-incpth="/usr/include"
-siteprefix="/usr"
-sitelib="/usr/lib/perl5/site_perl/5.38.2"
-sitearch="/usr/lib/perl5/site_perl/5.38.2/x86_64-linux"
-vendorlib="/usr/lib/perl5/vendor_perl/5.38.2"
-vendorarch="/usr/lib/perl5/vendor_perl/5.38.2/x86_64-linux"
-privlib="/usr/lib/perl5/5.38.2"
-archlib="/usr/lib/perl5/5.38.2/x86_64-linux"
-scriptdir="/usr/bin"
-sitescript="/usr/bin"
-vendorscript="/usr/bin"
-man1dir="/usr/share/man/man1"
-man3dir="/usr/share/man/man3"
-man1ext="1"
-man3ext="3"
-pager="/usr/bin/less -R"
-cccdlflags="-fPIC"
-ccdlflags="-Wl,-E"
-lddlflags="-shared -O2 -fstack-protector-strong"
-dlsrc="dl_dlopen.xs"
-dlext="so"
-d_dosuid="undef"
-d_setlocale_r="undef"
-d_setpgid="define"
-d_sockatmark="define"
-d_strerror_r="define"
-d_strcoll="define"
-d_strxfrm="define"
-d_tzname="define"
-d_vfork="undef"
-d_vprintf="define"
-d_printf="define"
-d_sprintf="define"
-usemymalloc="undef"
-usemallocwrap="define"
-usedl="define"
-d_dlopen="define"
-d_gnulibc="define"
-d_gnulibc2="define"
-gccversion="15.2.0"
-gccosandvers="linux-6.18.33"
-myuname="linux omen 6.18.33 x86_64"
-cf_by="meow"
-cf_email="meow@kitty.linux"
+# Write a complete config.sh with all answers pre-filled
+cat > config.sh << 'EOF'
+cc='gcc --sysroot=/tmp/meow-install'
+ccflags='-O2 -fwrapv -fno-strict-aliasing -pipe -fstack-protector-strong -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64'
+ld='gcc --sysroot=/tmp/meow-install'
+ldflags='-fstack-protector-strong'
+prefix='/usr'
+use64bitall='define'
+useshrplib='define'
+usesoname='define'
+vendorprefix='/usr'
+optimize='-O2'
+usesitecustomize='define'
+usevendorprefix='define'
+usethreads='undef'
+usemultiplicity='undef'
+useperlio='define'
+uselargefiles='define'
+usesocks='undef'
+usequadmath='undef'
+userelocatableinc='undef'
+archname='x86_64-linux'
+myarchname='x86_64-linux'
+libperl='libperl.so'
+libpth='/usr/lib'
+glibpth='/usr/lib'
+incpth='/usr/include'
+siteprefix='/usr'
+sitelib='/usr/lib/perl5/site_perl/5.38.2'
+sitearch='/usr/lib/perl5/site_perl/5.38.2/x86_64-linux'
+vendorlib='/usr/lib/perl5/vendor_perl/5.38.2'
+vendorarch='/usr/lib/perl5/vendor_perl/5.38.2/x86_64-linux'
+privlib='/usr/lib/perl5/5.38.2'
+archlib='/usr/lib/perl5/5.38.2/x86_64-linux'
+scriptdir='/usr/bin'
+sitescript='/usr/bin'
+vendorscript='/usr/bin'
+man1dir='/usr/share/man/man1'
+man3dir='/usr/share/man/man3'
+man1ext='1'
+man3ext='3'
+pager='/usr/bin/less -R'
+cccdlflags='-fPIC'
+ccdlflags='-Wl,-E'
+lddlflags='-shared -O2 -fstack-protector-strong'
+dlsrc='dl_dlopen.xs'
+dlext='so'
+d_dosuid='undef'
+d_setlocale_r='undef'
+d_setpgid='define'
+d_sockatmark='define'
+d_strerror_r='define'
+d_strcoll='define'
+d_strxfrm='define'
+d_tzname='define'
+d_vfork='undef'
+d_vprintf='define'
+d_printf='define'
+d_sprintf='define'
+usemymalloc='undef'
+usemallocwrap='define'
+usedl='define'
+d_dlopen='define'
+d_gnulibc='define'
+d_gnulibc2='define'
+gccversion='15.2.0'
+gccosandvers='linux-6.18.33'
+myuname='linux omen 6.18.33 x86_64'
+cf_by='meow'
+cf_email='meow@kitty.linux'
 EOF
 
-"${src}/Configure" -des -Dprefix=/usr
-'''
-build = '''
-_SYSROOT="/tmp/meow-install"
-export CC="gcc --sysroot=$_SYSROOT"
-export CFLAGS="-O2"
+# Run Configure with script for TTY, provide Enter for "edit config_sh" then n for "make depend"
+printf "\nn\n" | script -q -c "sh Configure -d -Dprefix=/usr" /dev/null
 
-cd "${build}"
+# Run make depend to generate dependencies
+make depend
+
+# Build in source directory
 make -j"${MEOW_JOBS}"
-'''
-install = '''
-cd "${build}"
+
+# Install to out directory
 make DESTDIR="${out}" install
 
 # Remove perllocal.pod and .packlist files
@@ -121,6 +117,14 @@ find "${out}" -name .packlist -delete
 
 # Remove empty directories
 find "${out}" -type d -empty -delete
+'''
+build = '''
+# Build is done in configure phase
+true
+'''
+install = '''
+# Install is done in configure phase
+true
 '''
 
 [build]
