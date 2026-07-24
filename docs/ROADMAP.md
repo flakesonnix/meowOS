@@ -1,5 +1,31 @@
 # MeowOS Roadmap
 
+## Current state (Jul 2026)
+
+v0.7 package manager (signed index, SAT resolver) + bootstrap underway.
+
+### Bootstrap package progress
+
+**Toolchain (complete):**
+- `binutils` 2.46.1 → `glibc` 2.42 → `gcc-stage1` 15.2.0 (C only) → `gcc-stage2` 15.2.0 → `gcc` 15.2.0 (final)
+
+**Base packages (in progress):**
+- ✅ `bash` 5.3 — GNU Bourne Again SHell
+- ✅ `coreutils` 9.6 — GNU core utilities
+- ✅ `make` 4.4.1 — GNU make
+- ✅ `pkgconf` 2.4.2 — Package compiler/linker metadata toolkit
+- ✅ `grep` 3.11 — GNU grep
+- ✅ `sed` 4.9 — GNU sed (w/ `--disable-acl`)
+- ✅ `gawk` 5.3.0 — GNU awk (w/ `-Wno-error=incompatible-pointer-types`)
+
+**Next batch (planned):**
+- `findutils`, `diffutils`, `patch` → `tar`, `gzip`, `xz`, `zstd` → `file`, `m4`, `bison`, `flex`, `perl`
+
+**Known infra issue:**
+- `/tmp/build-phase-*.sh` races under parallel `-j` builds. Fix: unique temp files per build instance.
+
+---
+
 ## Phase 0 - Design
 
 Goals:
@@ -26,12 +52,10 @@ Features:
 
 Commands:
 
-
 meow install package.tar.xz
 meow remove package
 meow list
 meow info package
-
 
 
 ## Phase 2 - Dependency Resolver
@@ -76,12 +100,21 @@ Features:
 
 ## Phase 6 - Bootstrap
 
-Features:
+Phase 6 is **active**. All phases below are future.
 
-- Create root filesystem
-- Build base packages
-- Create usable system
+### Done
+- Cross-toolchain: binutils → glibc → gcc-stage1 → gcc-stage2 → gcc (final)
+- Base packages: bash, coreutils, make, pkgconf, grep, sed, gawk
 
+### In progress
+- findutils, diffutils, patch
+- Archive tools: tar, gzip, xz, zstd
+- Build tools: file, m4, bison, flex, perl
+
+### Remaining
+- Initramfs + kernel
+- Bootloader
+- Login/init
 
 ## Phase 7 - Bootable System
 
