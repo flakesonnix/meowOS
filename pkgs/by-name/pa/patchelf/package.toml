@@ -1,0 +1,57 @@
+format_version = 1
+name = "patchelf"
+version = "0.18.0"
+architecture = "AMD64"
+
+description = "Utility to modify ELF binaries"
+license = "GPL-3.0-or-later"
+
+depends = [
+    "gcc",
+    "glibc"
+]
+
+[source]
+url = "https://github.com/NixOS/patchelf/releases/download/0.18.0/patchelf-0.18.0.tar.gz"
+sha256 = "6efc75e5a03e29219a8be3080af055eee2cf5b6b26bb87d211beaeb709e8e83c"
+
+[phases]
+configure = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CXX="g++ --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+export CXXFLAGS="-O2"
+
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+  --prefix=/usr \
+  --host=x86_64-pc-linux-gnu
+'''
+build = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CXX="g++ --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+export CXXFLAGS="-O2"
+
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+
+# Self-patch patchelf to use target interpreter
+_SYSROOT="/tmp/meow-install"
+if command -v patchelf >/dev/null 2>&1; then
+  patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+           --set-rpath /usr/lib:/usr/lib64 \
+           "${out}/usr/bin/patchelf" 2>/dev/null || true
+fi
+'''
+
+[build]
+reproducible = true
+source_date_epoch = 1721520000

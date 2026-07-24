@@ -21,6 +21,9 @@ glibc (GNU C Library)
 gcc (final compiler with libgcc against new glibc)
     │
     ▼
+patchelf (ELF patcher for cross-compiled binaries)
+    │
+    ▼
 bash coreutils make pkgconf grep sed gawk
     │
     ▼
@@ -50,11 +53,11 @@ rootfs image → ISO
 
 ## Current state
 
-Toolchain (+ downstream userspace): **done** (24 packages built).
+Toolchain (+ downstream userspace): **done** (25 packages built).
 
 Archive tools: `tar`, `gzip`, `xz`, `zstd`.
 
-Build tools: `bison`, `m4`, `zlib`.
+Build tools: `bison`, `m4`, `zlib`, `patchelf`.
 
 Base packages: `file`, `flex`, `perl`, `neofetch`.
 
