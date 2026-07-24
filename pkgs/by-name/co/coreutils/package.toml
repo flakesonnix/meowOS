@@ -1,0 +1,48 @@
+format_version = 1
+name = "coreutils"
+version = "9.6"
+architecture = "AMD64"
+description = "GNU core utilities"
+license = "GPL-3.0-or-later"
+depends = ["glibc"]
+
+[source]
+url = "https://ftp.gnu.org/gnu/coreutils/coreutils-9.6.tar.xz"
+sha256 = "7a0124327b398fd9eb1a6abde583389821422c744ffa10734b24f557610d3283"
+
+[phases]
+configure = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+    --prefix=/usr \
+    --host=x86_64-pc-linux-gnu
+'''
+
+build = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+
+shopt -s nullglob
+for _f in "${out}/usr/bin/"* "${out}/usr/libexec/"*; do
+  if file "$_f" 2>/dev/null | grep -q "ELF.*executable"; then
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+             --set-rpath /usr/lib:/usr/lib64 "$_f"
+  fi
+done
+
+rm -f "${out}/usr/share/info/dir"
+'''

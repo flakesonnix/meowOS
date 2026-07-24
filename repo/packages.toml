@@ -1,5 +1,5 @@
 format_version = 1
-generated = "2026-07-23T23:00:18Z"
+generated = "2026-07-24T01:39:44Z"
 
 [[package]]
 name = "gcc-stage1"
@@ -23,10 +23,24 @@ artifact_hash = "sha256:89719d9fd592e1b8e41d6a426f01ab5237140660c43cbf0a52f8598f
 size = 49343936
 
 [[package]]
+name = "bash"
+version = "5.3"
+manifest_hash = "sha256:4bfcdd9cc588162fe8d94d961b0618e8fd377bad95ef10430ec0313e590071d6"
+artifact_hash = "sha256:9709aa89ee349516d28e26de744446b649c16121d0e34cefbf4c3c4289fdd3f5"
+size = 0
+
+[[package]]
 name = "base-devel"
 version = "1.0.0"
 manifest_hash = "sha256:64cbc24f233d3cd0ba0f45eb6e7dc9ce87c3de0b61651d6e13c0afacaea89ad4"
 artifact_hash = "sha256:3b3f9fc99876aa3f815f9430378f68366a796e68caf04c12a039d4e0bdde0143"
+size = 0
+
+[[package]]
+name = "coreutils"
+version = "9.6"
+manifest_hash = "sha256:9ffe4b645f2430b3b9173b1e93236aa537c08271363a92de9c7ed04b2a2ff21d"
+artifact_hash = "sha256:b54a979d1107bb77a235b50000e950f88308079af54fccb7b05b83bfbef9992e"
 size = 0
 
 [[package]]
@@ -41,6 +55,20 @@ name = "filesystem"
 version = "1.0.0"
 manifest_hash = "sha256:cd0a39f3a6e217aa5e91ba4add167dec21882df7d9d6e4193e3fbcce6259d385"
 artifact_hash = "sha256:16bba8ec3e5994f8fdad43c47f53c1121876bfa9805e085054bd244f75e97c6c"
+size = 0
+
+[[package]]
+name = "pkgconf"
+version = "2.4.2"
+manifest_hash = "sha256:2c40b69cd060439466482919c364616c66db049cff0ed1d0776d32f2ae3672d7"
+artifact_hash = "sha256:641dca73b2d72e54d6511eadcb3b769e548ab9e36e2103ae479a844e6cde3df6"
+size = 0
+
+[[package]]
+name = "make"
+version = "4.4.1"
+manifest_hash = "sha256:8e736099c899c2521a0df11e71bf5b2a52dc44a36db51d084ca3648546ed5c88"
+artifact_hash = "sha256:5afea5ea4e959147646feccc8932138caf23a7f19aac40d6d32a1e49256f66f4"
 size = 0
 
 [[package]]

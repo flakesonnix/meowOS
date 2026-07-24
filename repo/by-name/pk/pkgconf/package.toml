@@ -1,0 +1,8 @@
+format_version = 1
+
+[metadata]
+name = "pkgconf"
+version = "2.4.2"
+architecture = "AMD64"
+description = "Package compiler and linker metadata toolkit"
+depends = ["glibc"]

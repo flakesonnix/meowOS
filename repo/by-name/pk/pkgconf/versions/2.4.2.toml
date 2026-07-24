@@ -1,0 +1,4 @@
+[artifact]
+filename = "pkgconf-2.4.2.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/pkgconf-2.4.2.pkg.tar.zst"
+sha256 = "641dca73b2d72e54d6511eadcb3b769e548ab9e36e2103ae479a844e6cde3df6"

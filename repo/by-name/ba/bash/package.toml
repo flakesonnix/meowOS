@@ -1,0 +1,8 @@
+format_version = 1
+
+[metadata]
+name = "bash"
+version = "5.3"
+architecture = "AMD64"
+description = "GNU Bourne Again SHell"
+depends = ["glibc"]
