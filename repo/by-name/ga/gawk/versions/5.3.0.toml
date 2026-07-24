@@ -1,0 +1,4 @@
+[artifact]
+filename = "gawk-5.3.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/gawk-5.3.0.pkg.tar.zst"
+sha256 = "6a72a206fa1a2eb29b3cd40540a37a30f285434c361c4075982b9d86749a4b89"

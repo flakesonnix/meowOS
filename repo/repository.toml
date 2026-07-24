@@ -2,8 +2,8 @@ format_version = 1
 name = "local"
 repository_id = "main"
 
-generated = "2026-07-19T08:56:41Z"
-expires = "2026-08-18T08:56:41Z"
+generated = "2026-07-24T07:46:57Z"
+expires = "2026-08-23T07:46:57Z"
 
 [[mirror]]
 url = "./repo"

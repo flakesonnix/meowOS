@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "sed"
+version = "4.9"
+architecture = "AMD64"
+description = "GNU sed - stream editor"
+depends = ["glibc"]
