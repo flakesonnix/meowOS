@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "m4"
+version = "1.4.21"
+architecture = "AMD64"
+description = "GNU m4 - macro processor"
+depends = ["glibc"]

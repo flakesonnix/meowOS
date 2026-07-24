@@ -1,5 +1,12 @@
 format_version = 1
-generated = "2026-07-24T07:46:57Z"
+generated = "2026-07-24T14:28:42Z"
+
+[[package]]
+name = "patch"
+version = "2.8"
+manifest_hash = "sha256:7ffdd7521f3842297a11ca7f3fbde89ece65bf08e9ecc52091d1023171813f2d"
+artifact_hash = "sha256:e853cf1c946e6d5d6aa343ffa6965e43d66a76b516f387c10bde5574f1b8d48c"
+size = 94772
 
 [[package]]
 name = "gcc-stage1"
@@ -30,6 +37,13 @@ artifact_hash = "sha256:dc49ecbe723bedf6859e4ff299c8dcebe91ddaddc1fe229752019213
 size = 121137
 
 [[package]]
+name = "tar"
+version = "1.35"
+manifest_hash = "sha256:2b493f801a44016c0fd940d4bb7ba52d84d047dd4c42fe223905b458ccd08718"
+artifact_hash = "sha256:747b2bd3a88bae610646ec84c5f534f37ed1e180386cc31e980ed767bb43dab1"
+size = 382617
+
+[[package]]
 name = "bash"
 version = "5.3"
 manifest_hash = "sha256:4bfcdd9cc588162fe8d94d961b0618e8fd377bad95ef10430ec0313e590071d6"
@@ -42,6 +56,13 @@ version = "1.0.0"
 manifest_hash = "sha256:64cbc24f233d3cd0ba0f45eb6e7dc9ce87c3de0b61651d6e13c0afacaea89ad4"
 artifact_hash = "sha256:3b3f9fc99876aa3f815f9430378f68366a796e68caf04c12a039d4e0bdde0143"
 size = 0
+
+[[package]]
+name = "m4"
+version = "1.4.21"
+manifest_hash = "sha256:8f34da0d8337a64c258f54ede36402142485161942eff1237ad22190ad74348a"
+artifact_hash = "sha256:1967b86f900aedc0c3ceebe1778cdc1bcec81a4aaf232eacd517f89970cc7b03"
+size = 792
 
 [[package]]
 name = "coreutils"
@@ -65,11 +86,46 @@ artifact_hash = "sha256:6d23ffcfc65938575effbcd18e810b0b4a94fd71537aca638283511b
 size = 113723
 
 [[package]]
+name = "xz"
+version = "5.8.3"
+manifest_hash = "sha256:08e517a7978f3cbedc003a4417ae18b3acd6da1ab2a51e9641860b0b2bcfda43"
+artifact_hash = "sha256:2e3d9dc487e7ee2e473e33eab6b1d211ab862773885f5a155ab556a4b043ab48"
+size = 251038
+
+[[package]]
+name = "gzip"
+version = "1.14"
+manifest_hash = "sha256:ea7e5f99deb18c48bfafbfcedd984cc2d889bb97911ea39de22fbc4c4c17c8ec"
+artifact_hash = "sha256:b2ab610d8183828c1b37de9915cfec323820ebcd76baf1bf3021db288ab8a82a"
+size = 84585
+
+[[package]]
+name = "zstd"
+version = "1.5.7"
+manifest_hash = "sha256:2d082292cb0257b92b07aae3b9e689e91158347ca5b331c9850c8d1d58aed3c5"
+artifact_hash = "sha256:d42eea432036270bb049c8ebc0629c1a809037298892199365df0110d735685a"
+size = 832536
+
+[[package]]
+name = "diffutils"
+version = "3.12"
+manifest_hash = "sha256:1e0dcff2863dc205168724aee874143469ee3eb57a26968d68792988f9a98dc6"
+artifact_hash = "sha256:fa6a9abf8deac449257deed220886f53a27ed35dc6daf38d4d1f56334137c353"
+size = 162331
+
+[[package]]
 name = "filesystem"
 version = "1.0.0"
 manifest_hash = "sha256:cd0a39f3a6e217aa5e91ba4add167dec21882df7d9d6e4193e3fbcce6259d385"
 artifact_hash = "sha256:16bba8ec3e5994f8fdad43c47f53c1121876bfa9805e085054bd244f75e97c6c"
 size = 0
+
+[[package]]
+name = "findutils"
+version = "4.11.0"
+manifest_hash = "sha256:6089a488498402ffaf45fb44b74cad726dc7dffb5e411bb6cdc381fea9ca275a"
+artifact_hash = "sha256:3b9d42ed55adbcf23481a92c5859ee13e22dcfd0f51556a47b9f286a2defeb31"
+size = 313323
 
 [[package]]
 name = "gawk"
@@ -105,4 +161,11 @@ version = "2.42"
 manifest_hash = "sha256:bc6912d39d793f5d20e050cb168cde3e1202c8bc8a765a384433030d6f0d6420"
 artifact_hash = "sha256:d63871f39dc9928c6a6619846f5fd9ddce9c44fa5cdc10e672f0a9d9d998b5be"
 size = 25226602
+
+[[package]]
+name = "neofetch"
+version = "7.1.0"
+manifest_hash = "sha256:15732213e03eeec5c7595406e823ae44cdbfc5c2ae36defd34d6a13147bf9a81"
+artifact_hash = "sha256:a44131210f09ca41bf4e8e9a59dae80973723733e57d8b630540a5c0a673f04d"
+size = 77045
 

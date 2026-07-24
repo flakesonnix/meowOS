@@ -1,0 +1,4 @@
+[artifact]
+filename = "hookbad-1.0.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/hookbad-1.0.0.pkg.tar.zst"
+sha256 = "b95410fa61434c4f7a889b8916b17cb3676b7ab2df75e6a6bf6f2430cf7ae2a1"

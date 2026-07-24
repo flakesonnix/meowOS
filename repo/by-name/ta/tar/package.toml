@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "tar"
+version = "1.35"
+architecture = "AMD64"
+description = "GNU tar - tape archiver"
+depends = ["glibc"]

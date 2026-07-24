@@ -1,0 +1,4 @@
+[artifact]
+filename = "findutils-4.11.0.pkg.tar.zst"
+url = "file:///home/lucy/CLionProjects/meowOS/repo/packages/findutils-4.11.0.pkg.tar.zst"
+sha256 = "3b9d42ed55adbcf23481a92c5859ee13e22dcfd0f51556a47b9f286a2defeb31"

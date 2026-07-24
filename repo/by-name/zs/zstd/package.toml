@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "zstd"
+version = "1.5.7"
+architecture = "AMD64"
+description = "Zstandard - fast real-time compression algorithm"
+depends = ["glibc"]

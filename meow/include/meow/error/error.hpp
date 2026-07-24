@@ -38,6 +38,7 @@ namespace meow::error {
         HookFailed,
         HookTimeout,
         HookDenied,
+        BuildFailed,
         Internal
     };
 

@@ -1,0 +1,4 @@
+[artifact]
+filename = "hookok-1.0.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/hookok-1.0.0.pkg.tar.zst"
+sha256 = "d33d8ea5952dfa4f36144592603cec1fdac0c31366a7c72a1fb2173a569741e8"

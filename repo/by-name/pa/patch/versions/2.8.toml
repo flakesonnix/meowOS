@@ -1,0 +1,4 @@
+[artifact]
+filename = "patch-2.8.pkg.tar.zst"
+url = "file:///home/lucy/CLionProjects/meowOS/repo/packages/patch-2.8.pkg.tar.zst"
+sha256 = "e853cf1c946e6d5d6aa343ffa6965e43d66a76b516f387c10bde5574f1b8d48c"

@@ -1,0 +1,4 @@
+#!/nix/store/v8llyqw71lygr2llhmcc8ya5bdlzq45v-bash-5.3p9/bin/bash
+cmd=${0##*/}
+echo "$cmd: warning: $cmd is obsolescent; using grep -F" >&2
+exec grep -F "$@"

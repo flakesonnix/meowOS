@@ -17,17 +17,25 @@
           nativeBuildInputs = with pkgs; [
             cmake
             pkg-config
-            gcc          # oder llvmPackages.clang für Clang
+            gcc
+            # kernel build dependencies
+            bc
+            bison
+            flex
+            arch-install-scripts
           ];
 
           # Bibliotheken, gegen die gelinkt werden soll
           buildInputs = with pkgs; [
             sqlite
             libarchive
-            tomlplusplus # In nixpkgs heißt das Paket tomlplusplus
+            tomlplusplus
             openssl      # Für Signatur-Verifikation
             curl         # libcurl transport für Downloads
             python3     # nur für den Integrationstest-Fixture-Server
+            # kernel build dependencies
+            elfutils     # libelf für kernel modules
+            perl         # kernel build scripts
           ];
 
           shellHook = ''

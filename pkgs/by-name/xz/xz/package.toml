@@ -1,0 +1,50 @@
+format_version = 1
+name = "xz"
+version = "5.8.3"
+architecture = "AMD64"
+description = "XZ Utils - LZMA compression"
+license = "GPL-3.0-or-later AND LGPL-2.1-or-later"
+depends = ["glibc"]
+
+[source]
+url = "https://github.com/tukaani-project/xz/releases/download/v5.8.3/xz-5.8.3.tar.xz"
+sha256 = "fff1ffcf2b0da84d308a14de513a1aa23d4e9aa3464d17e64b9714bfdd0bbfb6"
+
+[phases]
+configure = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+    --prefix=/usr \
+    --host=x86_64-pc-linux-gnu \
+    --disable-nls \
+    --disable-doc
+'''
+
+build = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+
+shopt -s nullglob
+for _f in "${out}/usr/bin/"*; do
+  if file "$_f" 2>/dev/null | grep -q "ELF.*executable"; then
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+             --set-rpath /usr/lib:/usr/lib64 "$_f"
+  fi
+done
+
+rm -f "${out}/usr/share/info/dir"
+'''

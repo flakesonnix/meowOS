@@ -1,0 +1,4 @@
+[artifact]
+filename = "gzip-1.14.pkg.tar.zst"
+url = "file:///home/lucy/CLionProjects/meowOS/repo/packages/gzip-1.14.pkg.tar.zst"
+sha256 = "b2ab610d8183828c1b37de9915cfec323820ebcd76baf1bf3021db288ab8a82a"

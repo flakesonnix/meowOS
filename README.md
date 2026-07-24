@@ -1,78 +1,68 @@
-# meowOS — Independent Linux Distribution
+# meowOS
 
-meowOS is an independent Linux distribution built around the **meow** package
-manager. It focuses on reproducibility, simplicity, signed packages, and a
-package-first architecture — everything in the system is a package.
+Independent Linux distribution built around the **meow** package manager.
 
-## Goals
+meowOS focuses on a simple package-first architecture: the operating system
+itself is built from packages, with reproducible builds, signed repositories,
+and transactional upgrades.
 
-- **Package-first architecture** — the system is defined by its packages, not
-  install scripts or distro-specific tooling
-- **Small, understandable tooling** — a single binary for the package manager,
-  no daemons, no magic
-- **Reproducible builds** — byte-identical archives from the same source
-- **Signed repositories** — Ed25519 signatures at every trust boundary
-- **Self-hosting distribution** — full bootstrap from source, no binary seed
-- **Wayland-first desktop** — modern display stack from day one
+## Architecture
 
-## Features
+- **Package-first design** — everything is a package, including the base system
+- **Modern package format** — `.tar.zst` archives with files, metadata, and build information
+- **SAT dependency resolver** — DPLL-based CNF solver with legacy DFS fallback
+- **Signed trust chain** — Ed25519 signatures for repository metadata and package data
+- **Atomic transactions** — install, upgrade, and rollback operations are transactional
+- **Parallel downloads, controlled installation** — fast fetching with deterministic package deployment
+- **Backend abstraction** — filesystem, HTTP (libcurl), and in-memory backends for testing
 
-- **Signed binary packages** — Ed25519 signatures at repo and index level,
-  end-to-end artifact verification
-- **SAT dependency resolver** — full version-constraint enforcement, UNSAT
-  diagnostics, deterministic provider selection
-- **Atomic transactions** — install/remove either completes fully or rolls back
-- **Self-hosting bootstrap** — cross-compiled from scratch: binutils → glibc
-  → gcc → base userspace
-- **Reproducible builds** — deterministic archives, `SOURCE_DATE_EPOCH`, sorted
-  entries, normalized permissions
-- **Signed repository index** — `packages.toml.sig` authenticates every manifest
-  and artifact hash
-- **Parallel downloads** — bounded worker pool, retries, HTTP resume, ETag caching
-- **Mirror groups** — transport-only failover, trust failures never papered over
-- **Package history** — append-only audit log, install reasons, `meow why`
-- **Doctor diagnostics** — system health + security checks
+## Current Status — v0.7 (July 2026)
 
-## Current status
+### Package Manager
+
+✅ Package manager core  
+✅ Signed repositories  
+✅ Package index  
+✅ SAT dependency resolver  
+✅ Transaction system with rollback  
+✅ Package ownership tracking  
+
+### Bootstrap Progress
+
+The first self-hosted userspace foundation is being built:
 
 | Component | Status |
-|-----------|--------|
-| Package manager | ✅ |
-| Signed repository | ✅ |
-| SAT resolver | ✅ |
-| Bootstrap toolchain | ✅ (binutils → glibc → gcc) |
-| Base userspace | 🚧 (15 pkgs built, more in progress) |
-| Initramfs | ⏳ |
-| Bootloader | ⏳ |
-| Rootfs image / ISO | ⏳ |
+|---|---|
+| filesystem | ✅ |
+| binutils | ✅ |
+| glibc | ✅ |
+| gcc | ✅ |
+| bash | ✅ |
+| coreutils | ✅ |
+| make | ✅ |
+| pkgconf | ✅ |
+| grep | ✅ |
+| sed | ✅ |
+| gawk | ✅ |
+| findutils | ✅ |
+| diffutils | ✅ |
+| patch | ✅ |
+| tar | ✅ |
+| gzip | ✅ |
+| xz | ✅ |
+| zstd | ✅ |
 
-## Installation
+## Roadmap
 
-meowOS is under active development. Pre-built releases are not yet available.
+1. Complete bootstrap userspace
+2. Build final `base` package set
+3. Generate root filesystem images
+4. Add initramfs generation
+5. Add bootloader integration
+6. Produce installable ISO images
 
-## Bootstrap packages
-
-| Package | Version | Stage |
-|---------|---------|-------|
-| binutils | 2.46.1 | toolchain |
-| glibc | 2.42 | toolchain |
-| gcc-stage1 | 15.2.0 | toolchain (C only) |
-| gcc-stage2 | 15.2.0 | toolchain |
-| gcc | 15.2.0 | toolchain (final) |
-| bash | 5.3 | base |
-| coreutils | 9.6 | base |
-| make | 4.4.1 | base |
-| pkgconf | 2.4.2 | base |
-| grep | 3.11 | base |
-| sed | 4.9 | base |
-| gawk | 5.3.0 | base |
-| findutils | 4.11.0 | base |
-| diffutils | 3.12 | base |
-| patch | 2.8 | base |
-
-Next: `tar`, `gzip`, `xz`, `zstd`.
-
-See `docs/packaging.md` for packaging conventions.
+The goal is a complete Linux distribution where the entire system lifecycle —
+from bootstrap to upgrades — is handled through the meow package ecosystem.
 
 ## Documentation
 

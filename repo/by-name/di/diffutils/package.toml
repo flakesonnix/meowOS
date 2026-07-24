@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "diffutils"
+version = "3.12"
+architecture = "AMD64"
+description = "GNU diffutils - diff, cmp, diff3, sdiff"
+depends = ["glibc"]

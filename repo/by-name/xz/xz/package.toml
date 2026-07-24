@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "xz"
+version = "5.8.3"
+architecture = "AMD64"
+description = "XZ Utils - LZMA compression"
+depends = ["glibc"]

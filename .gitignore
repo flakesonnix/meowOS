@@ -16,3 +16,5 @@ test/repo/repository.toml.sig
 test/rc/artifacts/
 test/rc/repo-main/
 test/rc/repo-extra/
+rootfs/
+repo/packages/*.pkg.tar.zst
