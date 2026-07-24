@@ -1,0 +1,4 @@
+[artifact]
+filename = "make-4.4.1.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/make-4.4.1.pkg.tar.zst"
+sha256 = "5afea5ea4e959147646feccc8932138caf23a7f19aac40d6d32a1e49256f66f4"

@@ -1,0 +1,51 @@
+format_version = 1
+name = "bash"
+version = "5.3"
+architecture = "AMD64"
+description = "GNU Bourne Again SHell"
+license = "GPL-3.0-or-later"
+depends = ["glibc"]
+
+[source]
+url = "https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz"
+sha256 = "0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba"
+
+[phases]
+configure = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+    --prefix=/usr \
+    --host=x86_64-pc-linux-gnu \
+    --without-bash-malloc \
+    --disable-nls \
+    --disable-readline
+'''
+
+build = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+
+shopt -s nullglob
+for _f in "${out}/usr/bin/"*; do
+  if file "$_f" 2>/dev/null | grep -q "ELF.*executable"; then
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+             --set-rpath /usr/lib:/usr/lib64 "$_f"
+  fi
+done
+
+rm -f "${out}/usr/share/info/dir"
+'''

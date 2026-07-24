@@ -1,0 +1,4 @@
+[artifact]
+filename = "bash-5.3.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/bash-5.3.pkg.tar.zst"
+sha256 = "9709aa89ee349516d28e26de744446b649c16121d0e34cefbf4c3c4289fdd3f5"

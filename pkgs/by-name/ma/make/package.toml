@@ -1,0 +1,49 @@
+format_version = 1
+name = "make"
+version = "4.4.1"
+architecture = "AMD64"
+description = "GNU make"
+license = "GPL-3.0-or-later"
+depends = ["glibc"]
+
+[source]
+url = "https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz"
+sha256 = "dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3"
+
+[phases]
+configure = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+    --prefix=/usr \
+    --host=x86_64-pc-linux-gnu \
+    --without-guile
+'''
+
+build = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+
+shopt -s nullglob
+for _f in "${out}/usr/bin/"*; do
+  if file "$_f" 2>/dev/null | grep -q "ELF.*executable"; then
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+             --set-rpath /usr/lib:/usr/lib64 "$_f"
+  fi
+done
+
+rm -f "${out}/usr/share/info/dir"
+'''

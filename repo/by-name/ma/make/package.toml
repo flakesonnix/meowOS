@@ -1,0 +1,8 @@
+format_version = 1
+
+[metadata]
+name = "make"
+version = "4.4.1"
+architecture = "AMD64"
+description = "GNU make"
+depends = ["glibc"]

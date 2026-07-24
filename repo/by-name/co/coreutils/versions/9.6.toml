@@ -1,0 +1,4 @@
+[artifact]
+filename = "coreutils-9.6.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/coreutils-9.6.pkg.tar.zst"
+sha256 = "b54a979d1107bb77a235b50000e950f88308079af54fccb7b05b83bfbef9992e"

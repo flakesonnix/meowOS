@@ -1,0 +1,8 @@
+format_version = 1
+
+[metadata]
+name = "coreutils"
+version = "9.6"
+architecture = "AMD64"
+description = "GNU core utilities"
+depends = ["glibc"]
