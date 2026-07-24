@@ -2,6 +2,9 @@
 
 ## Current state (Jul 2026)
 
+See `docs/bootstrap.md` for the bootstrap chain diagram and
+`docs/packaging.md` for packaging conventions.
+
 v0.7 package manager (signed index, SAT resolver) + bootstrap underway.
 
 ### Bootstrap package progress
