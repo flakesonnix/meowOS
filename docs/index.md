@@ -19,6 +19,8 @@
 ## Developers
 
 - [Architecture](architecture.md)
+- [Bootstrap chain](bootstrap.md)
+- [Packaging guide](packaging.md)
 - [Package format & reproducible builds](reproducible.md)
 - [Download transport](downloads.md)
 - [Restricted hook runner](hooks.md)
