@@ -1,7 +1,8 @@
-# meowOS v0.7.0 — Package Manager
+# meowOS — Package Manager & Linux Distribution
 
-A transactional Linux package manager with signed repositories, SAT-powered
+A transactional Linux package manager (v0.7) with signed repositories, SAT-powered
 dependency resolution, signed package index, and verify/repair capabilities.
+Bootstrap packages for a full meowOS distribution are in active development.
 
 ## Features
 
@@ -65,6 +66,29 @@ dependency resolution, signed package index, and verify/repair capabilities.
 - `meow-server`: minimal static HTTP server for signed repositories
 - `meow-repo`: repository builder with automatic index signing
 - `meow-build`: reproducible package builder
+
+### Bootstrap packages
+
+Available under `pkgs/by-name/` (built with `meow-build`):
+
+| Package | Version | Notes |
+|---------|---------|-------|
+| `binutils` | 2.46.1 | Assembler, linker, binary tools |
+| `glibc` | 2.42 | GNU C Library |
+| `gcc-stage1` | 15.2.0 | Stage1 (C only, bootstrap) |
+| `gcc-stage2` | 15.2.0 | Stage2 (with libgcc, against new glibc) |
+| `gcc` | 15.2.0 | Final compiler (synthetic promote of stage2) |
+| `bash` | 5.3 | GNU Bourne Again SHell |
+| `coreutils` | 9.6 | GNU core utilities |
+| `make` | 4.4.1 | GNU make |
+| `pkgconf` | 2.4.2 | Package compiler/linker metadata toolkit |
+| `grep` | 3.11 | GNU grep |
+| `sed` | 4.9 | GNU sed (`--disable-acl`) |
+| `gawk` | 5.3.0 | GNU awk (`-Wno-error=incompatible-pointer-types`) |
+
+Planned next: `findutils`, `diffutils`, `patch`, `tar`, `gzip`, `xz`, `zstd`.
+
+See `docs/ROADMAP.md` for the full bootstrap plan.
 
 ### Quality assurance
 

@@ -4,7 +4,13 @@
 
 ### Added
 
-*(next release)*
+- **Bootstrap packages**: full toolchain and base packages for meowOS distribution
+  - Toolchain: `binutils` 2.46.1, `glibc` 2.42, `gcc-stage1` 15.2.0 (C only),
+    `gcc-stage2` 15.2.0, `gcc` 15.2.0 (final)
+  - Base packages: `bash` 5.3, `coreutils` 9.6, `make` 4.4.1, `pkgconf` 2.4.2,
+    `grep` 3.11, `sed` 4.9, `gawk` 5.3.0
+  - Package-local fixes: `sed` uses `--disable-acl`; `gawk` uses
+    `-Wno-error=incompatible-pointer-types` (GCC 15 compat)
 
 ## [0.7.0] - 2026-07-21
 
