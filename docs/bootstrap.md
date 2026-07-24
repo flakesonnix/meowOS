@@ -24,7 +24,7 @@ gcc (final compiler with libgcc against new glibc)
 bash coreutils make pkgconf grep sed gawk
     │
     ▼
-findutils diffutils patch
+findutils diffutils patch  ✅
     │
     ▼
 tar gzip xz zstd
@@ -50,9 +50,7 @@ rootfs image → ISO
 
 ## Current state
 
-Toolchain (+ downstream userspace): **done** (12 packages built).
-
-Next batch: `findutils`, `diffutils`, `patch`.
+Toolchain (+ downstream userspace): **done** (15 packages built).
 
 Archive tools: `tar`, `gzip`, `xz`, `zstd`.
 

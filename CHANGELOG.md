@@ -11,6 +11,7 @@
     `grep` 3.11, `sed` 4.9, `gawk` 5.3.0
   - Package-local fixes: `sed` uses `--disable-acl`; `gawk` uses
     `-Wno-error=incompatible-pointer-types` (GCC 15 compat)
+  - Build essentials: `findutils` 4.11.0, `diffutils` 3.12, `patch` 2.8
 
 ## [0.7.0] - 2026-07-21
 
