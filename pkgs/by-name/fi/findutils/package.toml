@@ -1,0 +1,49 @@
+format_version = 1
+name = "findutils"
+version = "4.11.0"
+architecture = "AMD64"
+description = "GNU find utilities - find, locate, xargs"
+license = "GPL-3.0-or-later"
+depends = ["glibc"]
+
+[source]
+url = "https://ftp.gnu.org/gnu/findutils/findutils-4.11.0.tar.xz"
+sha256 = "bfd19cb06cc71f3352d567e90284d8cdac02ac89774bbeadf0b533b0c11432fd"
+
+[phases]
+configure = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+    --prefix=/usr \
+    --host=x86_64-pc-linux-gnu \
+    --disable-nls
+'''
+
+build = '''
+_SYSROOT="/tmp/meow-install"
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+
+shopt -s nullglob
+for _f in "${out}/usr/bin/"*; do
+  if file "$_f" 2>/dev/null | grep -q "ELF.*executable"; then
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+             --set-rpath /usr/lib:/usr/lib64 "$_f"
+  fi
+done
+
+rm -f "${out}/usr/share/info/dir"
+'''

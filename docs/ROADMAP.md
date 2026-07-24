@@ -22,7 +22,7 @@ v0.7 package manager (signed index, SAT resolver) + bootstrap underway.
 - ✅ `gawk` 5.3.0 — GNU awk (w/ `-Wno-error=incompatible-pointer-types`)
 
 **Next batch (planned):**
-- `findutils`, `diffutils`, `patch` → `tar`, `gzip`, `xz`, `zstd` → `file`, `m4`, `bison`, `flex`, `perl`
+- `tar`, `gzip`, `xz`, `zstd` → `file`, `m4`, `bison`, `flex`, `perl`
 
 **Known infra issue:**
 - `/tmp/build-phase-*.sh` races under parallel `-j` builds. Fix: unique temp files per build instance.
@@ -110,7 +110,6 @@ Phase 6 is **active**. All phases below are future.
 - Base packages: bash, coreutils, make, pkgconf, grep, sed, gawk
 
 ### In progress
-- findutils, diffutils, patch
 - Archive tools: tar, gzip, xz, zstd
 - Build tools: file, m4, bison, flex, perl
 

@@ -41,7 +41,7 @@ package-first architecture — everything in the system is a package.
 | Signed repository | ✅ |
 | SAT resolver | ✅ |
 | Bootstrap toolchain | ✅ (binutils → glibc → gcc) |
-| Base userspace | 🚧 (12 pkgs built, more in progress) |
+| Base userspace | 🚧 (15 pkgs built, more in progress) |
 | Initramfs | ⏳ |
 | Bootloader | ⏳ |
 | Rootfs image / ISO | ⏳ |
@@ -66,8 +66,11 @@ meowOS is under active development. Pre-built releases are not yet available.
 | grep | 3.11 | base |
 | sed | 4.9 | base |
 | gawk | 5.3.0 | base |
+| findutils | 4.11.0 | base |
+| diffutils | 3.12 | base |
+| patch | 2.8 | base |
 
-Next: `findutils`, `diffutils`, `patch`, `tar`, `gzip`, `xz`, `zstd`.
+Next: `tar`, `gzip`, `xz`, `zstd`.
 
 See `docs/packaging.md` for packaging conventions.
 
