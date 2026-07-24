@@ -18,6 +18,17 @@ cmake -B build
 cmake --build build
 ```
 
+### Building packages
+
+Bootstrap packages are built with `meow-build`:
+
+```bash
+./build/meow-build pkgs/by-name/<shard>/<pkg>/package.toml
+```
+
+See `docs/bootstrap.md` for the bootstrap chain and `docs/packaging.md`
+for packaging conventions.
+
 ## Testing
 
 ```bash

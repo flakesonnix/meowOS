@@ -4,6 +4,17 @@ meowOS is an independent Linux distribution built around the **meow** package
 manager. It focuses on reproducibility, simplicity, signed packages, and a
 package-first architecture — everything in the system is a package.
 
+## Goals
+
+- **Package-first architecture** — the system is defined by its packages, not
+  install scripts or distro-specific tooling
+- **Small, understandable tooling** — a single binary for the package manager,
+  no daemons, no magic
+- **Reproducible builds** — byte-identical archives from the same source
+- **Signed repositories** — Ed25519 signatures at every trust boundary
+- **Self-hosting distribution** — full bootstrap from source, no binary seed
+- **Wayland-first desktop** — modern display stack from day one
+
 ## Features
 
 - **Signed binary packages** — Ed25519 signatures at repo and index level,
@@ -38,20 +49,6 @@ package-first architecture — everything in the system is a package.
 ## Installation
 
 meowOS is under active development. Pre-built releases are not yet available.
-
-## Bootstrap
-
-Build a root filesystem from source (requires a Linux host with Nix):
-
-```bash
-git clone https://github.com/flakesonnix/meowOS
-cd meowOS
-nix develop
-cmake -B build && cmake --build build
-./build/meow-build pkgs/by-name/<shard>/<pkg>/package.toml
-```
-
-See `docs/bootstrap.md` for the full bootstrap chain and current progress.
 
 ## Bootstrap packages
 
