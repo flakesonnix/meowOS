@@ -18,6 +18,7 @@
 
 ## Developers
 
+- [DEVELOPING.md](../DEVELOPING.md) — Build, test, commands, internals
 - [Architecture](architecture.md)
 - [Bootstrap chain](bootstrap.md)
 - [Packaging guide](packaging.md)
