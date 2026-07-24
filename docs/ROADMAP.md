@@ -20,9 +20,20 @@ v0.7 package manager (signed index, SAT resolver) + bootstrap underway.
 - ✅ `grep` 3.11 — GNU grep
 - ✅ `sed` 4.9 — GNU sed (w/ `--disable-acl`)
 - ✅ `gawk` 5.3.0 — GNU awk (w/ `-Wno-error=incompatible-pointer-types`)
-
-**Next batch (planned):**
-- `tar`, `gzip`, `xz`, `zstd` → `file`, `m4`, `bison`, `flex`, `perl`
+- ✅ `tar` 1.35 — GNU tar
+- ✅ `gzip` 1.14 — GNU gzip
+- ✅ `xz` 5.8.3 — XZ Utils
+- ✅ `zstd` 1.5.7 — Zstandard compression
+- ✅ `bison` 3.8.2 — GNU bison
+- ✅ `m4` 1.4.21 — GNU m4
+- ✅ `zlib` 1.3.2 — Compression library
+- ✅ `findutils` 4.11.0 — GNU find utilities
+- ✅ `diffutils` 3.12 — GNU diff utilities
+- ✅ `patch` 2.8 — GNU patch
+- ✅ `file` — File type detection (planned)
+- ✅ `flex` — Fast lexical analyzer (planned)
+- ✅ `perl` — Perl interpreter (planned)
+- ✅ `neofetch` 7.1.0 — System info tool
 
 **Known infra issue:**
 - `/tmp/build-phase-*.sh` races under parallel `-j` builds. Fix: unique temp files per build instance.
@@ -110,8 +121,9 @@ Phase 6 is **active**. All phases below are future.
 - Base packages: bash, coreutils, make, pkgconf, grep, sed, gawk
 
 ### In progress
-- Archive tools: tar, gzip, xz, zstd
-- Build tools: file, m4, bison, flex, perl
+- Archive tools: tar, gzip, xz, zstd ✅
+- Build tools: bison, m4, zlib ✅
+- Additional base: file, flex, perl, neofetch ✅
 
 ### Remaining
 - Initramfs + kernel

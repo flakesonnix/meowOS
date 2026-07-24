@@ -50,11 +50,13 @@ rootfs image → ISO
 
 ## Current state
 
-Toolchain (+ downstream userspace): **done** (15 packages built).
+Toolchain (+ downstream userspace): **done** (24 packages built).
 
 Archive tools: `tar`, `gzip`, `xz`, `zstd`.
 
-Build tools: `file`, `m4`, `bison`, `flex`, `perl`.
+Build tools: `bison`, `m4`, `zlib`.
+
+Base packages: `file`, `flex`, `perl`, `neofetch`.
 
 ## Bootstrapping rules
 

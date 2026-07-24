@@ -36,6 +36,8 @@ The first self-hosted userspace foundation is being built:
 | filesystem | ✅ |
 | binutils | ✅ |
 | glibc | ✅ |
+| gcc-stage1 | ✅ |
+| gcc-stage2 | ✅ |
 | gcc | ✅ |
 | bash | ✅ |
 | coreutils | ✅ |
@@ -51,6 +53,9 @@ The first self-hosted userspace foundation is being built:
 | gzip | ✅ |
 | xz | ✅ |
 | zstd | ✅ |
+| bison | ✅ |
+| m4 | ✅ |
+| zlib | ✅ |
 
 ## Roadmap
 
