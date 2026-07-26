@@ -42,9 +42,8 @@ cd "${build}"
 "${src}/configure" \
     --prefix=/usr \
     --target=x86_64-pc-linux-gnu \
-    --enable-languages=c \
+    --enable-languages=c,c++ \
     --disable-bootstrap \
-    --disable-libstdcxx \
     --disable-libada \
     --disable-libfortran \
     --disable-libgo \
@@ -88,12 +87,12 @@ done
 
 # Nix gcc-wrapper adds -Werror=format-security via spec file; GCC 15.2.0 hits that.
 cd "${build}"
-make -j"${MEOW_JOBS}" CFLAGS="-Wno-error=format-security" CXXFLAGS="-Wno-error=format-security" all-gcc all-target-libgcc
+make -j"${MEOW_JOBS}" CFLAGS="-Wno-error=format-security" CXXFLAGS="-Wno-error=format-security" all-gcc all-target-libgcc all-target-libstdc++-v3
 '''
 
 install = '''
 cd "${build}"
-make DESTDIR="${out}" install-gcc install-target-libgcc
+make DESTDIR="${out}" install-gcc install-target-libgcc install-target-libstdc++-v3
 rm -f "${out}/usr/share/info/dir"
 '''
 

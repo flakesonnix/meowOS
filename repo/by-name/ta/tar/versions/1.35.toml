@@ -1,4 +1,4 @@
 [artifact]
 filename = "tar-1.35.pkg.tar.zst"
-url = "file:///home/lucy/CLionProjects/meowOS/repo/packages/tar-1.35.pkg.tar.zst"
-sha256 = "747b2bd3a88bae610646ec84c5f534f37ed1e180386cc31e980ed767bb43dab1"
+url = "file:///home/lucy/CLionProjects/meowOS/tar-1.35.pkg.tar.zst"
+sha256 = "87b1802618bbc91c523b03b344d018fca153b474ceae801e42f753f0e66a6bbd"
