@@ -354,12 +354,31 @@ namespace {
         return resolveAndStage(repo, cfg, selected);
     }
 
-    void cmdGroupList(const meow::config::Config& cfg) {
-        if (cfg.groups.empty()) {
+    void cmdGroupList(const meow::config::Config& cfg,
+                      const meow::repository::RepositoryManager& mgr) {
+        // Collect groups from config and from repo files.
+        std::vector<meow::config::PackageGroup> allGroups = cfg.groups;
+        for (const auto& rs : mgr.repositories()) {
+            for (const auto& url : rs.config.urls()) {
+                auto repoPath = meow::config::resolveRepoPath(url);
+                if (repoPath.empty()) continue;
+                auto fileGroups = meow::config::loadRepoGroups(repoPath);
+                for (auto& g : fileGroups) {
+                    // Config groups take precedence; skip if name collides.
+                    bool dup = false;
+                    for (const auto& existing : allGroups)
+                        if (existing.name == g.name) { dup = true; break; }
+                    if (!dup) allGroups.push_back(std::move(g));
+                }
+                break; // only try first mirror of first repo
+            }
+            break; // only first repo
+        }
+        if (allGroups.empty()) {
             std::cout << "(no groups defined)\n";
             return;
         }
-        for (const auto& g : cfg.groups) {
+        for (const auto& g : allGroups) {
             std::cout << g.name << ":\n";
             for (const auto& p : g.packages)
                 std::cout << "  - " << p << "\n";
@@ -545,7 +564,7 @@ int main(int argc, char** argv) {
         // command that depends on repository metadata. This keeps a single
         // broken source a loud error while still tolerating failures when at
         // least one healthy repository is available.
-        if (manager.repositories().empty() && cmd != "keys" && cmd != "clean") {
+        if (manager.repositories().empty() && cmd != std::string_view("keys") && cmd != std::string_view("clean")) {
             std::cerr << "error: no repository available: "
                       << manager.lastError() << "\n";
             return 1;
@@ -703,16 +722,33 @@ int main(int argc, char** argv) {
             }
             std::string sub = cmdArgv[1];
             if (sub == "list") {
-                cmdGroupList(cfg);
+                cmdGroupList(cfg, manager);
+                return 0;
             } else if (sub == "install") {
                 if (cmdArgc < 3) {
                     std::cerr << "usage: meow group install <name>\n";
                     return 1;
                 }
                 std::string groupName = cmdArgv[2];
+
+                // Look up group: first in config, then in repo/groups/*.toml.
                 const meow::config::PackageGroup* grp = nullptr;
                 for (const auto& g : cfg.groups) {
                     if (g.name == groupName) { grp = &g; break; }
+                }
+                if (!grp) {
+                    for (const auto& rs : manager.repositories()) {
+                        for (const auto& url : rs.config.urls()) {
+                            auto repoPath = meow::config::resolveRepoPath(url);
+                            if (repoPath.empty()) continue;
+                            auto fileGroups = meow::config::loadRepoGroups(repoPath);
+                            for (const auto& g : fileGroups) {
+                                if (g.name == groupName) { grp = &g; break; }
+                            }
+                            if (grp) break;
+                        }
+                        if (grp) break;
+                    }
                 }
                 if (!grp) {
                     std::cerr << "group not found: " << groupName << "\n";

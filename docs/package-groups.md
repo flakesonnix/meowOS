@@ -1,18 +1,25 @@
 # Package groups
 
 A *package group* is a named, local expansion alias over a list of package
-names. Groups live in `meow.toml` as a `[[groups]]` array, alongside
-`[[repositories]]`. They are **user/repository policy**, not package identities
-and not repository metadata.
+names. Groups can be defined in two places:
+
+1. **Config groups** — inline in `meow.toml` as a `[[groups]]` array.
+2. **File groups** — as TOML files under `repo/groups/<name>.toml`.
+
+File-based groups are preferred for shareable, repository-distributed group
+definitions. Config groups take precedence if a name collision occurs.
 
 ```toml
+# meow.toml — config groups (backwards-compatible)
 [[groups]]
 name = "base-devel"
-packages = [
-    "gcc",
-    "make",
-    "binutils"
-]
+packages = ["gcc", "make", "binutils"]
+```
+
+```toml
+# repo/groups/base.toml — file-based group (preferred)
+name = "base"
+packages = ["filesystem", "glibc", "bash", "coreutils", "gcc"]
 ```
 
 ## Commands
@@ -61,17 +68,3 @@ These are intentionally *not* part of the initial groups feature:
   individual member packages; a future phase may track membership for bulk
   removal.
 - nested groups and version-pinned group members.
-- groups as data files (`repo/groups/<name>.toml`) instead of inline in
-  `meow.toml`. Declaring groups outside config makes them shareable across
-  installs, syncable from a repository, and usable by tooling without parsing
-  the whole config:
-
-  ```toml
-  # repo/groups/base.toml
-  name = "base"
-  packages = ["filesystem", "glibc", "bash", "coreutils", "gcc"]
-  ```
-
-  The `meow` CLI would need no built-in knowledge of "base" — it reads the
-  file and expands the list. This also enables community-contributed groups
-  without config changes.

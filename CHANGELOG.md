@@ -4,6 +4,11 @@
 
 ### Added
 
+- **File-based package groups:** groups can now be defined as TOML files under
+  `repo/groups/<name>.toml` instead of only inline in `meow.toml`. `meow group
+  list` and `meow group install` search both locations. Config groups take
+  precedence on name collision. The `base` group moved from `meow.toml` to
+  `repo/groups/base.toml`.
 - **Future-direction docs:** packaging.md, package-groups.md, architecture.md
   now document the planned layer separation (Package Format / Repository Format
   / Build Recipes / Package Manager), groups as data files, and Package Format

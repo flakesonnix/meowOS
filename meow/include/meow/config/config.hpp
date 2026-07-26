@@ -99,6 +99,16 @@ ResolverEngine parseResolverEngine(const std::string& s);
 // defaultConfig() if the file is missing or has no repository entries.
 Config loadConfig(const std::filesystem::path& path);
 
+// Load package groups from a repository's groups/ directory. Reads every
+// *.toml file under {repoPath}/groups/ as a PackageGroup. Returns empty
+// vector if the directory does not exist.
+std::vector<PackageGroup> loadRepoGroups(const std::filesystem::path& repoPath);
+
+// Resolve a repository path that may be a relative filesystem path or a
+// file:// URL into an absolute filesystem path. Returns empty path on
+// non-file schemes (http://, https://, memory://).
+std::filesystem::path resolveRepoPath(const std::string& url);
+
 }
 
 #endif

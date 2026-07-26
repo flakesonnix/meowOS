@@ -18,6 +18,9 @@ test/rc/repo-main/
 test/rc/repo-extra/
 rootfs/
 
+# CTest runtime output
+Testing/
+
 # package build artifacts — root-level copies from source builds
 *.pkg.tar.zst
 

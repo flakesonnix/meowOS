@@ -152,4 +152,40 @@ ResolverEngine parseResolverEngine(const std::string& s) {
     return ResolverEngine::Auto;
 }
 
+std::vector<PackageGroup> loadRepoGroups(const std::filesystem::path& repoPath) {
+    std::vector<PackageGroup> result;
+    std::error_code ec;
+    auto groupsDir = repoPath / "groups";
+    if (!std::filesystem::exists(groupsDir, ec)) return result;
+    for (const auto& entry : std::filesystem::directory_iterator(groupsDir, ec)) {
+        if (entry.path().extension() != ".toml") continue;
+        try {
+            auto tbl = toml::parse_file(entry.path().string());
+            PackageGroup g;
+            g.name = tbl["name"].value_or("");
+            if (g.name.empty()) continue;
+            if (auto* pkgs = tbl["packages"].as_array()) {
+                for (const auto& p : *pkgs) {
+                    if (auto s = p.value<std::string>())
+                        if (!s->empty()) g.packages.push_back(*s);
+                }
+            }
+            if (!g.packages.empty()) result.push_back(std::move(g));
+        } catch (const std::exception& e) {
+            log::log(log::LogLevel::Warning,
+                     std::string("failed to parse group ") + entry.path().string() +
+                         ": " + e.what());
+        }
+    }
+    return result;
+}
+
+std::filesystem::path resolveRepoPath(const std::string& url) {
+    if (url.starts_with("file://"))
+        return std::filesystem::path(url.substr(7));
+    if (url.find("://") != std::string::npos)
+        return {};
+    return std::filesystem::absolute(std::filesystem::path(url));
+}
+
 }  // namespace meow::config

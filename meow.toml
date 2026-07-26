@@ -30,35 +30,3 @@ timeout = 300
 network = false
 # Inherit environment variables
 inherit_environment = false
-
-# Package groups - expansion aliases for atomic installs
-[[groups]]
-name = "base"
-packages = [
-    "filesystem",
-    "glibc",
-    "bash",
-    "coreutils",
-    "gcc",
-    "binutils",
-    "make",
-    "pkgconf",
-    "grep",
-    "sed",
-    "gawk",
-    "findutils",
-    "diffutils",
-    "patch",
-    "tar",
-    "gzip",
-    "xz",
-    "zstd",
-    "m4",
-    "bison",
-    "flex",
-    "perl",
-    "autoconf",
-    "automake",
-    "libtool",
-    "patchelf",
-]
