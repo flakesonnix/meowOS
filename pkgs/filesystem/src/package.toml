@@ -4,3 +4,18 @@ version = "1.0.0"
 architecture = "AMD64"
 description = "Base filesystem hierarchy (usr-merged)"
 depends = []
+
+[source]
+url = "file:///tmp/filesystem-1.0.0.tar.gz"
+sha256 = "4c404ad521404c377a7f863b4c2e24430348c17add859e0a3fdc9b649e6a370f"
+
+[phases]
+configure = '''
+echo "No configure needed"
+'''
+build = '''
+echo "No build needed"
+'''
+install = '''
+cp -a ./* "${out}/"
+'''

@@ -1,0 +1,60 @@
+# meowOS configuration
+
+[repositories]
+# Default repository - local filesystem or HTTP
+# repository = "file:///path/to/repo"
+# Multiple repositories with priority:
+# [[repositories]]
+# id = "main"
+# url = "file:///path/to/repo"
+# priority = 10
+
+[security]
+# Require repository signature verification
+require_repository_signature = false
+# Require package index signature verification
+require_package_index = false
+
+[build]
+# Number of parallel download workers (0 = auto)
+download_workers = 0
+
+[hooks]
+# Hook execution timeout in seconds
+timeout = 300
+# Allow network access in hooks (advisory)
+network = false
+# Inherit environment variables
+inherit_environment = false
+
+# Package groups - expansion aliases for atomic installs
+[[groups]]
+name = "base"
+packages = [
+    "filesystem",
+    "glibc",
+    "bash",
+    "coreutils",
+    "gcc",
+    "binutils",
+    "make",
+    "pkgconf",
+    "grep",
+    "sed",
+    "gawk",
+    "findutils",
+    "diffutils",
+    "patch",
+    "tar",
+    "gzip",
+    "xz",
+    "zstd",
+    "m4",
+    "bison",
+    "flex",
+    "perl",
+    "autoconf",
+    "automake",
+    "libtool",
+    "patchelf",
+]

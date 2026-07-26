@@ -4,14 +4,21 @@
 
 ### Added
 
-- **Bootstrap packages**: full toolchain and base packages for meowOS distribution
+- **Gate 2: Bootstrap userspace** — complete toolchain, core userspace, and
+  GNU build stack for meowOS distribution
   - Toolchain: `binutils` 2.46.1, `glibc` 2.42, `gcc-stage1` 15.2.0 (C only),
     `gcc-stage2` 15.2.0, `gcc` 15.2.0 (final)
-  - Base packages: `bash` 5.3, `coreutils` 9.6, `make` 4.4.1, `pkgconf` 2.4.2,
+  - Core userspace: `bash` 5.3, `coreutils` 9.6, `make` 4.4.1, `pkgconf` 2.4.2,
     `grep` 3.11, `sed` 4.9, `gawk` 5.3.0
+  - Archive tools: `tar` 1.35, `gzip` 1.14, `xz` 5.8.3, `zstd` 1.5.7
+  - Build essentials: `findutils` 4.11.0, `diffutils` 3.12, `patch` 2.8,
+    `m4` 1.4.21, `bison` 3.8.2, `flex` 2.6.4, `zlib` 1.3.2
+  - GNU build stack: `autoconf` 2.72, `automake` 1.17, `libtool` 2.4.7
+  - Utilities: `patchelf` 0.18.0, `perl` 5.38.2, `neofetch` 7.1.0
   - Package-local fixes: `sed` uses `--disable-acl`; `gawk` uses
     `-Wno-error=incompatible-pointer-types` (GCC 15 compat)
-  - Build essentials: `findutils` 4.11.0, `diffutils` 3.12, `patch` 2.8
+- **Package groups**: `base` group defined in `meow.toml` encompassing the
+  complete bootstrap userspace set
 
 ## [0.7.0] - 2026-07-21
 

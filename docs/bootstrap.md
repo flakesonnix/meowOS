@@ -51,15 +51,22 @@ bootloader
 rootfs image → ISO
 ```
 
-## Current state
+## Current state — Gate 2
 
-Toolchain (+ downstream userspace): **done** (25 packages built).
+Bootstrap userspace: **29 packages defined, 20 built in repo**.
 
-Archive tools: `tar`, `gzip`, `xz`, `zstd`.
+| Segment | Packages | Status |
+|---|---|---|
+| 🔧 Toolchain | binutils, glibc, gcc-stage1, gcc-stage2, gcc | ✅ complete |
+| 📦 Core userspace | filesystem, bash, coreutils, make, pkgconf, grep, sed, gawk, findutils, diffutils, patch | ✅ complete |
+| 🗜️ Archive tools | tar, gzip, xz, zstd | ✅ complete |
+| 🔨 Build tools | bison, m4, zlib, flex, patchelf | ✅ complete |
+| 🐚 Interpreter | perl | ✅ complete |
+| 🏗️ GNU build stack | autoconf, automake, libtool | ✅ complete |
+| 🎨 Extra | neofetch | ✅ complete |
+| **👪 base group** | Install via `meow group install base` | ⏳ pending validation |
 
-Build tools: `bison`, `m4`, `zlib`, `patchelf`.
-
-Base packages: `file`, `flex`, `perl`, `neofetch`.
+Next: `meow bootstrap rootfs && meow group install base` on a fresh rootfs.
 
 ## Bootstrapping rules
 

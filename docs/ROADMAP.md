@@ -1,39 +1,66 @@
 # MeowOS Roadmap
 
-## Current state (Jul 2026)
+## Current state (Jul 2026) — Gate 2
 
 See `docs/bootstrap.md` for the bootstrap chain diagram and
 `docs/packaging.md` for packaging conventions.
 
-v0.7 package manager (signed index, SAT resolver) + bootstrap underway.
+Gate 2 active. Package manager (v0.7) stable; bootstrap userspace complete
+across three segments:
 
-### Bootstrap package progress
+### Gate 2 progress
+
+```
+Gate 2
+│
+├── ✅ Bootstrap toolchain   (binutils → glibc → gcc-stage1 → gcc-stage2 → gcc)
+├── ✅ Core userspace        (bash, coreutils, make, pkgconf, grep, sed, gawk,
+│                             findutils, diffutils, patch, tar, gzip, xz, zstd)
+├── ✅ GNU build stack       (m4, bison, flex, perl, autoconf, automake, libtool)
+│
+├── ⏳ base group install    (meow bootstrap rootfs → meow group install base)
+├── ⏳ Regression Suite      (verify all tools; meow owns; toolchain smoke test)
+├── ⏳ Fresh RootFS rebuild  (repeat cleanly with no manual intervention)
+└── ⏳ Exit Checklist        (docs finalised, all gates green)
+```
 
 **Toolchain (complete):**
 - `binutils` 2.46.1 → `glibc` 2.42 → `gcc-stage1` 15.2.0 (C only) → `gcc-stage2` 15.2.0 → `gcc` 15.2.0 (final)
 
-**Base packages (in progress):**
-- ✅ `bash` 5.3 — GNU Bourne Again SHell
-- ✅ `coreutils` 9.6 — GNU core utilities
-- ✅ `make` 4.4.1 — GNU make
-- ✅ `pkgconf` 2.4.2 — Package compiler/linker metadata toolkit
-- ✅ `grep` 3.11 — GNU grep
-- ✅ `sed` 4.9 — GNU sed (w/ `--disable-acl`)
-- ✅ `gawk` 5.3.0 — GNU awk (w/ `-Wno-error=incompatible-pointer-types`)
-- ✅ `tar` 1.35 — GNU tar
-- ✅ `gzip` 1.14 — GNU gzip
-- ✅ `xz` 5.8.3 — XZ Utils
-- ✅ `zstd` 1.5.7 — Zstandard compression
-- ✅ `bison` 3.8.2 — GNU bison
-- ✅ `m4` 1.4.21 — GNU m4
-- ✅ `zlib` 1.3.2 — Compression library
-- ✅ `findutils` 4.11.0 — GNU find utilities
-- ✅ `diffutils` 3.12 — GNU diff utilities
-- ✅ `patch` 2.8 — GNU patch
-- ✅ `file` — File type detection (planned)
-- ✅ `flex` — Fast lexical analyzer (planned)
-- ✅ `perl` — Perl interpreter (planned)
-- ✅ `neofetch` 7.1.0 — System info tool
+**All 29 available packages:**
+
+| Package | Version | Description |
+|---|---|---|
+| filesystem | 1.0.0 | Base filesystem hierarchy |
+| binutils | 2.46.1 | GNU assembler, linker, ELF tools |
+| glibc | 2.42 | GNU C Library |
+| gcc-stage1 | 15.2.0 | C compiler (bootstrap, no libc) |
+| gcc-stage2 | 15.2.0 | Full compiler against stage1 glibc |
+| gcc | 15.2.0 | Final compiler with libgcc |
+| bash | 5.3 | GNU Bourne Again SHell |
+| coreutils | 9.6 | GNU core utilities |
+| make | 4.4.1 | GNU make |
+| pkgconf | 2.4.2 | Package compiler/linker metadata |
+| grep | 3.11 | GNU grep |
+| sed | 4.9 | GNU sed |
+| gawk | 5.3.0 | GNU awk |
+| findutils | 4.11.0 | GNU find utilities |
+| diffutils | 3.12 | GNU diff utilities |
+| patch | 2.8 | GNU patch |
+| tar | 1.35 | GNU tar |
+| gzip | 1.14 | GNU gzip |
+| xz | 5.8.3 | XZ Utils |
+| zstd | 1.5.7 | Zstandard compression |
+| bison | 3.8.2 | GNU bison |
+| m4 | 1.4.21 | GNU m4 |
+| zlib | 1.3.2 | Compression library |
+| flex | 2.6.4 | Fast lexical analyzer |
+| perl | 5.38.2 | Perl interpreter |
+| autoconf | 2.72 | GNU Autoconf |
+| automake | 1.17 | GNU Automake |
+| libtool | 2.4.7 | GNU Libtool |
+| patchelf | 0.18.0 | ELF patcher |
+| neofetch | 7.1.0 | System info tool |
 
 **Known infra issue:**
 - `/tmp/build-phase-*.sh` races under parallel `-j` builds. Fix: unique temp files per build instance.

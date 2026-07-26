@@ -16,22 +16,24 @@ and transactional upgrades.
 - **Parallel downloads, controlled installation** — fast fetching with deterministic package deployment
 - **Backend abstraction** — filesystem, HTTP (libcurl), and in-memory backends for testing
 
-## Current Status — v0.7 (July 2026)
+## Current Status — Gate 2 (System Validation)
 
-### Package Manager
+### Gate 2 — Bootstrap Userspace
 
-✅ Package manager core  
-✅ Signed repositories  
-✅ Package index  
-✅ SAT dependency resolver  
-✅ Transaction system with rollback  
-✅ Package ownership tracking  
+```
+│
+├── ✅ Bootstrap toolchain    (binutils → glibc → gcc-stage1 → gcc-stage2 → gcc)
+├── ✅ Core userspace         (bash, coreutils, make, pkgconf, grep, sed, gawk, ...)
+├── ✅ GNU build stack        (autoconf, automake, libtool, m4, bison, flex, perl)
+├── ⏳ base group             (defined in meow.toml; install pending)
+├── ⏳ Fresh RootFS install   (bootstrap + group install validation)
+├── ⏳ Regression Suite       (verify all tools; meow owns; toolchain smoke tests)
+└── ⏳ Exit Checklist         (documentation, clean rebuild, no manual fixes)
+```
 
-### Bootstrap Progress
+### Available Packages
 
-The first self-hosted userspace foundation is being built:
-
-| Component | Status |
+| Package | Status |
 |---|---|
 | filesystem | ✅ |
 | binutils | ✅ |
@@ -56,15 +58,21 @@ The first self-hosted userspace foundation is being built:
 | bison | ✅ |
 | m4 | ✅ |
 | zlib | ✅ |
+| flex | ✅ |
+| perl | ✅ |
+| autoconf | ✅ |
+| automake | ✅ |
+| libtool | ✅ |
+| patchelf | ✅ |
+| neofetch | ✅ |
 
 ## Roadmap
 
-1. Complete bootstrap userspace
-2. Build final `base` package set
-3. Generate root filesystem images
-4. Add initramfs generation
-5. Add bootloader integration
-6. Produce installable ISO images
+1. 🚧 **Gate 2** — Bootstrap userspace (complete → verify → close)
+2. 🔜 **Gate 3** — Self-hosting (meow OS builds meow OS)
+3. 🔜 **Gate 4** — Kernel, firmware, initramfs
+4. 🔜 **Gate 5** — Image builder / ISO
+5. 🔜 **Gate 6** — First self-hosted release
 
 The goal is a complete Linux distribution where the entire system lifecycle —
 from bootstrap to upgrades — is handled through the meow package ecosystem.
