@@ -17,4 +17,8 @@ test/rc/artifacts/
 test/rc/repo-main/
 test/rc/repo-extra/
 rootfs/
+
+# package build artifacts — root-level copies from source builds
+*.pkg.tar.zst
+
 repo/packages/*.pkg.tar.zst
