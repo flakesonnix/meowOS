@@ -61,7 +61,11 @@ bool verifyFile(
     long sz = ftell(cf);
     fseek(cf, 0, SEEK_SET);
     std::vector<char> content(sz);
-    (void)fread(content.data(), 1, sz, cf);
+    if (fread(content.data(), 1, sz, cf) != static_cast<size_t>(sz)) {
+        fclose(cf);
+        EVP_PKEY_free(pkey);
+        return false;
+    }
     fclose(cf);
 
     int pad = 0;
@@ -209,7 +213,12 @@ void signFile(
     long sz = ftell(cf);
     fseek(cf, 0, SEEK_SET);
     std::vector<unsigned char> content(sz);
-    (void)fread(content.data(), 1, sz, cf);
+    if (fread(content.data(), 1, sz, cf) != static_cast<size_t>(sz)) {
+        fclose(cf);
+        EVP_PKEY_free(pkey);
+        throw error::MeowError(error::ErrorCode::Internal,
+            "failed to read file: " + filePath.string());
+    }
     fclose(cf);
 
     EVP_MD_CTX* ctx = EVP_MD_CTX_new();

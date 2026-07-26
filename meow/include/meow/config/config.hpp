@@ -57,6 +57,7 @@ enum class ResolverEngine {
 struct Config {
     std::filesystem::path root;
     std::filesystem::path cache;
+    std::filesystem::path workdir;
     std::filesystem::path database;
     std::vector<RepositoryConfig> repositories;
     std::vector<PackageGroup> groups;

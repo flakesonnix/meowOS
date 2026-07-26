@@ -13,6 +13,7 @@ Config defaultConfig() {
     Config cfg;
     cfg.root = "/";
     cfg.cache = std::filesystem::path(std::getenv("HOME")) / ".cache" / "meow";
+    cfg.workdir = "/var/tmp/meow";
     cfg.repositories.push_back(
         RepositoryConfig{.id = "default", .mirrors = {"./repo"}, .url = "./repo"});
     cfg.downloadWorkers = 0;
@@ -35,6 +36,7 @@ Config loadConfig(const std::filesystem::path& path) {
     if (auto r = tbl["root"].value<std::string>()) cfg.root = *r;
     if (auto d = tbl["database"].value<std::string>())
         cfg.database = *d;
+    if (auto w = tbl["workdir"].value<std::string>()) cfg.workdir = *w;
     if (auto w = tbl["download_workers"].value<int>()) cfg.downloadWorkers = *w;
     if (auto t = tbl["hook_timeout"].value<int>()) cfg.hookTimeout = *t;
     if (auto n = tbl["hook_allow_network"].value<bool>())

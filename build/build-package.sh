@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+: "${MEOW_TMPDIR:="/var/tmp/meow"}"
 output_dir=""
 jobs="$(nproc)"
 
@@ -41,9 +42,10 @@ for k in ('configure', 'build', 'check', 'install'):
     if k in pkg['phases']:
         print(f'--- phase: {k} ---')
         script = pkg['phases'][k]
-        with open(f'/tmp/build-phase-{k}.sh', 'w') as f:
+        path = os.environ.get('MEOW_TMPDIR', '/var/tmp/meow')
+        with open(f'{path}/build-phase-{k}.sh', 'w') as f:
             f.write(script)
-        os.chmod(f'/tmp/build-phase-{k}.sh', 0o755)
+        os.chmod(f'{path}/build-phase-{k}.sh', 0o755)
 " 2>&1
 
 # --- extract metadata ---
@@ -60,7 +62,7 @@ if [ -z "$src_url" ]; then
 fi
 
 # --- download source ---
-src_cache="/tmp/meow-source-cache"
+src_cache="$MEOW_TMPDIR/source-cache"
 mkdir -p "$src_cache"
 src_tar="$src_cache/$(basename "$src_url")"
 
@@ -70,7 +72,7 @@ if [ ! -f "$src_tar" ]; then
 fi
 
 # --- set up directories ---
-build_root="/tmp/meow-build-$$"
+build_root="$MEOW_TMPDIR/build-$$"
 src_dir="$build_root/src"
 build_dir="$build_root/build"
 out_dir="$build_root/out"
@@ -92,7 +94,7 @@ export src build out
 
 # --- run phases ---
 for phase in configure build check install; do
-    script_file="/tmp/build-phase-$phase.sh"
+    script_file="$MEOW_TMPDIR/build-phase-$phase.sh"
     if [ -f "$script_file" ]; then
         echo "--- phase: $phase ---"
         bash -e "$script_file" 2>&1 || true
@@ -107,7 +109,7 @@ if [ -d "$out/usr" ]; then
 fi
 
 if [ -z "$output_dir" ]; then
-    output_dir="/tmp/meow-pkg-out"
+    output_dir="$MEOW_TMPDIR/pkg-out"
 fi
 mkdir -p "$output_dir"
 

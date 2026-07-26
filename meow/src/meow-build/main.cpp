@@ -2,6 +2,7 @@
 #include <meow/error/error.hpp>
 #include <iostream>
 #include <cstring>
+#include <cstdlib>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -11,7 +12,12 @@ int main(int argc, char** argv) {
 
     try {
         meow::builder::BuildOptions opts;
-        opts.outputDir = ".";
+        {
+            const char* env = std::getenv("MEOW_TMPDIR");
+            opts.outputDir = (env && *env)
+                ? std::filesystem::path(env) / "pkg-out"
+                : std::filesystem::path("/var/tmp/meow") / "pkg-out";
+        }
         opts.sourceDir = std::filesystem::current_path();
 
         for (int i = 1; i < argc; ++i) {

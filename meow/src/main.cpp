@@ -30,7 +30,12 @@
 
 namespace {
     const auto lockfilePath = std::filesystem::path("meow.lock");
-    const auto installRoot = std::filesystem::path("/tmp/meow-install");
+
+    const auto installRoot = []() -> std::filesystem::path {
+        const char* env = std::getenv("MEOW_TMPDIR");
+        if (env && *env) return std::filesystem::path(env) / "install";
+        return std::filesystem::path("/var/tmp/meow") / "install";
+    }();
 
      void cmdInfo(const meow::repository::Repository& repo, std::string_view name) {
          auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{std::string(name)});
