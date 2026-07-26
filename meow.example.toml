@@ -1,0 +1,47 @@
+# meow package manager — example configuration
+# Place at ~/.config/meow/meow.toml or pass via --config <path>
+
+# Install root prefix (default "/")
+# root = "/"
+
+# Database path (default <root>/var/lib/meow/database.sqlite)
+# database = "/var/lib/meow/database.sqlite"
+
+# Working directory for builds, source cache, package output, install root.
+# Can also be set via MEOW_TMPDIR environment variable. Default: /var/tmp/meow
+# workdir = "/var/tmp/meow"
+
+# Parallel download workers (0 = auto, min(hw_cores, 8))
+# download_workers = 4
+
+# Hook execution timeout in seconds
+# hook_timeout = 300
+
+# Allow network access in package hooks (advisory)
+# hook_allow_network = false
+
+# Resolver engine: "auto" (default), "legacy", or "sat"
+# [resolver]
+# engine = "sat"
+
+# Security policies
+# [security]
+# require_repository_signature = false
+# require_package_index = false
+
+# Repositories (modern form — multiple mirrors per repo)
+# [[repositories]]
+# id = "main"
+# mirrors = [
+#     "https://repo.meowos.org",
+#     "https://mirror.meowos.org",
+# ]
+# priority = 100
+
+# Legacy single-repository form
+# repository = "./repo"
+
+# Package group aliases
+# [[groups]]
+# name = "my-group"
+# packages = ["foo", "bar", "baz"]
