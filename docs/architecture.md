@@ -126,6 +126,23 @@ registries later means adding a backend, not branching through the core.
   rest of the code consumes an in-memory `Repository`.
 - `CLI` is the only place that wires config → db → repo → commands.
 
+### Future layer separation
+
+After Gate 3 the system may benefit from formalizing four independent layers:
+
+```
+Package Format       — .pkg.tar.zst schema, metadata fields
+Repository Format    — by-name layout, signing, index protocol
+Build Recipes        — package.toml + recipe.sh + patches/files
+Package Manager      — resolver, installer, transaction, hooks
+```
+
+Each layer has its own version, documentation, and stability guarantees.
+The current codebase already approximates this separation (builder lives
+in `meow-build`, repository logic in `meow-repo`/`meow-server`, client in
+`meow`), but the boundaries are not yet explicit at the format/contract
+level.
+
 ## Design invariants
 
 - **Repository metadata is the source of truth** for resolution; downloads

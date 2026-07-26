@@ -61,3 +61,17 @@ These are intentionally *not* part of the initial groups feature:
   individual member packages; a future phase may track membership for bulk
   removal.
 - nested groups and version-pinned group members.
+- groups as data files (`repo/groups/<name>.toml`) instead of inline in
+  `meow.toml`. Declaring groups outside config makes them shareable across
+  installs, syncable from a repository, and usable by tooling without parsing
+  the whole config:
+
+  ```toml
+  # repo/groups/base.toml
+  name = "base"
+  packages = ["filesystem", "glibc", "bash", "coreutils", "gcc"]
+  ```
+
+  The `meow` CLI would need no built-in knowledge of "base" — it reads the
+  file and expands the list. This also enables community-contributed groups
+  without config changes.

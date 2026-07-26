@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Future-direction docs:** packaging.md, package-groups.md, architecture.md
+  now document the planned layer separation (Package Format / Repository Format
+  / Build Recipes / Package Manager), groups as data files, and Package Format
+  v2 as a post-Gate-3 project.
 - **Gate 2: Bootstrap userspace** — complete toolchain, core userspace, and
   GNU build stack for meowOS distribution
   - Toolchain: `binutils` 2.46.1, `glibc` 2.42, `gcc-stage1` 15.2.0 (C only),

@@ -106,3 +106,42 @@ Create `pkgs/by-name/<shard>/<pkgname>/package.toml` and build with:
 
 Commit the `package.toml` and the built artifact to `repo/packages/`.
 Maintain shard layout—do not commit to an incorrect shard.
+
+## Future directions
+
+The current format embeds build phases directly in `package.toml`. After
+bootstrapping ~50+ packages, a cleaner separation may emerge:
+
+```
+package.toml          — metadata (name, version, deps, sources)
+recipe.sh             — configure/build/install steps
+patches/              — upstream patches
+files/                — static files
+```
+
+Each file is smaller and focused. The build system (`meow-build`) reads
+`package.toml` for metadata, then dispatches to `recipe.sh` for phases.
+This also makes it easier to share recipes between distros.
+
+### Package Format v2
+
+A post-Gate-3 project. Redesign package format from experience with 50+
+real packages. Key questions:
+
+- What metadata repeated across every package? Move to convention.
+- What does `meow-build` actually need to know? Remove the rest.
+- What belongs in the package artifact vs the repository vs the recipe?
+- How do virtual packages (`provides = ["editor"]`) interact with the resolver
+  as first-class concepts rather than metadata side-effects?
+
+Separating the layers explicitly:
+
+```
+Package Format       — .pkg.tar.zst internals, metadata schema
+Repository Format    — by-name layout, signing, index
+Build Recipes        — package.toml + recipe.sh + patches
+Package Manager      — resolver, installer, transaction engine
+```
+
+This decoupling lets each layer evolve independently and makes the system
+easier to reason about.
