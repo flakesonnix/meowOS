@@ -59,7 +59,15 @@ make -j"${MEOW_JOBS}"
 install = '''
 cd "${build}"
 make DESTDIR="${out}" install
-rm -f "${out}/usr/share/info/dir"
+
+# Fix absolute symlink in lib64/ld-linux-x86-64.so.2
+if [ -L "${out}/lib64/ld-linux-x86-64.so.2" ]; then
+    target=$(readlink "${out}/lib64/ld-linux-x86-64.so.2")
+    if [[ "$target" == /* ]]; then
+        rm -f "${out}/lib64/ld-linux-x86-64.so.2"
+        ln -sf /usr/lib/ld-linux-x86-64.so.2 "${out}/lib64/ld-linux-x86-64.so.2"
+    fi
+fi
 '''
 
 [build.environment]

@@ -5,42 +5,20 @@ architecture = "AMD64"
 description = "Zstandard - fast real-time compression algorithm"
 license = "BSD-3-Clause"
 depends = ["glibc"]
-
 [source]
 url = "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
 sha256 = "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
-
 [phases]
 configure = '''
-_SYSROOT="/tmp/meow-install"
-export CC="gcc --sysroot=$_SYSROOT"
-export CFLAGS="-O2"
-
 mkdir -p "${build}"
 cd "${src}"
 # zstd uses raw Makefiles, no separate configure step
 '''
-
 build = '''
-_SYSROOT="/tmp/meow-install"
-export CC="gcc --sysroot=$_SYSROOT"
-export CFLAGS="-O2"
-
 cd "${src}"
 make -j"${MEOW_JOBS}" zstd
 '''
-
 install = '''
 cd "${src}"
 make DESTDIR="${out}" PREFIX=/usr install
-
-shopt -s nullglob
-for _f in "${out}/usr/bin/"*; do
-  if file "$_f" 2>/dev/null | grep -q "ELF.*executable"; then
-    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
-             --set-rpath /usr/lib:/usr/lib64 "$_f"
-  fi
-done
-
-rm -f "${out}/usr/share/info/dir" 2>/dev/null || true
 '''

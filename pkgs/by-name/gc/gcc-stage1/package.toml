@@ -79,7 +79,6 @@ make -j"${MEOW_JOBS}" -s check-gcc 2>&1 | tail -20 || true
 install = '''
 cd "${build}"
 make DESTDIR="${out}" install-gcc
-rm -f "${out}/usr/share/info/dir"
 '''
 
 [build.environment]

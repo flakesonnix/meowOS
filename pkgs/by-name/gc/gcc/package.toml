@@ -93,7 +93,6 @@ make -j"${MEOW_JOBS}" CFLAGS="-Wno-error=format-security" CXXFLAGS="-Wno-error=f
 install = '''
 cd "${build}"
 make DESTDIR="${out}" install-gcc install-target-libgcc install-target-libstdc++-v3
-rm -f "${out}/usr/share/info/dir"
 '''
 
 [build.environment]

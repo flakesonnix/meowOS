@@ -12,6 +12,8 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include <cstdlib>
+#include <array>
 
 namespace meow::builder {
     namespace {
@@ -130,6 +132,72 @@ namespace meow::builder {
             return os.str();
         }
 
+        // ELF magic detection
+        bool isElf(const std::string& data) {
+            return data.size() >= 4
+                && static_cast<unsigned char>(data[0]) == 0x7f
+                && data[1] == 'E'
+                && data[2] == 'L'
+                && data[3] == 'F';
+        }
+
+        static const std::array<std::string, 5> elfSkipPrefixes = {
+            "files/usr/lib/debug/",
+            "files/usr/share/",
+            "files/usr/include/",
+            "files/usr/src/",
+            "files/usr/man/"
+        };
+        bool shouldSkipElfPatch(const std::string& name) {
+            for (const auto& p : elfSkipPrefixes)
+                if (name.size() >= p.size() && name.substr(0, p.size()) == p)
+                    return true;
+            return false;
+        }
+
+        std::vector<ArchiveEntry> removeInfoDir(std::vector<ArchiveEntry> entries) {
+            std::vector<ArchiveEntry> out;
+            out.reserve(entries.size());
+            for (auto& e : entries) {
+                if (e.name == "files/usr/share/info/dir" ||
+                    e.name == "files/usr/info/dir" ||
+                    e.name == "files/share/info/dir" ||
+                    e.name == "files/info/dir")
+                    continue;
+                out.push_back(std::move(e));
+            }
+            return out;
+        }
+
+        std::string patchElf(const ArchiveEntry& e) {
+            auto tmpDir = std::filesystem::temp_directory_path() / "meow-elf-XXXXXX";
+            std::string tmpl = tmpDir.string();
+            if (!mkdtemp(tmpl.data())) {
+                throw error::MeowError(error::ErrorCode::Internal,
+                    "failed to create temp dir for ELF patching");
+            }
+            tmpDir = tmpl;
+            auto binPath = tmpDir / e.name;
+            std::filesystem::create_directories(binPath.parent_path());
+            {
+                std::ofstream f(binPath, std::ios::binary);
+                f.write(e.content.data(), static_cast<std::streamsize>(e.content.size()));
+            }
+            std::system(("patchelf --set-interpreter /usr/lib/meow/ld-linux-x86-64.so.2 " +
+                         binPath.string() + " 2>/dev/null").c_str());
+            std::system(("patchelf --set-rpath /usr/lib/meow:/usr/lib " +
+                         binPath.string() + " 2>/dev/null").c_str());
+            std::string result;
+            {
+                std::ifstream f(binPath, std::ios::binary);
+                std::ostringstream ss;
+                ss << f.rdbuf();
+                result = ss.str();
+            }
+            std::filesystem::remove_all(tmpDir);
+            return result;
+        }
+
         void validateMetadata(const package::PackageMetadata& meta) {
             if (meta.name.value.empty()) {
                 throw error::MeowError(error::ErrorCode::InvalidManifest,
@@ -157,7 +225,6 @@ namespace meow::builder {
 
         auto epoch = resolveSourceDateEpoch(metadata.build);
 
-        auto archName = metadata.architecture == types::CpuArch::AMD64 ? "amd64" : "aarch64";
         std::string pkgFilename = metadata.name.value + "-" + metadata.version.value + ".pkg.tar.zst";
         auto outPath = opts.outputDir / pkgFilename;
 
@@ -174,6 +241,21 @@ namespace meow::builder {
         collectDir(opts.sourceDir / "files", "files", dirs, files);
         collectDir(opts.sourceDir / "scripts", "scripts", dirs, files);
         collectDir(opts.sourceDir / "metadata", "metadata", dirs, files);
+
+        // Post-processing: remove info/dir, patch ELF binaries.
+        files = removeInfoDir(std::move(files));
+        for (auto& f : files) {
+            if (f.isDir || f.isSymlink || f.content.empty()) continue;
+            if (shouldSkipElfPatch(f.name)) continue;
+            if (isElf(f.content)) {
+                try {
+                    log::log(log::LogLevel::Info, "patching ELF: " + f.name);
+                    f.content = patchElf(f);
+                } catch (const std::exception& e) {
+                    log::log(log::LogLevel::Info, std::string("ELF patch skipped: ") + e.what());
+                }
+            }
+        }
 
         // Synthetic build metadata (always written, makes builds self-describing).
         ArchiveEntry buildInfo;

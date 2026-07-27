@@ -2,27 +2,19 @@ format_version = 1
 name = "flex"
 version = "2.6.4"
 architecture = "AMD64"
-
 description = "Fast lexical analyzer generator"
 license = "BSD"
-
 depends = [
     "m4",
     "gcc",
     "glibc",
     "make"
 ]
-
 [source]
 url = "https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz"
 sha256 = "e87aae032bf07c26f85ac0ed3250998c37621d95f8bd748b31f15b33c45ee995"
-
 [phases]
 configure = '''
-_SYSROOT="/tmp/meow-install"
-export CC="gcc --sysroot=$_SYSROOT"
-export CFLAGS="-O2"
-
 mkdir -p "${build}"
 cd "${build}"
 "${src}/configure" \
@@ -31,10 +23,6 @@ cd "${build}"
   --disable-nls
 '''
 build = '''
-_SYSROOT="/tmp/meow-install"
-export CC="gcc --sysroot=$_SYSROOT"
-export CFLAGS="-O2"
-
 cd "${build}"
 make -j"${MEOW_JOBS}"
 '''
@@ -42,7 +30,6 @@ install = '''
 cd "${build}"
 make DESTDIR="${out}" install
 '''
-
 [build]
 reproducible = true
 source_date_epoch = 1721520000

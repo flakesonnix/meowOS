@@ -2,35 +2,23 @@ format_version = 1
 name = "autoconf"
 version = "2.72"
 architecture = "AMD64"
-
 description = "Automatic configure script builder"
 license = "GPL-3.0-or-later"
-
 depends = [
     "perl",
     "m4"
 ]
-
 [source]
 url = "https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.xz"
 sha256 = "ba885c1319578d6c94d46e9b0dceb4014caafe2490e437a0dbca3f270a223f5a"
-
 [phases]
 configure = '''
-_SYSROOT="/tmp/meow-install"
-export CC="gcc --sysroot=$_SYSROOT"
-export CFLAGS="-O2"
-
 cd "${build}"
 "${src}/configure" \
   --prefix=/usr \
   --host=x86_64-pc-linux-gnu
 '''
 build = '''
-_SYSROOT="/tmp/meow-install"
-export CC="gcc --sysroot=$_SYSROOT"
-export CFLAGS="-O2"
-
 cd "${build}"
 make -j"${MEOW_JOBS}"
 '''
@@ -38,7 +26,6 @@ install = '''
 cd "${build}"
 make DESTDIR="${out}" install
 '''
-
 [build]
 reproducible = true
 source_date_epoch = 1721520000
