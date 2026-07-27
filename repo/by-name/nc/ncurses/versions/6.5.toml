@@ -1,0 +1,4 @@
+[artifact]
+filename = "ncurses-6.5.pkg.tar.zst"
+url = "file:///var/tmp/meow/pkg-out/ncurses-6.5.pkg.tar.zst"
+sha256 = "0b1c71e6bb3738b9ca5602c65eaeddca9863f065de89000ac631350ce101c84f"

@@ -1,0 +1,41 @@
+format_version = 1
+name = "htop"
+version = "3.4.0"
+architecture = "AMD64"
+description = "Interactive process viewer"
+license = "GPL-2.0-only"
+depends = ["glibc", "ncurses"]
+
+[source]
+url = "https://github.com/htop-dev/htop/releases/download/3.4.0/htop-3.4.0.tar.xz"
+sha256 = "feaabd2d31ca27c09c367a3b1b547ea9f96105fc41f4dfa799e2f49daad5de29"
+
+[phases]
+configure = '''
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+export PKG_CONFIG_LIBDIR="${_SYSROOT}/usr/lib/pkgconfig:${_SYSROOT}/usr/share/pkgconfig"
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+    --prefix=/usr \
+    --host=x86_64-pc-linux-gnu
+'''
+build = '''
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+
+shopt -s nullglob
+for _f in "${out}/usr/bin/"*; do
+  if file "$_f" 2>/dev/null | grep -q "ELF.*executable"; then
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+             --set-rpath /usr/lib:/usr/lib64 "$_f"
+  fi
+done
+
+rm -f "${out}/usr/share/info/dir"
+'''

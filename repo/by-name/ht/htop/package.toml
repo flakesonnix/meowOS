@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "htop"
+version = "3.4.0"
+architecture = "AMD64"
+description = "Interactive process viewer"
+depends = ["glibc", "ncurses"]

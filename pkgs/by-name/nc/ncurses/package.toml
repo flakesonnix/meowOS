@@ -1,0 +1,53 @@
+format_version = 1
+name = "ncurses"
+version = "6.5"
+architecture = "AMD64"
+description = "System V Release 4.0 curses emulation library"
+license = "MIT"
+depends = ["glibc"]
+
+[source]
+url = "https://ftp.gnu.org/gnu/ncurses/ncurses-6.5.tar.gz"
+sha256 = "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
+
+[phases]
+configure = '''
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" \
+    --prefix=/usr \
+    --host=x86_64-pc-linux-gnu \
+    --with-shared \
+    --without-ada \
+    --without-debug \
+    --without-manpages \
+    --without-tests \
+    --enable-widec \
+    --enable-overwrite
+'''
+build = '''
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+
+# Symlink libncurses.so -> libncursesw.so for compatibility
+ln -sf libncursesw.so "${out}/usr/lib/libncurses.so"
+ln -sf libncursesw.so.6 "${out}/usr/lib/libncurses.so.6"
+ln -sf libncursesw.so "${out}/usr/lib/libcurses.so"
+ln -sf libncursesw.so.6 "${out}/usr/lib/libcurses.so.6"
+
+shopt -s nullglob
+for _f in "${out}/usr/bin/"*; do
+  if file "$_f" 2>/dev/null | grep -q "ELF.*executable"; then
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+             --set-rpath /usr/lib:/usr/lib64 "$_f"
+  fi
+done
+
+rm -f "${out}/usr/share/info/dir"
+'''

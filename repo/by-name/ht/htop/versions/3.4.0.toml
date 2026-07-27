@@ -1,0 +1,4 @@
+[artifact]
+filename = "htop-3.4.0.pkg.tar.zst"
+url = "file:///var/tmp/meow/pkg-out/htop-3.4.0.pkg.tar.zst"
+sha256 = "6ec7d43d1d7c8142454bce4253407d74b9c1eb87140fd3e84c701acabab59818"

@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "ncurses"
+version = "6.5"
+architecture = "AMD64"
+description = "System V Release 4.0 curses emulation library"
+depends = ["glibc"]
