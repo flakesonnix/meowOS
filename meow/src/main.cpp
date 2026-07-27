@@ -31,11 +31,24 @@
 namespace {
     const auto lockfilePath = std::filesystem::path("meow.lock");
 
-    const auto installRoot = []() -> std::filesystem::path {
+    const auto defaultInstallRoot = []() -> std::filesystem::path {
         const char* env = std::getenv("MEOW_TMPDIR");
         if (env && *env) return std::filesystem::path(env) / "install";
         return std::filesystem::path("/var/tmp/meow") / "install";
     }();
+
+    std::filesystem::path g_installRoot;
+    std::filesystem::path g_dbPath;
+
+    std::filesystem::path getInstallRoot() {
+        if (!g_installRoot.empty()) return g_installRoot;
+        return defaultInstallRoot;
+    }
+
+    std::filesystem::path getDbPath() {
+        if (!g_dbPath.empty()) return g_dbPath;
+        return getInstallRoot() / "var/lib/meow/database.sqlite";
+    }
 
      void cmdInfo(const meow::repository::Repository& repo, std::string_view name) {
          auto pkg = meow::repository::resolvePackage(repo, meow::types::PackageName{std::string(name)});
@@ -286,9 +299,17 @@ namespace {
     std::vector<meow::package::PackageFile> resolveAndStage(
         const meow::repository::Repository& repo,
         const meow::config::Config& cfg,
-        const std::vector<std::pair<meow::types::PackageName, meow::types::PackageVersion>>& selected) {
+        const std::vector<std::pair<meow::types::PackageName, meow::types::PackageVersion>>& selected,
+        meow::database::Database* db) {
         std::vector<meow::download::DownloadTask> tasks;
         for (const auto& [name, version] : selected) {
+            // Skip if already installed at this version
+            if (db) {
+                auto installedVer = meow::database::installedVersion(*db, name);
+                if (installedVer && installedVer->value == version.value) {
+                    continue;
+                }
+            }
             const auto* rp = meow::repository::findPackage(repo, name);
             if (!rp) {
                 throw meow::error::MeowError(meow::error::ErrorCode::PackageNotFound,
@@ -313,12 +334,23 @@ namespace {
         meow::log::log(meow::log::LogLevel::Info,
                        "downloading " + std::to_string(tasks.size()) +
                            " artifacts in parallel");
+        if (!tasks.empty()) {
+            std::cout << "  \x1b[36m→\x1b[0m Downloading " << tasks.size() << " package(s)...\n";
+        }
         meow::download::downloadAll(queue, tasks);
 
         std::vector<meow::package::PackageFile> toInstall;
         for (const auto& [name, version] : selected) {
+            // Skip if already installed at this version
+            if (db) {
+                auto installedVer = meow::database::installedVersion(*db, name);
+                if (installedVer && installedVer->value == version.value) {
+                    std::cout << "  \x1b[32m✓\x1b[0m " << name.value << " " << version.value << " \x1b[90m(already installed)\x1b[0m\n";
+                    continue;
+                }
+            }
             auto pkg = meow::repository::resolvePackage(repo, name, version);
-            std::cout << "  " << name.value << " " << pkg.metadata.version.value << "\n";
+            std::cout << "  \x1b[32m→\x1b[0m " << name.value << " " << pkg.metadata.version.value << "\n";
             toInstall.push_back(std::move(pkg));
         }
         return toInstall;
@@ -329,7 +361,8 @@ namespace {
     std::vector<meow::package::PackageFile> resolveAndStage(
         const meow::repository::Repository& repo,
         const meow::config::Config& cfg,
-        const std::vector<meow::types::PackageName>& names) {
+        const std::vector<meow::types::PackageName>& names,
+        meow::database::Database* db = nullptr) {
         std::vector<std::pair<meow::types::PackageName, meow::types::PackageVersion>> selected;
         std::set<std::string> seen;
         for (const auto& name : names) {
@@ -338,6 +371,13 @@ namespace {
             auto nameset = meow::repository::resolveDependencyNames(repo, name);
             for (const auto& n : nameset) {
                 if (!seen.insert(n.value).second) continue;
+                // Skip if already installed at latest version
+                if (db) {
+                    auto installedVer = meow::database::installedVersion(*db, n);
+                    if (installedVer) {
+                        continue;
+                    }
+                }
                 const auto* rp = meow::repository::findPackage(repo, n);
                 if (!rp) {
                     throw meow::error::MeowError(meow::error::ErrorCode::PackageNotFound,
@@ -351,7 +391,7 @@ namespace {
                 selected.emplace_back(n, *ver);
             }
         }
-        return resolveAndStage(repo, cfg, selected);
+        return resolveAndStage(repo, cfg, selected, db);
     }
 
     void cmdGroupList(const meow::config::Config& cfg,
@@ -437,11 +477,15 @@ int main(int argc, char** argv) {
     std::string dbPath;
     std::string repositoryOverride;
     std::string configPath;
+    std::string installRootPath;
     int argi = 1;
     while (argi < argc) {
         std::string_view a = argv[argi];
         if (a == "--db-path" && argi + 1 < argc) {
             dbPath = argv[++argi];
+            ++argi;
+        } else if (a == "--root" && argi + 1 < argc) {
+            installRootPath = argv[++argi];
             ++argi;
         } else if (a == "--repository" && argi + 1 < argc) {
             repositoryOverride = argv[++argi];
@@ -454,8 +498,11 @@ int main(int argc, char** argv) {
         }
     }
 
+    if (!installRootPath.empty()) g_installRoot = installRootPath;
+    if (!dbPath.empty()) g_dbPath = dbPath;
+
     if (argi >= argc || std::string_view(argv[argi]) == "--help") {
-        std::cerr << "usage: meow [--db-path <path>] [--config <file>] [--repository <url>] <command> [args]\n"
+        std::cerr << "usage: meow [--db-path <path>] [--root <path>] [--config <file>] [--repository <url>] <command> [args]\n"
                   << "\n"
                   << "Commands:\n"
                   << "  info       <package>       show package details\n"
@@ -478,6 +525,7 @@ int main(int argc, char** argv) {
                   << "  explain    <package>       detailed package info (reason, requires, provides)\n"
                   << "  why-not    <package>       show why a package cannot be installed\n"
                   << "  doctor     [--json] [--security]  system diagnostics\n"
+                  << "  bootstrap  [--force] <rootfs> [packages...]  bootstrap a root filesystem (default: base meta-package)\n"
                   << "  keys       list|add        manage trusted signing keys\n"
                   << "  clean                      clear repository cache\n";
         return 1;
@@ -556,21 +604,30 @@ int main(int argc, char** argv) {
             meow::repository::setSecurityPolicy(policy);
         }
 
+                // Parse command first
+        std::string_view cmd = cmdArgv[0];
+
         meow::repository::RepositoryManager manager(cfg);
         meow::repository::Repository repo = manager.mergedRepository();
-        auto db = meow::database::openDatabase(dbPath.empty() ? "" : dbPath);
+
+        // Open database for all commands except bootstrap (which creates its own DB)
+        auto db = meow::database::Database{};
+        if (cmd != "bootstrap") {
+            // Ensure database directory exists
+            auto dbPath = getDbPath();
+            std::filesystem::create_directories(dbPath.parent_path());
+            db = meow::database::openDatabase(dbPath);
+        }
 
         // If no repository could be loaded, surface the failure for any
         // command that depends on repository metadata. This keeps a single
         // broken source a loud error while still tolerating failures when at
         // least one healthy repository is available.
-        if (manager.repositories().empty() && cmd != std::string_view("keys") && cmd != std::string_view("clean")) {
+        if (manager.repositories().empty() && cmd != std::string_view("keys") && cmd != std::string_view("clean") && cmd != std::string_view("bootstrap")) {
             std::cerr << "error: no repository available: "
                       << manager.lastError() << "\n";
             return 1;
         }
-
-        std::string_view cmd = cmdArgv[0];
 
         // doctor reports every configured repository via the manager; a
         // broken source is surfaced as a check rather than aborting.
@@ -679,6 +736,7 @@ int main(int argc, char** argv) {
                 rreq.roots.push_back(meow::types::PackageName{pkgName});
                 rreq.includeAllOptional = withOptional;
                 rreq.selectedOptional = selectedOptional;
+                rreq.db = &db;
                 auto resolution = resolver->resolve(repo, rreq);
 
                 if (!resolution.ok) {
@@ -702,13 +760,13 @@ int main(int argc, char** argv) {
                 }
 
                 meow::log::log(meow::log::LogLevel::Info, "resolving dependency names");
-                toInstall = resolveAndStage(repo, cfg, selected);
+                toInstall = resolveAndStage(repo, cfg, selected, &db);
             }
 
             meow::log::log(meow::log::LogLevel::Info, "installing packages");
             meow::install::installPackages(toInstall, requested,
                                            meow::database::InstallReason::Explicit,
-                                           installRoot, db);
+                                           getInstallRoot(), db);
 
             if (!locked) {
                 cmdSaveLockfile(toInstall, repo);
@@ -732,6 +790,7 @@ int main(int argc, char** argv) {
                 std::string groupName = cmdArgv[2];
 
                 // Look up group: first in config, then in repo/groups/*.toml.
+                meow::config::PackageGroup foundGroup;
                 const meow::config::PackageGroup* grp = nullptr;
                 for (const auto& g : cfg.groups) {
                     if (g.name == groupName) { grp = &g; break; }
@@ -743,7 +802,11 @@ int main(int argc, char** argv) {
                             if (repoPath.empty()) continue;
                             auto fileGroups = meow::config::loadRepoGroups(repoPath);
                             for (const auto& g : fileGroups) {
-                                if (g.name == groupName) { grp = &g; break; }
+                                if (g.name == groupName) {
+                                    foundGroup = g;
+                                    grp = &foundGroup;
+                                    break;
+                                }
                             }
                             if (grp) break;
                         }
@@ -755,8 +818,15 @@ int main(int argc, char** argv) {
                     return 1;
                 }
                 std::vector<meow::types::PackageName> members;
-                for (const auto& p : grp->packages)
-                    members.push_back(meow::types::PackageName{p});
+                for (const auto& p : grp->packages) {
+                    // Skip packages already installed at the same version
+                    auto installedVer = meow::database::installedVersion(db, meow::types::PackageName{p});
+                    if (!installedVer) {
+                        members.push_back(meow::types::PackageName{p});
+                    } else {
+                        std::cout << "  \x1b[32m✓\x1b[0m " << p << " " << installedVer->value << " \x1b[90m(already installed)\x1b[0m\n";
+                    }
+                }
 
                 // Expand the group to its members and install them all in one
                 // atomic transaction. A group is an expansion alias, not a
@@ -764,7 +834,7 @@ int main(int argc, char** argv) {
                 // packages, never a synthetic "group" entity.
                 meow::log::log(meow::log::LogLevel::Info,
                                "expanding group " + groupName);
-                auto toInstall = resolveAndStage(repo, cfg, members);
+                auto toInstall = resolveAndStage(repo, cfg, members, &db);
 
                 meow::log::log(meow::log::LogLevel::Info,
                                "installing group " + groupName);
@@ -772,7 +842,7 @@ int main(int argc, char** argv) {
                 for (const auto& p : grp->packages) requested.insert(p);
                 meow::install::installPackages(toInstall, requested,
                                                meow::database::InstallReason::GroupMember,
-                                               installRoot, db);
+                                               getInstallRoot(), db);
                 cmdSaveLockfile(toInstall, repo);
                 std::cout << "\ndone\n";
             } else {
@@ -784,7 +854,7 @@ int main(int argc, char** argv) {
                 std::cerr << "usage: meow upgrade <package>\n";
                 return 1;
             }
-            auto result = meow::upgrade::upgradePackage(repo, db, meow::types::PackageName{cmdArgv[1]}, installRoot);
+            auto result = meow::upgrade::upgradePackage(repo, db, meow::types::PackageName{cmdArgv[1]}, getInstallRoot());
             if (result.upToDate) {
                 std::cout << cmdArgv[1] << " " << result.oldVersion->value << " is already up to date\n";
             }
@@ -799,7 +869,7 @@ int main(int argc, char** argv) {
         } else if (cmd == "repair") {
             if (cmdArgc >= 2) {
                 meow::log::log(meow::log::LogLevel::Info, std::string("checking ") + cmdArgv[1]);
-                auto result = meow::repair::repairPackage(repo, db, meow::types::PackageName{cmdArgv[1]}, installRoot);
+                auto result = meow::repair::repairPackage(repo, db, meow::types::PackageName{cmdArgv[1]}, getInstallRoot());
                 if (result.ok) {
                     std::cout << "  " << cmdArgv[1] << " OK\n";
                 } else {
@@ -809,7 +879,7 @@ int main(int argc, char** argv) {
                 }
             } else {
                 meow::log::log(meow::log::LogLevel::Info, "checking installed packages");
-                auto result = meow::repair::repairAll(repo, db, installRoot);
+                auto result = meow::repair::repairAll(repo, db, getInstallRoot());
                 for (const auto& f : result.repaired) {
                     std::cout << "  \x1b[32m\u2713 " << f << "\x1b[0m\n";
                 }
@@ -948,39 +1018,37 @@ int main(int argc, char** argv) {
             meow::repository::clearRepositoryCache();
             std::cout << "cache cleared\n";
         } else if (cmd == "bootstrap") {
-            bool verbose = false;
-            bool quiet = false;
-            std::string rootfsPath;
-            std::vector<std::string> packageNames;
+            meow::bootstrap::BootstrapOptions bopts;
 
             for (int i = 1; i < cmdArgc; ++i) {
-                if (std::string_view(cmdArgv[i]) == "--verbose") {
-                    verbose = true;
-                } else if (std::string_view(cmdArgv[i]) == "--quiet") {
-                    quiet = true;
-                } else if (rootfsPath.empty()) {
-                    rootfsPath = cmdArgv[i];
+                std::string_view a = cmdArgv[i];
+                if (a == "--verbose") {
+                    bopts.verbose = true;
+                } else if (a == "--quiet") {
+                    bopts.quiet = true;
+                } else if (a == "--force") {
+                    bopts.force = true;
+                } else if (bopts.root.empty()) {
+                    bopts.root = cmdArgv[i];
                 } else {
-                    packageNames.push_back(cmdArgv[i]);
+                    bopts.packages.push_back(cmdArgv[i]);
                 }
             }
 
-            if (verbose && quiet) {
+            if (bopts.verbose && bopts.quiet) {
                 std::cerr << "error: --verbose and --quiet are mutually exclusive\n";
                 return 1;
             }
 
-            if (rootfsPath.empty()) {
-                std::cerr << "usage: meow bootstrap [--verbose] [--quiet] <rootfs> <packages...>\n";
+            if (bopts.root.empty()) {
+                std::cerr << "usage: meow bootstrap [--verbose] [--quiet] [--force] <rootfs> [packages...]\n"
+                          << "\n"
+                          << "  Defaults to the 'base' meta-package when no packages given.\n"
+                          << "  Specify packages explicitly to override.\n";
                 return 1;
             }
 
-            if (packageNames.empty()) {
-                std::cerr << "usage: meow bootstrap [--verbose] [--quiet] <rootfs> <packages...>\n";
-                return 1;
-            }
-
-            meow::bootstrap::bootstrapRootFS(rootfsPath, packageNames, verbose);
+            meow::bootstrap::bootstrapRootFS(bopts, cfg);
         } else {
             std::cerr << "unknown command: " << cmd << "\n";
             return 1;
