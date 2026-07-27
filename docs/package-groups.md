@@ -17,9 +17,9 @@ packages = ["gcc", "make", "binutils"]
 ```
 
 ```toml
-# repo/groups/base.toml — file-based group (preferred)
-name = "base"
-packages = ["filesystem", "glibc", "bash", "coreutils", "gcc"]
+# repo/groups/editors.toml — file-based group (preferred)
+name = "editors"
+packages = ["vim", "emacs", "nano"]
 ```
 
 ## Commands

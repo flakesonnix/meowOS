@@ -64,9 +64,9 @@ Bootstrap userspace: **29 packages defined, 20 built in repo**.
 | 🐚 Interpreter | perl | ✅ complete |
 | 🏗️ GNU build stack | autoconf, automake, libtool | ✅ complete |
 | 🎨 Extra | neofetch | ✅ complete |
-| **👪 base group** | Install via `meow group install base` | ⏳ pending validation |
+| **📦 base meta-package** | Install via `meow bootstrap rootfs` (default) | ✅ complete |
 
-Next: `meow bootstrap rootfs && meow group install base` on a fresh rootfs.
+Next: `meow bootstrap rootfs` pulls the `base` meta-package with all 27 deps.
 
 ## Bootstrapping rules
 

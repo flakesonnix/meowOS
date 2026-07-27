@@ -18,7 +18,7 @@ Gate 2
 │                             findutils, diffutils, patch, tar, gzip, xz, zstd)
 ├── ✅ GNU build stack       (m4, bison, flex, perl, autoconf, automake, libtool)
 │
-├── ⏳ base group install    (meow bootstrap rootfs → meow group install base)
+├── ✅ base meta-package     (meow bootstrap rootfs installs base + 27 deps)
 ├── ⏳ Regression Suite      (verify all tools; meow owns; toolchain smoke test)
 ├── ⏳ Fresh RootFS rebuild  (repeat cleanly with no manual intervention)
 └── ⏳ Exit Checklist        (docs finalised, all gates green)
