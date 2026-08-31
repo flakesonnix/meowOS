@@ -42,7 +42,7 @@ std::string percentDecode(std::string s) {
     std::string out;
     for (size_t i = 0; i < s.size(); ++i) {
         if (s[i] == '%' && i + 2 < s.size()) {
-            int hi = 0, lo = 0;
+            unsigned int hi = 0;
             if (std::sscanf(s.substr(i + 1, 2).c_str(), "%2x", &hi) == 1) {
                 out.push_back(static_cast<char>(hi));
                 i += 2;

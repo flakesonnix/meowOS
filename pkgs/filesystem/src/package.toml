@@ -7,7 +7,7 @@ depends = []
 
 [source]
 url = "file:///tmp/filesystem-1.0.0.tar.gz"
-sha256 = "4c404ad521404c377a7f863b4c2e24430348c17add859e0a3fdc9b649e6a370f"
+sha256 = "9ebb0b5905f549a96040ce6a17092266139c979866942439d4829f7f0dbc1ed3"
 
 [phases]
 configure = '''

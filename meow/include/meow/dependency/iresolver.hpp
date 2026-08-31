@@ -26,7 +26,10 @@ struct ResolveRequest {
     bool includeAllOptional = false;
     std::set<types::PackageName> selectedOptional;
     const lock::Lockfile* lock = nullptr;
-    database::Database* db = nullptr;  // may be null for pure repository queries
+    database::Database* db = nullptr;
+
+    ResolveRequest() = default;
+    explicit ResolveRequest(std::vector<types::PackageName> r) : roots(std::move(r)) {}
 };
 
 // One package selected by a resolver, with enough to drive installation. The

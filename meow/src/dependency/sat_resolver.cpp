@@ -4,12 +4,21 @@
 #include <meow/sat/translate.hpp>
 #include <meow/sat/solver.hpp>
 #include <meow/error/error.hpp>
+#include <meow/database/database.hpp>
 
 #include <set>
 #include <unordered_map>
 
 namespace meow::dependency {
 namespace {
+
+static bool isAlreadyInstalled(database::Database* db,
+                                const types::PackageName& name,
+                                const types::PackageVersion& version) {
+    if (!db) return false;
+    auto ver = database::installedVersion(*db, name);
+    return ver && ver->value == version.value;
+}
 
 // After SAT returns UNSAT, collect structural diagnostics without running
 // the solver again. Scans for:
@@ -185,6 +194,11 @@ ResolveResult SatResolver::resolve(const repository::Repository& repo,
         }
         if (!ver) ver = detail::pickVersion(*rp);
         if (!ver) continue;
+
+        // Skip if already installed at the same version
+        if (isAlreadyInstalled(req.db, types::PackageName{name}, *ver)) {
+            continue;
+        }
 
         ResolvedPackage rpkg;
         rpkg.name = types::PackageName{name};

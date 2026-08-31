@@ -15,7 +15,9 @@ namespace meow::verify {
         auto entries = database::listPackageFileEntries(db, name);
 
         for (const auto& entry : entries) {
-            if (!std::filesystem::exists(entry.path)) {
+            std::error_code ec;
+            auto status = std::filesystem::symlink_status(entry.path, ec);
+            if (ec || status.type() == std::filesystem::file_type::not_found) {
                 result.missing.push_back(entry.path);
                 continue;
             }

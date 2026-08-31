@@ -1,0 +1,49 @@
+format_version = 1
+name = "base"
+version = "1.0.0"
+architecture = "AMD64"
+description = "Base system meta-package (filesystem, glibc, bash, coreutils, gcc, binutils, make, pkgconf, grep, sed, gawk, findutils, diffutils, patch, tar, gzip, xz, zstd, m4, bison, flex, perl, autoconf, automake, libtool, patchelf)"
+license = "MIT"
+depends = [
+    "filesystem",
+    "glibc",
+    "bash",
+    "coreutils",
+    "gcc",
+    "binutils",
+    "make",
+    "pkgconf",
+    "grep",
+    "sed",
+    "gawk",
+    "findutils",
+    "diffutils",
+    "patch",
+    "tar",
+    "gzip",
+    "xz",
+    "zstd",
+    "m4",
+    "bison",
+    "flex",
+    "perl",
+    "autoconf",
+    "automake",
+    "libtool",
+    "patchelf",
+]
+
+[source]
+url = "file:///tmp/base-1.0.0.tar.gz"
+sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+[phases]
+configure = '''
+echo "Meta-package: no configure needed"
+'''
+build = '''
+echo "Meta-package: no build needed"
+'''
+install = '''
+echo "Meta-package: no install needed"
+'''

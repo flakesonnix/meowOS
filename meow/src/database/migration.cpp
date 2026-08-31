@@ -5,7 +5,7 @@
 
 namespace meow::database {
 
-void migrateDatabase(Database& db, int fromVersion, int toVersion) {
+void migrateDatabase(Database& /*db*/, int fromVersion, int toVersion) {
     if (fromVersion == toVersion) return;
 
     std::ostringstream msg;

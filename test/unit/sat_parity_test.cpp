@@ -56,21 +56,6 @@ std::vector<std::string> orderedNames(const ResolveResult& r) {
 }
 
 // ResolveResult identity: same ok, same set, same versions, same order.
-bool resultIdentity(const ResolveResult& a, const ResolveResult& b) {
-    if (a.ok != b.ok) return false;
-    if (a.packages.size() != b.packages.size()) return false;
-    for (std::size_t i = 0; i < a.packages.size(); ++i) {
-        if (a.packages[i].name.value != b.packages[i].name.value) return false;
-        if (a.packages[i].version.value != b.packages[i].version.value) return false;
-        if (a.packages[i].isRoot != b.packages[i].isRoot) return false;
-    }
-    if (a.diagnostics.size() != b.diagnostics.size()) return false;
-    for (std::size_t i = 0; i < a.diagnostics.size(); ++i) {
-        if (a.diagnostics[i].kind != b.diagnostics[i].kind) return false;
-        if (a.diagnostics[i].package.value != b.diagnostics[i].package.value) return false;
-    }
-    return true;
-}
 
 // Set-level agree (order-agnostic): same ok, same packages+versions, same
 // diagnostic presence. Does NOT compare ordering — used when the two backends

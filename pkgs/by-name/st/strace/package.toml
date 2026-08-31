@@ -1,0 +1,27 @@
+format_version = 1
+name = "strace"
+version = "7.0"
+architecture = "AMD64"
+description = "Diagnostic, debugging and instructional userspace tracer"
+license = "BSD-3-Clause"
+depends = ["glibc"]
+
+[source]
+url = "https://github.com/strace/strace/releases/download/v7.0/strace-7.0.tar.xz"
+sha256 = "febf0cb567abb48f42e04906c8ef9cba7c704abf92c06a6f62cc09c73461e7b8"
+
+[phases]
+configure = '''
+mkdir -p "${build}"
+cd "${build}"
+"${src}/configure" --prefix=/usr --host=x86_64-pc-linux-gnu
+'''
+build = '''
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+install = '''
+cd "${build}"
+make DESTDIR="${out}" install
+rm -f "${out}/usr/share/info/dir"
+'''

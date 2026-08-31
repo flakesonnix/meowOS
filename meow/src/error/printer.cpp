@@ -34,6 +34,9 @@ namespace meow::error {
             case ErrorCode::HookFailed:                codeStr = "HookFailed";               break;
             case ErrorCode::HookTimeout:               codeStr = "HookTimeout";              break;
             case ErrorCode::HookDenied:                codeStr = "HookDenied";               break;
+            case ErrorCode::AlreadyLocked:           codeStr = "AlreadyLocked";           break;
+            case ErrorCode::DownloadHttp5xx:         codeStr = "DownloadHttp5xx";         break;
+            case ErrorCode::BuildFailed:             codeStr = "BuildFailed";             break;
             case ErrorCode::Internal:                codeStr = "Internal";                break;
         }
         if (e.code == ErrorCode::RepositoryExpired) {

@@ -9,6 +9,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <set>
 
 namespace meow::install {
@@ -65,49 +66,55 @@ namespace meow::install {
         }
     }
 
-    void installPackages(const std::vector<package::PackageFile>& packages,
-                          const std::set<std::string>& requested,
-                          database::InstallReason requestReason,
-                          const std::filesystem::path& root,
-                          database::Database& db) {
-        // Serialize against any concurrent mutating operation. The lock lives
-        // for the whole extraction + commit window and is released on scope
-        // exit (also on throw / crash via the kernel).
-        auto lock = lock::InstallLock(lock::defaultInstallLockPath(db.path));
+void installPackages(const std::vector<package::PackageFile>& packages,
+                      const std::set<std::string>& requested,
+                      database::InstallReason requestReason,
+                      const std::filesystem::path& root,
+                      database::Database& db) {
+    // Serialize against any concurrent mutating operation. The lock lives
+    // for the whole extraction + commit window and is released on scope
+    // exit (also on throw / crash via the kernel).
+    auto lock = lock::InstallLock(lock::defaultInstallLockPath(db.path));
 
-        auto policy = defaultPolicy();
-        auto tx = transaction::beginTransaction();
+    auto policy = defaultPolicy();
+    auto tx = transaction::beginTransaction();
 
-        try {
-            for (const auto& pkg : packages) {
-                log::log(log::LogLevel::Info, "installing " + pkg.metadata.name.value + " " + pkg.metadata.version.value);
+    try {
+        size_t total = packages.size();
+        size_t current = 0;
+        for (const auto& pkg : packages) {
+            ++current;
+            std::cout << "  \x1b[36m[" << current << "/" << total << "]\x1b[0m Installing "
+                      << pkg.metadata.name.value << " " << pkg.metadata.version.value << "\n";
 
-                runHookFor("pre_install", hooks::HookType::PreInstall, pkg, policy);
+            runHookFor("pre_install", hooks::HookType::PreInstall, pkg, policy);
 
-                archive::Archive archive{pkg.archivePath};
-                auto files = archive::extractPackageContent(archive, root);
-                transaction::recordExtractedFiles(tx, files);
+            archive::Archive archive{pkg.archivePath};
+            auto files = archive::extractPackageContent(archive, root);
+            transaction::recordExtractedFiles(tx, files);
 
-                runHookFor("post_install", hooks::HookType::PostInstall, pkg, policy);
+            runHookFor("post_install", hooks::HookType::PostInstall, pkg, policy);
 
-                transaction::Transaction::PackageEntry entry;
-                entry.pkg = pkg;
-                entry.installedFiles = files.value;
-                // `requested` carries the names the user asked for (either a
-                // direct install target or a group member). Everything else in
-                // the closure is a transitive dependency.
-                entry.reason = requested.count(pkg.metadata.name.value)
-                    ? requestReason
-                    : database::InstallReason::Dependency;
-                tx.packages.push_back(std::move(entry));
-            }
-
-            transaction::commitTransaction(tx, db);
-            log::log(log::LogLevel::Info, "transaction committed");
-        } catch (...) {
-            log::log(log::LogLevel::Error, "transaction failed, rolling back");
-            transaction::rollbackTransaction(tx);
-            throw;
+            transaction::Transaction::PackageEntry entry;
+            entry.pkg = pkg;
+            entry.installedFiles = files.value;
+            // `requested` carries the names the user asked for (either a
+            // direct install target or a group member). Everything else in
+            // the closure is a transitive dependency.
+            entry.reason = requested.count(pkg.metadata.name.value)
+                ? requestReason
+                : database::InstallReason::Dependency;
+            tx.packages.push_back(std::move(entry));
         }
+
+        std::cout << "  \x1b[32m✓\x1b[0m Transaction committed\n";
+        transaction::commitTransaction(tx, db);
+        log::log(log::LogLevel::Info, "transaction committed");
+    } catch (...) {
+        std::cerr << "  \x1b[31m✗\x1b[0m Transaction failed, rolling back\n";
+        log::log(log::LogLevel::Error, "transaction failed, rolling back");
+        transaction::rollbackTransaction(tx);
+        throw;
     }
+}
 }

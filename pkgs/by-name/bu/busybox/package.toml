@@ -1,0 +1,128 @@
+format_version = 1
+name = "busybox"
+version = "1.37.0"
+architecture = "AMD64"
+description = "Multi-call binary combining common UNIX utilities"
+license = "GPL-2.0-only"
+depends = ["glibc"]
+
+[source]
+url = "https://busybox.net/downloads/busybox-1.37.0.tar.bz2"
+sha256 = "3311dff32e746499f4df0d5df04d7eb396382d7e108bb9250e7b519b837043a4"
+
+[phases]
+configure = '''
+export CC="gcc --sysroot=$_SYSROOT"
+export CFLAGS="-O2"
+mkdir -p "${build}"
+cp -a "${src}/." "${build}/"
+
+cd "${build}"
+make allnoconfig 2>/dev/null
+
+# Enable individual applets via the config system
+# Core
+sed -i 's/# CONFIG_MOUNT is not set/CONFIG_MOUNT=y/' .config
+sed -i 's/# CONFIG_UMOUNT is not set/CONFIG_UMOUNT=y/' .config
+sed -i 's/# CONFIG_MKDIR is not set/CONFIG_MKDIR=y/' .config
+sed -i 's/# CONFIG_MKNOD is not set/CONFIG_MKNOD=y/' .config
+sed -i 's/# CONFIG_CHROOT is not set/CONFIG_CHROOT=y/' .config
+sed -i 's/# CONFIG_PIVOT_ROOT is not set/CONFIG_PIVOT_ROOT=y/' .config
+sed -i 's/# CONFIG_SWITCH_ROOT is not set/CONFIG_SWITCH_ROOT=y/' .config
+
+# Shell
+sed -i 's/# CONFIG_BASH is not set/CONFIG_BASH=y/' .config
+sed -i 's/# CONFIG_ASH is not set/CONFIG_ASH=y/' .config
+
+# Init
+sed -i 's/# CONFIG_INIT is not set/CONFIG_INIT=y/' .config
+sed -i 's/# CONFIG_HALT is not set/CONFIG_HALT=y/' .config
+sed -i 's/# CONFIG_POWEROFF is not set/CONFIG_POWEROFF=y/' .config
+sed -i 's/# CONFIG_REBOOT is not set/CONFIG_REBOOT=y/' .config
+
+# Core file utils
+sed -i 's/# CONFIG_CAT is not set/CONFIG_CAT=y/' .config
+sed -i 's/# CONFIG_CP is not set/CONFIG_CP=y/' .config
+sed -i 's/# CONFIG_LN is not set/CONFIG_LN=y/' .config
+sed -i 's/# CONFIG_LS is not set/CONFIG_LS=y/' .config
+sed -i 's/# CONFIG_MV is not set/CONFIG_MV=y/' .config
+sed -i 's/# CONFIG_RM is not set/CONFIG_RM=y/' .config
+sed -i 's/# CONFIG_CHMOD is not set/CONFIG_CHMOD=y/' .config
+sed -i 's/# CONFIG_CHOWN is not set/CONFIG_CHOWN=y/' .config
+sed -i 's/# CONFIG_ECHO is not set/CONFIG_ECHO=y/' .config
+sed -i 's/# CONFIG_PRINTF is not set/CONFIG_PRINTF=y/' .config
+sed -i 's/# CONFIG_SLEEP is not set/CONFIG_SLEEP=y/' .config
+sed -i 's/# CONFIG_TEST is not set/CONFIG_TEST=y/' .config
+sed -i 's/# CONFIG_TRUE is not set/CONFIG_TRUE=y/' .config
+sed -i 's/# CONFIG_FALSE is not set/CONFIG_FALSE=y/' .config
+sed -i 's/# CONFIG_UNAME is not set/CONFIG_UNAME=y/' .config
+sed -i 's/# CONFIG_DMESG is not set/CONFIG_DMESG=y/' .config
+sed -i 's/# CONFIG_CLEAR is not set/CONFIG_CLEAR=y/' .config
+
+# Process utils
+sed -i 's/# CONFIG_PS is not set/CONFIG_PS=y/' .config
+sed -i 's/# CONFIG_KILL is not set/CONFIG_KILL=y/' .config
+sed -i 's/# CONFIG_GREP is not set/CONFIG_GREP=y/' .config
+sed -i 's/# CONFIG_SED is not set/CONFIG_SED=y/' .config
+sed -i 's/# CONFIG_HEAD is not set/CONFIG_HEAD=y/' .config
+sed -i 's/# CONFIG_TAIL is not set/CONFIG_TAIL=y/' .config
+sed -i 's/# CONFIG_WC is not set/CONFIG_WC=y/' .config
+
+# Networking
+sed -i 's/# CONFIG_PING is not set/CONFIG_PING=y/' .config
+sed -i 's/# CONFIG_IFCONFIG is not set/CONFIG_IFCONFIG=y/' .config
+sed -i 's/# CONFIG_HOSTNAME is not set/CONFIG_HOSTNAME=y/' .config
+sed -i 's/# CONFIG_WGET is not set/CONFIG_WGET=y/' .config
+
+# Logging
+sed -i 's/# CONFIG_SYSLOGD is not set/CONFIG_SYSLOGD=y/' .config
+sed -i 's/# CONFIG_KLOGD is not set/CONFIG_KLOGD=y/' .config
+
+# Kernel module utils
+sed -i 's/# CONFIG_MODPROBE is not set/CONFIG_MODPROBE=y/' .config
+sed -i 's/# CONFIG_LSMOD is not set/CONFIG_LSMOD=y/' .config
+sed -i 's/# CONFIG_MODINFO is not set/CONFIG_MODINFO=y/' .config
+sed -i 's/# CONFIG_INSMOD is not set/CONFIG_INSMOD=y/' .config
+sed -i 's/# CONFIG_RMMOD is not set/CONFIG_RMMOD=y/' .config
+sed -i 's/# CONFIG_DEPMOD is not set/CONFIG_DEPMOD=y/' .config
+
+# Login/accounting
+sed -i 's/# CONFIG_ADDGROUP is not set/CONFIG_ADDGROUP=y/' .config
+sed -i 's/# CONFIG_ADDUSER is not set/CONFIG_ADDUSER=y/' .config
+sed -i 's/# CONFIG_LOGIN is not set/CONFIG_LOGIN=y/' .config
+sed -i 's/# CONFIG_PASSWD is not set/CONFIG_PASSWD=y/' .config
+sed -i 's/# CONFIG_SU is not set/CONFIG_SU=y/' .config
+sed -i 's/# CONFIG_GETTY is not set/CONFIG_GETTY=y/' .config
+
+# Static build
+sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
+
+# Features
+sed -i 's/# CONFIG_FEATURE_MOUNT_LOOP is not set/CONFIG_FEATURE_MOUNT_LOOP=y/' .config
+sed -i 's/# CONFIG_FEATURE_MOUNT_LABEL is not set/CONFIG_FEATURE_MOUNT_LABEL=y/' .config
+sed -i 's/# CONFIG_FEATURE_MOUNT_FLAGS is not set/CONFIG_FEATURE_MOUNT_FLAGS=y/' .config
+sed -i 's/# CONFIG_FEATURE_INSTALLER is not set/CONFIG_FEATURE_INSTALLER=y/' .config
+
+make oldconfig -j"${MEOW_JOBS}" 2>/dev/null || true
+'''
+build = '''
+cd "${build}"
+make -j"${MEOW_JOBS}"
+'''
+install = '''
+cd "${build}"
+make CONFIG_PREFIX="${out}/usr" install
+
+mkdir -p "${out}/bin" "${out}/sbin"
+ln -sf /usr/bin/busybox "${out}/bin/sh"
+
+shopt -s nullglob
+for _f in "${out}/usr/bin/"* "${out}/bin/"* "${out}/sbin/"*; do
+  if [ -f "$_f" ] && file "$_f" 2>/dev/null | grep -q "ELF.*executable"; then
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+             --set-rpath /usr/lib:/usr/lib64 "$_f"
+  fi
+done
+
+rm -f "${out}/usr/share/info/dir"
+'''

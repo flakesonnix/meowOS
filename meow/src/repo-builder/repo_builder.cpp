@@ -24,22 +24,14 @@ namespace meow::repo {
             return s;
         }
 
-        std::string readFileContent(const std::filesystem::path& path) {
-            std::ifstream f(path, std::ios::binary);
-            if (!f) return "";
-            std::ostringstream ss;
-            ss << f.rdbuf();
-            return ss.str();
-        }
-
         void writeFileContent(const std::filesystem::path& path, const std::string& content) {
             std::filesystem::create_directories(path.parent_path());
             std::ofstream f(path);
             f << content;
         }
 
-        std::string pkgMetadataToml(const package::PackageMetadata& meta, const std::string& sha256,
-                                      const std::filesystem::path& archivePath) {
+        std::string pkgMetadataToml(const package::PackageMetadata& meta, const std::string& /*sha256*/,
+                                      const std::filesystem::path& /*archivePath*/) {
             std::ostringstream ss;
             ss << "format_version = 1\n";
             ss << "[metadata]\n";
@@ -87,7 +79,7 @@ namespace meow::repo {
             return ss.str();
         }
 
-        std::string versionToml(const std::string& version, const std::string& sha256,
+        std::string versionToml(const std::string& /*version*/, const std::string& sha256,
                                  const std::filesystem::path& archivePath) {
             std::ostringstream ss;
             ss << "[artifact]\n";

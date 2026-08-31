@@ -23,6 +23,11 @@
             bison
             flex
             arch-install-scripts
+            # ISO / bootable media
+            grub2
+            xorriso
+            squashfsTools
+            cpio
           ];
 
           # Bibliotheken, gegen die gelinkt werden soll

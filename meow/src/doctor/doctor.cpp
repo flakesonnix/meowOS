@@ -293,14 +293,10 @@ namespace {
         }
     }
 
-    std::string trustChainReason(const std::exception& e) {
-        // Best-effort: surface the underlying error message.
-        return e.what();
-    }
 }
 
 Diagnosis diagnoseSecurity(const config::Config& cfg,
-                            database::Database& db,
+                            database::Database& /*db*/,
                             const repository::RepositoryManager& manager,
                             const hooks::HookPolicy& policy) {
     std::vector<Check> checks;

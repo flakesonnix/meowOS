@@ -27,7 +27,7 @@ namespace meow::package {
         metadata.name = types::PackageName{tbl["name"].value_or("")};
         metadata.version = types::PackageVersion{tbl["version"].value_or("")};
 
-        auto cpuArch = tbl["architecture"].value_or("");
+        auto cpuArch = tbl["architecture"].value_or(std::string{});
         metadata.architecture = (cpuArch == "aarch64" || cpuArch == "AARCH64")
             ? types::CpuArch::AARCH64 : types::CpuArch::AMD64;
 

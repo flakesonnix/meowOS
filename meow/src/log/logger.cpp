@@ -4,7 +4,7 @@
 namespace meow::log {
 
 namespace {
-    LogLevel g_minLevel = LogLevel::Debug;
+    LogLevel g_minLevel = LogLevel::Warning;
 }
 
 void setLevel(LogLevel level) {
@@ -19,16 +19,16 @@ void log(LogLevel level, const std::string& message) {
     if (static_cast<int>(level) < static_cast<int>(g_minLevel)) return;
     switch (level) {
         case LogLevel::Debug:
-            std::cout << "[DEBUG] " << message << "\n";
+            std::cerr << "[DEBUG] " << message << "\n";
             break;
         case LogLevel::Info:
-            std::cout << "[INFO] " << message << "\n";
+            std::cerr << "[INFO] " << message << "\n";
             break;
         case LogLevel::Warning:
-            std::cout << "[WARN] " << message << "\n";
+            std::cerr << "[WARN] " << message << "\n";
             break;
         case LogLevel::Error:
-            std::cout << "[ERROR] " << message << "\n";
+            std::cerr << "[ERROR] " << message << "\n";
             break;
     }
 }

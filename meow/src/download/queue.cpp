@@ -6,6 +6,8 @@
 #include <queue>
 #include <thread>
 #include <vector>
+#include <iostream>
+#include <iomanip>
 
 namespace meow::download {
     namespace {
@@ -19,6 +21,23 @@ namespace meow::download {
 
         std::filesystem::path destFor(const meow::types::PackageArtifact& artifact) {
             return cacheDir() / artifact.filename;
+        }
+
+        const char* spinFrames[] = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
+
+        void printProgress(const std::string& filename, size_t current, size_t total, int frame = -1) {
+            const int barWidth = 30;
+            float progress = total > 0 ? static_cast<float>(current) / total : 0.0f;
+            int pos = static_cast<int>(barWidth * progress);
+
+            std::cout << "\r  \x1b[36m→\x1b[0m [\x1b[90m" << std::setw(3) << current << "\x1b[0m/\x1b[90m" << std::setw(3) << total << "\x1b[0m] "
+                      << "\x1b[36m";
+            for (int i = 0; i < barWidth; ++i) {
+                if (i < pos) std::cout << "█";
+                else std::cout << "░";
+            }
+            std::cout << "\x1b[0m " << "\x1b[33m" << std::fixed << std::setprecision(0) << (progress * 100.0f) << "%\x1b[0m "
+                      << "\x1b[90m" << filename << "\x1b[0m" << std::flush;
         }
     }
 
@@ -45,6 +64,7 @@ namespace meow::download {
         std::atomic<bool> failed{false};
         std::atomic<size_t> active{0};
         std::atomic<size_t> done{0};
+        std::atomic<int> frameCounter{0};
 
         auto worker = [&]() {
             for (;;) {
@@ -63,6 +83,9 @@ namespace meow::download {
 
                 try {
                     auto dest = destFor(tasks[idx].artifact);
+                    // Print progress from worker thread
+                    int frame = frameCounter.fetch_add(1) % 10;
+                    printProgress(tasks[idx].artifact.filename, done.load() + 1, tasks.size(), frame);
                     results[idx] = downloadFile(tasks[idx].artifact.url, dest);
                 } catch (...) {
                     errors[idx] = std::current_exception();
@@ -89,6 +112,10 @@ namespace meow::download {
             cv.wait(lk, [&]() { return done.load() == tasks.size() || (failed.load() && active.load() == 0); });
         }
         for (auto& t : pool) t.join();
+
+        if (done.load() > 0) {
+            std::cout << "\r" << std::string(120, ' ') << "\r" << std::flush;
+        }
 
         if (failed.load()) {
             // Clean up any partial files left behind.
