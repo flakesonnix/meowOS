@@ -329,6 +329,7 @@ set(INTEGRATION_SECTIONS
     21.optionals
     22.groups
     23.signed_index
+    24.boot
 )
 foreach(section ${INTEGRATION_SECTIONS})
     string(REPLACE "." ";" parts "${section}")
