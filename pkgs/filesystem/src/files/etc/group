@@ -1,0 +1,7 @@
+root:x:0:
+meow:x:1000:
+users:x:100:
+nobody:x:65534:
+tty:x:5:
+disk:x:6:
+wheel:x:10:meow

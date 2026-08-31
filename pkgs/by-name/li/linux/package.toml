@@ -1,0 +1,38 @@
+format_version = 1
+name = "linux"
+version = "6.14.11"
+architecture = "AMD64"
+description = "Linux kernel and modules (bootstrap prebuilt for QEMU x86_64)"
+license = "GPL-2.0-only"
+depends = ["filesystem"]
+
+[source]
+url = "file:///tmp/linux-6.14.11.tar.gz"
+sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+[phases]
+configure = '''
+echo "bootstrap kernel: no configure"
+'''
+build = '''
+echo "bootstrap kernel: no build"
+'''
+install = '''
+mkdir -p "${out}/boot"
+if [ -f "/boot/vmlinuz-7.0.0-30-generic" ]; then
+  cp /boot/vmlinuz-7.0.0-30-generic "${out}/boot/vmlinuz-6.14.11"
+  cp /boot/vmlinuz-7.0.0-30-generic "${out}/boot/vmlinuz"
+elif [ -f "/boot/vmlinuz" ]; then
+  cp /boot/vmlinuz "${out}/boot/vmlinuz-6.14.11"
+  cp /boot/vmlinuz "${out}/boot/vmlinuz"
+else
+  echo "dummy kernel" > "${out}/boot/vmlinuz-6.14.11"
+  cp "${out}/boot/vmlinuz-6.14.11" "${out}/boot/vmlinuz"
+fi
+mkdir -p "${out}/lib/modules/6.14.11"
+echo "bootstrap modules" > "${out}/lib/modules/6.14.11/modules.dep"
+'''
+
+[build]
+reproducible = true
+source_date_epoch = 1721520000

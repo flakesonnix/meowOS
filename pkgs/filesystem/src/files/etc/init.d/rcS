@@ -1,0 +1,11 @@
+#!/bin/sh
+# Gate A rcS - minimal bring-up (mounts handled by /init, kept for OpenRC compat)
+echo "rcS: meowOS Gate A"
+# Ensure essential dirs
+mkdir -p /run /tmp
+chmod 1777 /tmp
+# Set hostname
+/bin/hostname -F /etc/hostname 2>/dev/null || hostname meowOS
+# Welcome marker for QEMU tests
+echo "Welcome to meowOS"
+echo "BOOT_MARKER: userspace ready"

@@ -1,0 +1,6 @@
+NAME="meowOS"
+PRETTY_NAME="meowOS"
+ID=meowos
+VERSION_ID=0.1.0
+VERSION="0.1.0 Gate A"
+HOME_URL="https://github.com/flakesonnix/meowOS"
