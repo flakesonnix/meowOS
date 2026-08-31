@@ -3,5 +3,4 @@ format_version = 1
 name = "busybox"
 version = "1.37.0"
 architecture = "AMD64"
-description = "Multi-call binary combining common UNIX utilities"
-depends = ["glibc"]
+description = "Multi-call binary combining common UNIX utilities (static musl for initramfs)"

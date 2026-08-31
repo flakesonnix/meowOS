@@ -189,9 +189,21 @@ RepositoryPackage FilesystemRepositoryBackend::loadPackage(
 package::PackageFile FilesystemRepositoryBackend::fetchArtifact(
     const types::PackageArtifact& artifact) {
     fs::path dest = repoCacheDir(url_) / artifact.filename;
-    if (!fs::exists(dest))
-        download::downloadFile(artifact.url, dest.string(),
-                               download::DownloadOptions{});
+    if (!fs::exists(dest)) {
+        std::string url = artifact.url;
+        // Resolve relative artifact URLs against the repository root
+        // (e.g. "packages/foo-1.0.pkg.tar.zst" -> "file://<repo>/packages/...")
+        // so repositories remain portable across hosts (no absolute /home/...)
+        if (!url.starts_with("file://") && !url.starts_with("http://") &&
+            !url.starts_with("https://")) {
+            if (!url.empty()) {
+                auto root = resolveLocalPath(url_);
+                auto abs = root / url;
+                url = "file://" + abs.string();
+            }
+        }
+        download::downloadFile(url, dest.string(), download::DownloadOptions{});
+    }
     download::verifyChecksum(dest.string(), artifact.sha256);
     return package::loadPackage(dest.string());
 }

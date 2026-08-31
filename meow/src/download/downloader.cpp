@@ -285,6 +285,24 @@ namespace meow::download {
         if (url.starts_with("http://") || url.starts_with("https://")) {
             return performHttp(url, destination, options);
         }
+        // Relative artifact URLs (e.g. "packages/foo.pkg.tar.zst") for portable
+        // repositories. Try as local file relative to repo root and cwd.
+        if (!url.empty() && url.find("://") == std::string::npos) {
+            std::vector<std::filesystem::path> candidates;
+            candidates.emplace_back(url);
+            candidates.emplace_back(std::filesystem::path("repo") / url);
+            candidates.emplace_back(std::filesystem::absolute(url));
+            candidates.emplace_back(std::filesystem::absolute(std::filesystem::path("repo") / url));
+            for (auto& cand : candidates) {
+                if (std::filesystem::exists(cand)) {
+                    return performFile("file://" + cand.string(), destination, options);
+                }
+            }
+            // Also try resolving against the repository backend's cache dir?
+            // Fall back to treating as file:// with the given relative path
+            // (performFile will throw source not found with a clear message).
+            return performFile("file://" + std::filesystem::absolute(url).string(), destination, options);
+        }
         throw error::MeowError(error::ErrorCode::InvalidDownload, "unsupported URL scheme: " + url);
     }
 

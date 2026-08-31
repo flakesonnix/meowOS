@@ -1,7 +1,9 @@
 # /etc/inittab - BusyBox init (Gate A)
+# Use getty without absolute path so BusyBox init finds it via PATH
+# (BusyBox applets are in /usr/bin, and /bin is symlink to usr/bin)
 ::sysinit:/etc/init.d/rcS
-::respawn:/sbin/getty -L tty1 115200 vt100
-::respawn:/sbin/getty -L tty2 115200 vt100
-::respawn:/sbin/getty -L ttyS0 115200 vt100
-::ctrlaltdel:/sbin/reboot
-::shutdown:/bin/umount -a -r
+::respawn:getty -L tty1 115200 vt100
+::respawn:getty -L tty2 115200 vt100
+::respawn:getty -L ttyS0 115200 vt100
+::ctrlaltdel:reboot
+::shutdown:umount -a -r
