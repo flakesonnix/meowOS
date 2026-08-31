@@ -1,4 +1,4 @@
-# Package groups
+# Package groups & meta-packages
 
 A *package group* is a named, local expansion alias over a list of package
 names. Groups can be defined in two places:
@@ -22,11 +22,33 @@ name = "editors"
 packages = ["vim", "emacs", "nano"]
 ```
 
+## Meta-packages vs groups
+
+**`base` is now a meta-package, not a group.**
+
+- **Before:** `base` was a group: `meow.toml` `[[groups]] name="base"` and later
+  `repo/groups/base.toml` (29 packages). `meow group install base` expanded the
+  member list.
+- **Now:** `base` is a real package at `pkgs/by-name/ba/base/package.toml`
+  (v1.0.0, 27 `depends`). `meow bootstrap <root>` installs it by default (no
+  `--group` flag since `feat(bootstrap): default to base meta-package`). The
+  resolver treats it like any other package, and **idempotency** applies:
+  re-running `meow bootstrap` or `meow install base` skips already-installed
+  same-version deps via `installedVersion` checks in both resolvers.
+
+`repo/groups/base.toml` was deleted in `5802214`. File groups remain supported
+for other shareable sets, but the canonical way to ship a curated set like
+`base` is a meta-package so it participates in versioning, signing (`packages.toml`),
+and dependency resolution. `base-devel` stays at `pkgs/base-devel/src/package.toml`
+as a separate meta for the build toolchain.
+
 ## Commands
 
 ```
 meow group list                 # print every defined group and its members
 meow group install base-devel   # expand and install all members atomically
+meow bootstrap <root>           # installs base meta-package by default (idempotent)
+meow install base               # same as above, but via explicit package name
 ```
 
 ## Invariants
@@ -57,6 +79,13 @@ The config loader rejects malformed groups strictly:
 - a group name that collides with a reserved CLI command (`install`, `remove`,
   `update`, `group`, ...) → error, so the CLI surface never becomes ambiguous
 
+## Bootstrap note
+
+`base` via meta-package means `meow bootstrap` and `meow install` share the
+same idempotent resolver path (`ResolveRequest::db` + `installedVersion`):
+no special-case `--group` flag, no group-specific transaction logic. `--force`
+is required for `meow bootstrap` into a non-empty target.
+
 ## Out of scope (deferred)
 
 These are intentionally *not* part of the initial groups feature:
@@ -68,3 +97,5 @@ These are intentionally *not* part of the initial groups feature:
   individual member packages; a future phase may track membership for bulk
   removal.
 - nested groups and version-pinned group members.
+- `base` is no longer a group; use the `base` meta-package. File groups
+  (`repo/groups/*.toml`) remain for non-base shareable sets.

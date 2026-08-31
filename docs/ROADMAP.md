@@ -17,17 +17,19 @@ Gate 2
 ├── ✅ Core userspace        (bash, coreutils, make, pkgconf, grep, sed, gawk,
 │                             findutils, diffutils, patch, tar, gzip, xz, zstd)
 ├── ✅ GNU build stack       (m4, bison, flex, perl, autoconf, automake, libtool)
+├── ✅ Extra userspace       (ncurses, htop, busybox, strace, patchelf, neofetch)
 │
-├── ✅ base meta-package     (meow bootstrap rootfs installs base + 27 deps)
+├── ✅ base meta-package     (meow bootstrap <root> installs base + 27 deps, idempotent)
+├── ✅ Fresh RootFS          (meow bootstrap → base; re-run is no-op for satisfied deps)
+├── ✅ ISO prototype         (scripts/mkiso.sh: kernel + busybox initramfs + GRUB)
 ├── ⏳ Regression Suite      (verify all tools; meow owns; toolchain smoke test)
-├── ⏳ Fresh RootFS rebuild  (repeat cleanly with no manual intervention)
 └── ⏳ Exit Checklist        (docs finalised, all gates green)
 ```
 
 **Toolchain (complete):**
 - `binutils` 2.46.1 → `glibc` 2.42 → `gcc-stage1` 15.2.0 (C only) → `gcc-stage2` 15.2.0 → `gcc` 15.2.0 (final)
 
-**All 29 available packages:**
+**All 36 available packages (Gate 2 + extras + metas):**
 
 | Package | Version | Description |
 |---|---|---|
@@ -61,6 +63,19 @@ Gate 2
 | libtool | 2.4.7 | GNU Libtool |
 | patchelf | 0.18.0 | ELF patcher |
 | neofetch | 7.1.0 | System info tool |
+| ncurses | 6.5 | Terminal handling (wide-char, terminfo) |
+| htop | 3.4.0 | Interactive process viewer |
+| busybox | 1.37.0 | Multi-call binary for initramfs |
+| strace | 7.0 | System call tracer |
+| base | 1.0.0 | Meta-package: 27 deps (filesystem → patchelf) |
+| base-devel | 1.0.0 | Meta: build toolchain |
+
+**Recent (Unreleased — 5802214):**
+- Idempotent installs (both resolvers skip already-installed same-version via `installedVersion`).
+- Progress UX: download bar + ` [N/M] Installing` + colored commit/rollback; `log` to `stderr`, default `Warning`.
+- `verify` handles dangling symlinks via `symlink_status`; error codes `AlreadyLocked`/`DownloadHttp5xx`/`BuildFailed`.
+- ISO: `flake.nix` (+grub2/xorriso/squashfs/cpio) and `scripts/mkiso.sh` + `scripts/init.sh` (busybox initramfs + GRUB).
+- New packages: `busybox` 1.37.0, `strace` 7.0, `base` meta-package (replaces `repo/groups/base.toml`).
 
 **Known infra issue:**
 - `/tmp/build-phase-*.sh` races under parallel `-j` builds. Fix: unique temp files per build instance.

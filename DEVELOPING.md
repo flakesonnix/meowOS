@@ -7,7 +7,7 @@ Requires: CMake 3.20+, C++20 compiler, SQLite3, libarchive, OpenSSL, tomlplusplu
 ```bash
 cmake -B build
 cmake --build build
-./build/meowOS list
+./build/meow list
 ```
 
 On Nix:
@@ -24,10 +24,25 @@ Bootstrap packages are built with `meow-build`:
 
 ```bash
 ./build/meow-build pkgs/by-name/<shard>/<pkg>/package.toml
+# meta-packages (base, base-devel) need no build; they are empty deps-only:
+# pkgs/by-name/ba/base, pkgs/base-devel/src
 ```
 
 See `docs/bootstrap.md` for the bootstrap chain and `docs/packaging.md`
-for packaging conventions.
+for packaging conventions. `busybox` (1.37.0) and `strace` (7.0) follow the
+`--host=x86_64-pc-linux-gnu --sysroot` convention; `base` is built as an empty
+`pkgs/by-name/ba/base` meta (no files).
+
+### Bootstrapping a rootfs & ISO
+
+```bash
+./build/meow bootstrap /tmp/meow-root          # installs base meta-package (idempotent)
+./build/meow bootstrap --force /tmp/meow-root  # non-empty target
+scripts/mkiso.sh myos.iso                       # kernel + busybox initramfs + GRUB (needs nix develop)
+# initramfs uses scripts/init.sh (busybox init, mounts proc/sys/dev, ASCII banner)
+```
+
+`flake.nix` devShell provides ISO deps: `grub2`, `xorriso`, `squashfsTools`, `cpio`.
 
 ## Testing
 
@@ -105,10 +120,12 @@ See `docs/repository-server.md` for hosting a repository with `meow-server`.
 | `meow install --locked <pkg>` | Install from lockfile |
 | `meow install --with-optional` | Install with optional dependencies |
 | `meow install --optional <name>` | Install specific optional deps |
+| `meow bootstrap <root>` | Install `base` meta-package into rootfs (default, idempotent) |
+| `meow bootstrap --force <root>` | Force bootstrap into non-empty target |
 | `meow remove <pkg>` | Remove package |
 | `meow upgrade <pkg>` | Upgrade package |
 | `meow installed` | List installed packages |
-| `meow verify` | Check all installed files |
+| `meow verify` | Check all installed files (handles dangling symlinks) |
 | `meow repair [pkg]` | Restore missing/modified files |
 | `meow sync` | Check for updates |
 | `meow update [--dry-run]` | Upgrade all packages |
@@ -128,13 +145,22 @@ See `docs/repository-server.md` for hosting a repository with `meow-server`.
 Downloads use a libcurl-based transport (no shell execution) with TLS
 verification, timeouts, retries on transient failures, atomic
 `.part`+rename writes, checksum verification, and HTTP `ETag`/`304`
-support for caching.
+support for caching. `downloadAll` shows a colored progress bar
+(`[done/total] █░ 42% file`) and `installPackages` prints stepped
+` [N/M] Installing` with `✓`/`✗` outcome; `log::` writes to `stderr` at
+`Warning` default so `stdout` stays clean.
 
-## Resolver selection
+## Resolver selection & idempotency
 
 Set `MEOW_RESOLVER=sat` or `MEOW_RESOLVER=legacy` to switch. The default
 (`Auto`) maps to `SatResolver`. Legacy is available via `MEOW_RESOLVER=legacy`
 or `ResolverEngine::Legacy`.
+
+Both resolvers are **idempotent**: `ResolveRequest` carries `db*` and skips
+packages where `installedVersion(db, name) == resolved version`. Re-running
+`meow install` or `meow bootstrap` for satisfied deps is a no-op. New error
+codes `AlreadyLocked`, `DownloadHttp5xx`, `BuildFailed` cover lock contention
+and 5xx failover.
 
 ## Repository layout
 

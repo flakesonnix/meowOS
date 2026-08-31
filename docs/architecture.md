@@ -27,31 +27,34 @@ lockfile (meow.lock)                      ← pinned hash + version
 ## Install flow
 
 ```
-meow install <pkg>
+meow install <pkg>          meow bootstrap <root> (= install base meta-package, idempotent)
+    │                          │
+    ▼                          ▼
+config + database open (ResolveRequest carries db* for idempotency)
     │
     ▼
-config + database open
-    │
-    ▼
-    repository open  ──► signature verify ──► signed index verify ──► identity ──► expiry
+repository open  ──► signature verify ──► signed index verify ──► identity ──► expiry
     │
     ▼
 resolveDependencyNames        ← repo metadata only, no downloads
     │  (SAT: DPLL over CNF, version constraints, UNSAT diagnostics)
     │  (Legacy: topological, cycle detection, no version constraints)
+    │  Both skip already-installed same-version via installedVersion (idempotent)
     ▼
 downloadAll (parallel)        ← bounded worker pool, atomic .part + rename
     │  retries / resume / ETag / timeout / size guard
+    │  progress: colored bar [done/total] █░ 42% filename → stdout, logs → stderr
     ▼
 resolvePackage (cache hit)    ← load metadata + verify sha256
     │
     ▼
-transaction begin
-    │  for each package:
+transaction begin             ← InstallLock (flock) held for whole window
+    │  for each package (serial, deterministic):
     │     pre_install hook  ──► extract ──► post_install hook
-    │  on any failure → rollback (remove extracted files)
+    │     UI: " [N/M] Installing <name> <ver>" → stdout
+    │  on any failure → rollback (remove extracted files, "✗ Transaction failed")
     ▼
-commit → register in SQLite database
+commit → register in SQLite database  ("✓ Transaction committed")
 ```
 
 ## Module map
@@ -64,7 +67,7 @@ commit → register in SQLite database
 | Repository      | `repository`              | by-name scan, open/verify, index verify     |
 | Resolver (SAT)  | `dependency/sat`          | DPLL over CNF, version constraints, UNSAT   |
 | Resolver (Legacy)| `dependency/legacy`      | DFS-based, cycle detection, compatibility   |
-| Resolver factory| `dependency`              | `Auto → Legacy` routing (flip deferred)    |
+| Resolver factory| `dependency`              | `Auto → Sat` (legacy via `MEOW_RESOLVER=legacy`); `ResolveRequest::db` for idempotent skip |
 | Download        | `download`                | libcurl transport, atomic writes, retries   |
 | Download queue  | `download/queue`          | bounded parallel fetch of artifacts         |
 | Builder         | `builder`                 | reproducible `.pkg.tar.zst` generation       |
@@ -149,8 +152,16 @@ level.
   are independent of verification/installation.
 - **Install is strictly serial** even when artifact downloads are parallel,
   so the transaction/DB path stays deterministic.
+- **Idempotent resolve:** `LegacyResolver` and `SatResolver` both skip packages
+  where `installedVersion(db, name) == resolved version`; `meow install` and
+  `meow bootstrap` are safe to re-run. `ResolveRequest` carries `db*` and a
+  `vector<PackageName>` ctor for this.
 - **Verification never trusts the cache as a source**: an artifact is
-  re-checked against the repository-declared sha256 after download.
+  re-checked against the repository-declared sha256 after download. `verify`
+  uses `symlink_status` so dangling symlinks are `missing` not exceptions.
+- **Logging separation:** `log::` defaults to `Warning` and writes to `stderr`;
+  `stdout` is reserved for machine-readable output and progress UI
+  (`downloadAll` bar, `installPackages` step lines).
 - **Hooks are isolated, not sandboxed**: a controlled runner bounds
   runtime and environment; OS-level sandboxing (namespaces/seccomp) is a
   planned follow-up.

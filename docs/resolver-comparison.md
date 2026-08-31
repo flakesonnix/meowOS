@@ -76,6 +76,15 @@ MEOW_RESOLVER=legacy ./build/meow install app
 MEOW_RESOLVER=sat    ./build/meow install app
 ```
 
+## Idempotency
+
+Both backends are **idempotent** as of `5802214`: `ResolveRequest` carries
+`db*` and each resolver checks `installedVersion(db, name) == version` to skip
+already-installed same-version packages. `meow install base`, `meow install
+<already-installed>`, and `meow bootstrap` (which installs `base`) are no-ops
+for satisfied deps. No resolver re-downloads or re-extracts; `downloadAll` and
+`installPackages` are simply not invoked for skipped members.
+
 ## What to compare
 
 1. **Correctness parity** — `meow-unit-sat-parity` on synthetic graphs.

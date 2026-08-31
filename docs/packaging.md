@@ -107,6 +107,15 @@ Create `pkgs/by-name/<shard>/<pkgname>/package.toml` and build with:
 Commit the `package.toml` and the built artifact to `repo/packages/`.
 Maintain shard layout—do not commit to an incorrect shard.
 
+For **meta-packages** (e.g. `base` at `pkgs/by-name/ba/base`, `base-devel` at
+`pkgs/base-devel/src`), no `files/` or build phases beyond `echo` stubs are
+needed — they are empty packages that only carry `depends`. They still go
+through `meow-build`/`meow-repo` so they are signed and indexed.
+
+For **ISO initramfs** helpers, `busybox` (`pkgs/by-name/bu/busybox`) provides
+the multi-call binary that `scripts/mkiso.sh` embeds via `cpio`. See
+`docs/bootstrap.md` for the `flake.nix` devShell deps (`grub2`/`xorriso`/etc.).
+
 ## Future directions
 
 The current format embeds build phases directly in `package.toml`. After

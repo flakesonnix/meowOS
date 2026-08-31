@@ -33,27 +33,30 @@ findutils diffutils patch  ✅
 tar gzip xz zstd
     │
     ▼
-file m4 bison flex perl
+m4 bison flex perl autoconf automake libtool
     │
     ▼
-base-devel (meta)
+ncurses htop busybox strace  ✅  (extra userspace)
+    │
+    ▼
+base (meta: 27 deps)  ←  meow bootstrap <root> default
     │
     ▼
 linux (kernel)
     │
     ▼
-initramfs
+initramfs (busybox + scripts/init.sh via cpio)
     │
     ▼
-bootloader
+bootloader (GRUB via grub-mkrescue)
     │
     ▼
-rootfs image → ISO
+rootfs image → ISO  (scripts/mkiso.sh)
 ```
 
 ## Current state — Gate 2
 
-Bootstrap userspace: **29 packages defined, 20 built in repo**.
+Bootstrap userspace: **36 packages defined, 36 built in repo** (incl. 2 metas: `base`, `base-devel`).
 
 | Segment | Packages | Status |
 |---|---|---|
@@ -63,10 +66,13 @@ Bootstrap userspace: **29 packages defined, 20 built in repo**.
 | 🔨 Build tools | bison, m4, zlib, flex, patchelf | ✅ complete |
 | 🐚 Interpreter | perl | ✅ complete |
 | 🏗️ GNU build stack | autoconf, automake, libtool | ✅ complete |
-| 🎨 Extra | neofetch | ✅ complete |
-| **📦 base meta-package** | Install via `meow bootstrap rootfs` (default) | ✅ complete |
+| 🎨 Extra | neofetch, ncurses, htop, busybox, strace | ✅ complete |
+| **📦 base meta-package** | `pkgs/by-name/ba/base` → `meow bootstrap <root>` default (27 deps, idempotent) | ✅ complete |
+| **🏗️ base-devel meta** | `pkgs/base-devel/src` (build toolchain) | ✅ complete |
 
-Next: `meow bootstrap rootfs` pulls the `base` meta-package with all 27 deps.
+- `meow bootstrap <root>` installs the `base` meta-package by default (no `--group` flag; `--force` for non-empty target).
+- Both resolvers are now **idempotent**: already-installed same-version packages are skipped via `Database::installedVersion`, so re-running `meow bootstrap` or `meow install base` is a no-op for satisfied deps.
+- Next: fresh rootfs rebuild + `scripts/mkiso.sh` (busybox initramfs + GRUB ISO; see `flake.nix` devShell for `grub2`/`xorriso`/`cpio`/`squashfsTools`).
 
 ## Bootstrapping rules
 

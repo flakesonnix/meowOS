@@ -20,15 +20,15 @@
 
 - [DEVELOPING.md](../DEVELOPING.md) — Build, test, commands, internals
 - [Architecture](architecture.md)
-- [Bootstrap chain](bootstrap.md)
+- [Bootstrap chain](bootstrap.md) — incl. `base` meta-package + ISO (`scripts/mkiso.sh`)
 - [Packaging guide](packaging.md)
 - [Package format & reproducible builds](reproducible.md)
-- [Download transport](downloads.md)
+- [Download transport](downloads.md) — progress UI, idempotent resolve
 - [Restricted hook runner](hooks.md)
 - [Cache & verification](cache.md)
 - [Package history & install reasons](package-history.md)
 - [Optional dependencies](optional-dependencies.md)
-- [Package groups](package-groups.md)
+- [Package groups](package-groups.md) — groups vs meta-packages (`base` is a package)
 - [Resolver backends: Legacy vs SAT](resolver-comparison.md)
 - [SAT-as-default transition criteria](sat-default-criteria.md)
 - [Benchmark methodology](benchmark-methodology.md)

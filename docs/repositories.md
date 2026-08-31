@@ -133,3 +133,12 @@ The cache remains keyed by the cryptographic `repository_id` (under
 `~/.cache/meow/repos/<id>` for filesystem and `~/.cache/meow/repos-http/<id>`
 for HTTP), so renaming a config entry or changing its URL does not disturb
 local state.
+
+## Bootstrap & meta-packages
+
+The `base` meta-package (`pkgs/by-name/ba/base`, 27 deps) is the canonical
+bootstrap set. `meow bootstrap <root>` installs it by default (no `--group`
+flag). The `base` package is resolved like any other, so idempotency applies:
+already-installed same-version members are skipped. `repo/groups/base.toml`
+was removed in favor of this package so the set is versioned, signed, and
+indexed via `packages.toml`.

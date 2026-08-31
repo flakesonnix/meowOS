@@ -157,6 +157,15 @@ exits (including on crash).
   `sync` metadata refresh) — only for operations that write the install root
   or the database.
 
+## Progress & logging
+
+- `downloadAll` shows a per-file progress bar on `stdout`; `installPackages`
+  prints ` [N/M] Installing` steps and `✓`/`✗` outcome on `stdout`.
+- `log::` defaults to `Warning` (was `Debug`) and always writes to `stderr`
+  so `stdout` stays clean for machine-readable output and progress UI.
+- New error codes: `AlreadyLocked` (from `InstallLock`), `DownloadHttp5xx`
+  (HTTP 5xx before retry/failover), `BuildFailed`.
+
 ## Transaction rollback
 
 A mutating operation either commits fully or rolls back:

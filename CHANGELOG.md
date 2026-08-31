@@ -2,32 +2,73 @@
 
 ## [Unreleased]
 
-### Added
+### Changed
 
+- **Base is now a meta-package, not a group:** `repo/groups/base.toml` was
+  removed; `pkgs/by-name/ba/base` (v1.0.0) is a proper package with 27
+  `depends` that `meow bootstrap <root>` installs by default. `meow.toml`
+  no longer defines a `base` group. `base-devel` remains at
+  `pkgs/base-devel/src/package.toml`. `meow group install` still works for
+  any groups defined in `meow.toml` or `repo/groups/*.toml`, but `base`
+  is now installed via the resolver like any other package (idempotent:
+  re-running `meow bootstrap` or `meow install base` skips already-installed
+  deps at the same version).
 - **File-based package groups:** groups can now be defined as TOML files under
   `repo/groups/<name>.toml` instead of only inline in `meow.toml`. `meow group
   list` and `meow group install` search both locations. Config groups take
-  precedence on name collision. The `base` group moved from `meow.toml` to
-  `repo/groups/base.toml`.
+  precedence on name collision. (The `base` group has since been migrated to
+  the `base` meta-package above.)
+- **Resolver idempotency:** both `LegacyResolver` and `SatResolver`
+  (`meow/src/dependency/*_resolver.cpp`) now check `Database::installedVersion`
+  via `ResolveRequest::db` and skip packages already installed at the resolved
+  version. `ResolveRequest` gains a `ResolveRequest(vector<PackageName>)` ctor.
+- **Install/download UX:** `download::downloadAll` shows a colored progress bar
+  (`[done/total] █░ 42% filename`) and clears the line on completion;
+  `install::installPackages` prints ` [N/M] Installing <name> <ver>` and
+  `✓ Transaction committed` / `✗ Transaction failed` with colors. `log::` now
+  defaults to `Warning` (was `Debug`) and writes to `stderr` (was `stdout`) so
+  `stdout` stays clean for machine-readable output.
+- **Verifier robustness:** `verify::` uses `symlink_status` so a dangling
+  symlink is reported as `missing` without throwing, instead of mis-handled by
+  `exists()`.
+- **Error codes:** `AlreadyLocked`, `DownloadHttp5xx`, `BuildFailed` added to
+  `ErrorCode` and `error::printer`.
+- **Small fixes:** `meow-server` `percentDecode` type, `package/parser` default
+  for `architecture`, `repo-builder` unused params, `doctor`/`migration` unused
+  param warnings, `sat_parity_test` unused `resultIdentity` removal.
+- **ISO / bootable media:** `flake.nix` devShell adds `grub2`, `xorriso`,
+  `squashfsTools`, `cpio`; new `scripts/init.sh` (busybox-based init, mounts
+  proc/sys/dev/tmpfs, hostname, ASCII banner) and `scripts/mkiso.sh` (builds a
+  bootable ISO from a `meow bootstrap` rootfs: extracts kernel, builds busybox
+  initramfs via `cpio`, writes `grub.cfg`, runs `grub-mkrescue`).
 - **Future-direction docs:** packaging.md, package-groups.md, architecture.md
   now document the planned layer separation (Package Format / Repository Format
   / Build Recipes / Package Manager), groups as data files, and Package Format
   v2 as a post-Gate-3 project.
+
+### Added
+
 - **Gate 2: Bootstrap userspace** — complete toolchain, core userspace, and
   GNU build stack for meowOS distribution
-  - Toolchain: `binutils` 2.46.1, `glibc` 2.42, `gcc-stage1` 15.2.0 (C only),
-    `gcc-stage2` 15.2.0, `gcc` 15.2.0 (final)
-  - Core userspace: `bash` 5.3, `coreutils` 9.6, `make` 4.4.1, `pkgconf` 2.4.2,
-    `grep` 3.11, `sed` 4.9, `gawk` 5.3.0
-  - Archive tools: `tar` 1.35, `gzip` 1.14, `xz` 5.8.3, `zstd` 1.5.7
-  - Build essentials: `findutils` 4.11.0, `diffutils` 3.12, `patch` 2.8,
-    `m4` 1.4.21, `bison` 3.8.2, `flex` 2.6.4, `zlib` 1.3.2
-  - GNU build stack: `autoconf` 2.72, `automake` 1.17, `libtool` 2.4.7
-  - Utilities: `patchelf` 0.18.0, `perl` 5.38.2, `neofetch` 7.1.0
-  - Package-local fixes: `sed` uses `--disable-acl`; `gawk` uses
-    `-Wno-error=incompatible-pointer-types` (GCC 15 compat)
-- **Package groups**: `base` group defined in `meow.toml` encompassing the
-  complete bootstrap userspace set
+   - Toolchain: `binutils` 2.46.1, `glibc` 2.42, `gcc-stage1` 15.2.0 (C only),
+     `gcc-stage2` 15.2.0, `gcc` 15.2.0 (final)
+   - Core userspace: `bash` 5.3, `coreutils` 9.6, `make` 4.4.1, `pkgconf` 2.4.2,
+     `grep` 3.11, `sed` 4.9, `gawk` 5.3.0
+   - Archive tools: `tar` 1.35, `gzip` 1.14, `xz` 5.8.3, `zstd` 1.5.7
+   - Build essentials: `findutils` 4.11.0, `diffutils` 3.12, `patch` 2.8,
+     `m4` 1.4.21, `bison` 3.8.2, `flex` 2.6.4, `zlib` 1.3.2
+   - GNU build stack: `autoconf` 2.72, `automake` 1.17, `libtool` 2.4.7
+   - Utilities: `patchelf` 0.18.0, `perl` 5.38.2, `neofetch` 7.1.0,
+     `ncurses` 6.5, `htop` 3.4.0
+   - Extras: `busybox` 1.37.0 (multi-call, static applets for ISO initramfs),
+     `strace` 7.0 (tracer, `--sysroot` build)
+   - Meta: `base` 1.0.0 (all 27 userspace+toolchain deps),
+     `base-devel` 1.0.0 (build toolchain meta)
+   - Package-local fixes: `sed` uses `--disable-acl`; `gawk` uses
+     `-Wno-error=incompatible-pointer-types` (GCC 15 compat)
+- **Package groups**: `base` as meta-package (see Changed) encompassing the
+  complete bootstrap userspace set; `repo/groups/*.toml` remains supported for
+  shareable group definitions not backed by a package.
 
 ## [0.7.0] - 2026-07-21
 
