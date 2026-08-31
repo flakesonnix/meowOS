@@ -1,4 +1,4 @@
 [artifact]
 filename = "neofetch-7.1.0.pkg.tar.zst"
-url = "file:///home/lucy/CLionProjects/meowOS/repo/packages/neofetch-7.1.0.pkg.tar.zst"
+url = "packages/neofetch-7.1.0.pkg.tar.zst"
 sha256 = "a44131210f09ca41bf4e8e9a59dae80973723733e57d8b630540a5c0a673f04d"

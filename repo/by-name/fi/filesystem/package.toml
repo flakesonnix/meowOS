@@ -1,5 +1,4 @@
 format_version = 1
-
 [metadata]
 name = "filesystem"
 version = "1.0.0"

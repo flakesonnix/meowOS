@@ -1,4 +1,4 @@
 [artifact]
 filename = "zstd-1.5.7.pkg.tar.zst"
-url = "file:///home/lucy/CLionProjects/meowOS/repo/packages/zstd-1.5.7.pkg.tar.zst"
+url = "packages/zstd-1.5.7.pkg.tar.zst"
 sha256 = "d42eea432036270bb049c8ebc0629c1a809037298892199365df0110d735685a"

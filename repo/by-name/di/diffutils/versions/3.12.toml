@@ -1,4 +1,4 @@
 [artifact]
 filename = "diffutils-3.12.pkg.tar.zst"
-url = "file:///home/lucy/CLionProjects/meowOS/repo/packages/diffutils-3.12.pkg.tar.zst"
+url = "packages/diffutils-3.12.pkg.tar.zst"
 sha256 = "fa6a9abf8deac449257deed220886f53a27ed35dc6daf38d4d1f56334137c353"

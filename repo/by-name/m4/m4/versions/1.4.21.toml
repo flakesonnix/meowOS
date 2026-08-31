@@ -1,4 +1,4 @@
 [artifact]
 filename = "m4-1.4.21.pkg.tar.zst"
-url = "file:///home/lucy/CLionProjects/meowOS/repo/packages/m4-1.4.21.pkg.tar.zst"
+url = "packages/m4-1.4.21.pkg.tar.zst"
 sha256 = "1967b86f900aedc0c3ceebe1778cdc1bcec81a4aaf232eacd517f89970cc7b03"
