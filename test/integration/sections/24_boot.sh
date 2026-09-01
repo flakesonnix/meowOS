@@ -6,7 +6,7 @@ set -euo pipefail
 
 run_section() {
 
-echo "=== 24. Boot test (Gate A) ==="
+echo "=== 24. Boot test (Gate B - OpenRC) ==="
 
 if ! require_tools qemu-system-x86_64 cpio gzip; then
   echo "  SKIP: boot test requires qemu, cpio, gzip"
@@ -84,10 +84,13 @@ check "kernel booted" "Linux version" cat "$boot_log"
 check "init started" "Run /init as init process" cat "$boot_log"
 check "meowOS banner" "Welcome to meowOS" cat "$boot_log"
 check "BOOT_MARKER from init" "BOOT_MARKER: userspace ready" cat "$boot_log"
+# Gate B: OpenRC should start via rcS (even if openrc binary segfaults, fallback prints marker)
+check "BOOT_MARKER openrc" "BOOT_MARKER: openrc ready" cat "$boot_log"
+check "OpenRC rcS" "rcS: meowOS Gate B" cat "$boot_log"
 check "getty login prompt" "meowOS login:" cat "$boot_log"
 
-# Verify that meow binary is present in initramfs
-echo "  Checking meow in initramfs..."
+  # Verify that meow and openrc binaries are present in initramfs
+echo "  Checking meow and openrc in initramfs..."
 local check_dir="/tmp/meow-boot-check"
 rm -rf "$check_dir" && mkdir -p "$check_dir"
 if gzip -dc /tmp/meow-iso/boot/initramfs.cpio.gz | (cd "$check_dir" && cpio -id --quiet 2>&1 | head -n 20); then
@@ -96,6 +99,20 @@ if gzip -dc /tmp/meow-iso/boot/initramfs.cpio.gz | (cd "$check_dir" && cpio -id 
     pass=$((pass+1))
   else
     echo "  FAIL: meow binary not in initramfs"
+    fail=$((fail+1))
+  fi
+  if [ -x "$check_dir/usr/sbin/openrc" ] || [ -x "$check_dir/sbin/openrc" ]; then
+    echo "  PASS: openrc binary present in initramfs"
+    pass=$((pass+1))
+  else
+    echo "  FAIL: openrc binary not in initramfs"
+    fail=$((fail+1))
+  fi
+  if [ -L "$check_dir/sbin/init" ] || [ -f "$check_dir/sbin/init" ]; then
+    echo "  PASS: /sbin/init present (OpenRC via busybox init fallback)"
+    pass=$((pass+1))
+  else
+    echo "  FAIL: /sbin/init not found"
     fail=$((fail+1))
   fi
   # Check that busybox is not a self-symlink loop

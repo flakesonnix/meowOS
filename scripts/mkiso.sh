@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# meowOS ISO builder - Gate A (initramfs-only) deterministic
-# Uses meow-built packages (filesystem, busybox, linux) where possible.
-# For Gate A, the initramfs IS the root filesystem (no switch_root yet).
-# Gate B will add switch_root + OpenRC.
+# meowOS ISO builder - Gate B (OpenRC) deterministic
+# Uses meow-built packages (filesystem, busybox, openrc, linux) where possible.
+# For Gate B, the initramfs IS the root filesystem with OpenRC as init.
+# Gate C will add switch_root to real root.
 
 MEOW="${MEOW:-$PWD/build/meow}"
 ROOTFS="/tmp/meow-iso-root"
@@ -13,7 +13,7 @@ OUTISO="${1:-meowos.iso}"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1721520000}"
 export SOURCE_DATE_EPOCH
 
-echo "==> meowOS ISO builder (Gate A - deterministic)"
+echo "==> meowOS ISO builder (Gate B - OpenRC deterministic)"
 echo "  Output: $OUTISO"
 echo "  SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 echo ""
@@ -67,13 +67,14 @@ if [ -f "$ROOTFS/boot/System.map" ]; then
 fi
 
 # --- Step 2: Build initramfs root from meow packages ---
-echo "==> Step 2: Building initramfs root (filesystem + busybox)..."
+echo "==> Step 2: Building initramfs root (filesystem + busybox + openrc)..."
 rm -rf "$ROOTFS"
 # Bootstrap minimal userspace for initramfs.
-# filesystem provides usr-merge + etc/passwd etc (expanded for Gate A)
+# filesystem provides usr-merge + etc/passwd etc
 # busybox provides static binary (no glibc needed in early boot)
-if ! "$MEOW" bootstrap --verbose "$ROOTFS" filesystem busybox 2>&1; then
-  echo "error: meow bootstrap filesystem busybox failed"
+# openrc provides init system (Gate B)
+if ! "$MEOW" bootstrap --verbose "$ROOTFS" filesystem busybox openrc 2>&1; then
+  echo "error: meow bootstrap filesystem busybox openrc failed"
   exit 1
 fi
 echo "  bootstrapped: $(du -sh "$ROOTFS" | cut -f1)"
@@ -115,7 +116,10 @@ if [ -n "$BB" ] && [ -x "$BB" ]; then
     if [ "$applet" = "busybox" ]; then continue; fi
     ln -sf /usr/bin/busybox "$ROOTFS/usr/bin/$applet" 2>/dev/null || true
   done
-  # Ensure /bin/sh and /sbin/init point to busybox
+  # Ensure /bin/sh and /sbin/* point to busybox
+  # For Gate B, OpenRC is run as a service via rcS, not as PID 1.
+  # Keep BusyBox init as PID 1 (/sbin/init -> busybox) for now.
+  # OpenRC will be started from rcS via "openrc sysinit/boot/default".
   # Note: /bin is a symlink to usr/bin (usr-merge), so don't create
   # /bin/busybox as it would overwrite /usr/bin/busybox via the symlink.
   # /bin/sh -> /usr/bin/busybox is fine (creates usr/bin/sh via the symlink)
