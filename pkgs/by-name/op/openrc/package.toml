@@ -4,7 +4,7 @@ version = "0.55"
 architecture = "AMD64"
 description = "Dependency based init system"
 license = "BSD-2-Clause"
-depends = ["filesystem", "bash", "coreutils", "grep", "sed", "gawk", "ncurses"]
+depends = ["filesystem", "busybox", "glibc"]
 
 [source]
 url = "https://github.com/OpenRC/openrc/archive/0.55.tar.gz"
@@ -45,6 +45,7 @@ mkdir -p "${build}"
 "${MESON}" setup "${build}" "${src}" \
   --prefix=/usr \
   --libdir=/usr/lib \
+  --sbindir=/usr/sbin \
   --sysconfdir=/etc \
   --localstatedir=/var \
   -Dos=Linux \
@@ -75,23 +76,27 @@ done
 DESTDIR="${out}" "${NINJA}" -C "${build}" install
 
 # Create symlink for /sbin/init -> openrc-init (OpenRC's init)
-# OpenRC installs openrc-init at /sbin/openrc-init, we want /sbin/init to be OpenRC
-if [ -f "${out}/sbin/openrc-init" ]; then
-  ln -sf openrc-init "${out}/sbin/init" 2>/dev/null || true
-elif [ -f "${out}/usr/sbin/openrc-init" ]; then
+# With usr-merge, /sbin is symlink to usr/sbin, so we ensure sbin/init is
+# correctly placed at usr/sbin/init for the final system.
+# OpenRC with sbindir=/usr/sbin installs openrc-init at usr/sbin/openrc-init
+if [ -f "${out}/usr/sbin/openrc-init" ]; then
+  ln -sf openrc-init "${out}/usr/sbin/init" 2>/dev/null || true
+  # Also ensure sbin/init exists for compatibility (via usr-merge, sbin is symlink)
   mkdir -p "${out}/sbin"
-  ln -sf /usr/sbin/openrc-init "${out}/sbin/init" 2>/dev/null || true
+  ln -sf ../usr/sbin/openrc-init "${out}/sbin/init" 2>/dev/null || true
+elif [ -f "${out}/sbin/openrc-init" ]; then
+  ln -sf openrc-init "${out}/sbin/init" 2>/dev/null || true
 fi
 
 # Ensure agetty service uses BusyBox getty
-# OpenRC's agetty service expects /sbin/agetty, but we use BusyBox getty at /usr/bin/getty
-# Create a compatibility symlink
+# Use relative symlinks, ensure they are in usr/sbin for usr-merge
+mkdir -p "${out}/usr/sbin"
+ln -sf ../../usr/bin/busybox "${out}/usr/sbin/getty" 2>/dev/null || true
+ln -sf ../../usr/bin/busybox "${out}/usr/sbin/agetty" 2>/dev/null || true
+# Also ensure sbin compatibility links
 mkdir -p "${out}/sbin"
-if [ ! -e "${out}/sbin/agetty" ] && [ -f "${out}/usr/bin/busybox" ]; then
-  ln -sf /usr/bin/busybox "${out}/sbin/agetty" 2>/dev/null || true
-fi
-# Also ensure /sbin/getty exists
-ln -sf /usr/bin/busybox "${out}/sbin/getty" 2>/dev/null || true || true
+ln -sf ../usr/sbin/getty "${out}/sbin/getty" 2>/dev/null || true
+ln -sf ../usr/sbin/agetty "${out}/sbin/agetty" 2>/dev/null || true
 
 # Minimal OpenRC configuration for meowOS Gate B
 mkdir -p "${out}/etc/runlevels/sysinit"
@@ -172,6 +177,61 @@ rc_logger="YES"
 rc_log_path="/var/log/rc.log"
 unicode="NO"
 RCCONF
+fi
+
+# Fix absolute symlink for OpenRC's functions.sh (secure extraction rejects absolute)
+# OpenRC installs etc/init.d/functions.sh -> /lib/rc/sh/functions.sh (absolute)
+# meow's secure extraction rejects absolute symlink targets, so use relative
+if [ -L "${out}/etc/init.d/functions.sh" ]; then
+  target=$(readlink "${out}/etc/init.d/functions.sh")
+  if [ "$target" = "/lib/rc/sh/functions.sh" ]; then
+    rm -f "${out}/etc/init.d/functions.sh"
+    ln -sf ../../lib/rc/sh/functions.sh "${out}/etc/init.d/functions.sh"
+  fi
+fi
+# Also fix any other absolute symlinks that point inside the package
+# Find all absolute symlinks and convert to relative if they point inside $out
+find "${out}" -type l 2>/dev/null | while read -r link; do
+  target=$(readlink "$link" 2>/dev/null || true)
+  case "$target" in
+    /*)
+      # If target is absolute and points inside $out (e.g. /lib/... or /usr/...),
+      # convert to relative
+      # Remove leading / and make relative to link's directory
+      rel_target=$(realpath --relative-to="$(dirname "$link")" "${out}${target}" 2>/dev/null || true)
+      if [ -n "$rel_target" ]; then
+        # Only convert if the target exists in $out
+        if [ -e "${out}${target}" ] || [ -L "${out}${target}" ]; then
+          echo "Fixing absolute symlink: $link -> $target => $rel_target"
+          rm -f "$link"
+          ln -sf "$rel_target" "$link"
+        fi
+      fi
+      ;;
+  esac
+done
+
+# For usr-merge, ensure sbin and lib are symlinks, not real dirs
+# Move sbin files to usr/sbin if sbin is a real dir in out
+if [ -d "${out}/sbin" ] && [ ! -L "${out}/sbin" ]; then
+  mkdir -p "${out}/usr/sbin"
+  # Move all files from sbin to usr/sbin
+  if [ -n "$(ls -A "${out}/sbin" 2>/dev/null)" ]; then
+    cp -a "${out}/sbin"/* "${out}/usr/sbin/" 2>/dev/null || true
+  fi
+  rm -rf "${out}/sbin"
+  ln -sf usr/sbin "${out}/sbin"
+fi
+# Similarly for lib
+if [ -d "${out}/lib" ] && [ ! -L "${out}/lib" ]; then
+  mkdir -p "${out}/usr/lib"
+  if [ -n "$(ls -A "${out}/lib" 2>/dev/null)" ]; then
+    cp -a "${out}/lib"/* "${out}/usr/lib/" 2>/dev/null || true
+    # Handle symlinks and hidden files
+    cp -a "${out}/lib"/.* "${out}/usr/lib/" 2>/dev/null || true
+  fi
+  rm -rf "${out}/lib"
+  ln -sf usr/lib "${out}/lib"
 fi
 
 # Clean up unwanted info dir
