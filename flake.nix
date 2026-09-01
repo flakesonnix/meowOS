@@ -28,6 +28,9 @@
             xorriso
             squashfsTools
             cpio
+            # OpenRC build (meson/ninja)
+            meson
+            ninja
           ];
 
           # Bibliotheken, gegen die gelinkt werden soll

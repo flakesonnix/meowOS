@@ -1,0 +1,186 @@
+format_version = 1
+name = "openrc"
+version = "0.55"
+architecture = "AMD64"
+description = "Dependency based init system"
+license = "BSD-2-Clause"
+depends = ["filesystem", "bash", "coreutils", "grep", "sed", "gawk", "ncurses"]
+
+[source]
+url = "https://github.com/OpenRC/openrc/archive/0.55.tar.gz"
+sha256 = "5dd0c361fa0a718d0f8433e9d341dc4cbc6e30a88cc127889e02b896c45715be"
+
+[phases]
+configure = '''
+# Find meson and ninja from Nix store (host provides them, not meow)
+for _d in /nix/store/*-meson-*/bin/meson; do
+  [ -x "$_d" ] && MESON="$_d" && break
+done
+if [ -z "${MESON:-}" ]; then
+  MESON=$(command -v meson 2>/dev/null || echo "")
+fi
+[ -n "$MESON" ] || { echo "error: meson not found"; exit 1; }
+echo "MESON: $MESON"
+
+for _d in /nix/store/*-ninja-*/bin/ninja; do
+  [ -x "$_d" ] && NINJA="$_d" && break
+done
+if [ -z "${NINJA:-}" ]; then
+  NINJA=$(command -v ninja 2>/dev/null || echo "")
+fi
+[ -n "$NINJA" ] || { echo "error: ninja not found"; exit 1; }
+echo "NINJA: $NINJA"
+
+# Find pkg-config
+for _d in /nix/store/*-pkg-config-*/bin/pkg-config /nix/store/*-pkgconf-*/bin/pkgconf; do
+  [ -x "$_d" ] && export PKG_CONFIG="$_d" && break
+done
+
+mkdir -p "${build}"
+# Use meson with minimal features, no PAM/audit/selinux, and install to /usr
+# OpenRC's default rootprefix is / , we keep it, but we want everything under /usr
+# For meowOS, we use rootprefix=/ so that sbin is /sbin (which is symlink to usr/sbin via usr-merge)
+# But we will install with --prefix=/usr and --rootprefix=/
+
+"${MESON}" setup "${build}" "${src}" \
+  --prefix=/usr \
+  --libdir=/usr/lib \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  -Dos=Linux \
+  -Drootprefix=/ \
+  -Dpam=false \
+  -Daudit=disabled \
+  -Dselinux=disabled \
+  -Dcapabilities=disabled \
+  -Dpkgconfig=true \
+  --buildtype=plain
+
+# Ensure deterministic: meson already handles it, but we set SOURCE_DATE_EPOCH
+'''
+
+build = '''
+for _d in /nix/store/*-ninja-*/bin/ninja; do
+  [ -x "$_d" ] && NINJA="$_d" && break
+done
+[ -z "${NINJA:-}" ] && NINJA=$(command -v ninja 2>/dev/null)
+"${NINJA}" -C "${build}" -j"${MEOW_JOBS}"
+'''
+
+install = '''
+for _d in /nix/store/*-ninja-*/bin/ninja; do
+  [ -x "$_d" ] && NINJA="$_d" && break
+done
+[ -z "${NINJA:-}" ] && NINJA=$(command -v ninja 2>/dev/null)
+DESTDIR="${out}" "${NINJA}" -C "${build}" install
+
+# Create symlink for /sbin/init -> openrc-init (OpenRC's init)
+# OpenRC installs openrc-init at /sbin/openrc-init, we want /sbin/init to be OpenRC
+if [ -f "${out}/sbin/openrc-init" ]; then
+  ln -sf openrc-init "${out}/sbin/init" 2>/dev/null || true
+elif [ -f "${out}/usr/sbin/openrc-init" ]; then
+  mkdir -p "${out}/sbin"
+  ln -sf /usr/sbin/openrc-init "${out}/sbin/init" 2>/dev/null || true
+fi
+
+# Ensure agetty service uses BusyBox getty
+# OpenRC's agetty service expects /sbin/agetty, but we use BusyBox getty at /usr/bin/getty
+# Create a compatibility symlink
+mkdir -p "${out}/sbin"
+if [ ! -e "${out}/sbin/agetty" ] && [ -f "${out}/usr/bin/busybox" ]; then
+  ln -sf /usr/bin/busybox "${out}/sbin/agetty" 2>/dev/null || true
+fi
+# Also ensure /sbin/getty exists
+ln -sf /usr/bin/busybox "${out}/sbin/getty" 2>/dev/null || true || true
+
+# Minimal OpenRC configuration for meowOS Gate B
+mkdir -p "${out}/etc/runlevels/sysinit"
+mkdir -p "${out}/etc/runlevels/boot"
+mkdir -p "${out}/etc/runlevels/default"
+mkdir -p "${out}/etc/runlevels/shutdown"
+
+# Create basic runlevel links (OpenRC's default services)
+# sysinit: devfs, dmesg, mdev is not needed, we use devtmpfs
+# For Gate B minimal, we just need hostname, bootmisc, and agetty
+for svc in sysinit bootmisc hostname; do
+  if [ -f "${out}/etc/init.d/$svc" ]; then
+    ln -sf /etc/init.d/$svc "${out}/etc/runlevels/sysinit/$svc" 2>/dev/null || true
+  fi
+done
+for svc in bootmisc hostname modules hwclock; do
+  if [ -f "${out}/etc/init.d/$svc" ]; then
+    ln -sf /etc/init.d/$svc "${out}/etc/runlevels/boot/$svc" 2>/dev/null || true
+  fi
+done
+# default runlevel: local and agetty
+for svc in local agetty; do
+  if [ -f "${out}/etc/init.d/$svc" ]; then
+    ln -sf /etc/init.d/$svc "${out}/etc/runlevels/default/$svc" 2>/dev/null || true
+  fi
+done
+# agetty needs config for ttyS0
+mkdir -p "${out}/etc/conf.d"
+if [ ! -f "${out}/etc/conf.d/agetty" ]; then
+  cat > "${out}/etc/conf.d/agetty" <<AGETTY
+# meowOS agetty config for OpenRC Gate B - uses BusyBox getty
+agetty_options="--noclear"
+baud="115200"
+term_type="vt100"
+AGETTY
+fi
+
+# Create a simple agetty service if not present (OpenRC's agetty.in)
+# The service will be started by OpenRC, we ensure it uses busybox getty
+if [ ! -f "${out}/etc/init.d/agetty" ]; then
+  cat > "${out}/etc/init.d/agetty" <<'AGETTYSVC'
+#!/sbin/openrc-run
+# meowOS agetty service for OpenRC + BusyBox getty
+command="/sbin/getty"
+command_args="-L ttyS0 115200 vt100"
+pidfile="/run/agetty.pid"
+depend() {
+  need localmount
+  after bootmisc
+}
+AGETTYSVC
+  chmod +x "${out}/etc/init.d/agetty"
+fi
+
+# Create local service to print BOOT_MARKER
+mkdir -p "${out}/etc/init.d"
+cat > "${out}/etc/init.d/meowos-mark" <<'MARK'
+#!/sbin/openrc-run
+# meowOS boot marker for QEMU tests
+command="/bin/sh"
+command_args="-c 'echo \"BOOT_MARKER: openrc ready\" && echo \"Welcome to meowOS (OpenRC)\" && touch /run/meowos-openrc-ready'"
+command_background=true
+pidfile="/run/meowos-mark.pid"
+depend() {
+  need localmount
+  after bootmisc
+}
+MARK
+chmod +x "${out}/etc/init.d/meowos-mark"
+ln -sf /etc/init.d/meowos-mark "${out}/etc/runlevels/default/meowos-mark" 2>/dev/null || true
+
+# Ensure /etc/openrc/rc.conf exists with minimal config
+mkdir -p "${out}/etc/openrc"
+if [ ! -f "${out}/etc/openrc/rc.conf" ]; then
+  cat > "${out}/etc/openrc/rc.conf" <<RCCONF
+# meowOS OpenRC rc.conf - Gate B minimal
+rc_logger="YES"
+rc_log_path="/var/log/rc.log"
+unicode="NO"
+RCCONF
+fi
+
+# Clean up unwanted info dir
+rm -f "${out}/usr/share/info/dir" 2>/dev/null || true
+'''
+
+[build]
+reproducible = true
+source_date_epoch = 1721520000
+
+[build.environment]
+requires = ["gcc", "make", "pkgconf", "bash", "coreutils"]

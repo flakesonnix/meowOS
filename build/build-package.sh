@@ -103,9 +103,19 @@ for phase in configure build check install; do
 done
 
 # --- package with meow-build ---
-if [ -d "$out/usr" ]; then
+# Copy all installed files from $out to $pkg_dir/files
+# Previous version only copied usr, which misses etc, sbin, lib for OpenRC
+if [ -d "$out" ] && [ "$(ls -A "$out" 2>/dev/null)" ]; then
+    rm -rf "$pkg_dir/files"
     mkdir -p "$pkg_dir/files"
-    cp -a "$out/usr" "$pkg_dir/files/"
+    cp -a "$out"/* "$pkg_dir/files/" 2>/dev/null || true
+    # Handle hidden files if any (e.g. .keep)
+    for _f in "$out"/.*; do
+        case "$_f" in
+            "$out/."|"$out/..") continue ;;
+            *) [ -e "$_f" ] && cp -a "$_f" "$pkg_dir/files/" 2>/dev/null || true ;;
+        esac
+    done
 fi
 
 if [ -z "$output_dir" ]; then
