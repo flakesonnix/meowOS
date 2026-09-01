@@ -80,14 +80,14 @@ echo "  boot log: $(wc -l < "$boot_log") lines, $(du -sh "$boot_log" | cut -f1)"
 # Show last lines for debugging
 tail -n 30 "$boot_log" 2>&1 | head -n 40 || true
 
-check "kernel booted" "Linux version" cat "$boot_log"
-check "init started" "Run /init as init process" cat "$boot_log"
-check "meowOS banner" "Welcome to meowOS" cat "$boot_log"
-check "BOOT_MARKER from init" "BOOT_MARKER: userspace ready" cat "$boot_log"
+check "kernel booted" "Linux version" bash -c "grep -a -q 'Linux version' \"$boot_log\" && echo 'Linux version'"
+check "init started" "Run /init as init process" bash -c "grep -a -q 'Run /init as init process' \"$boot_log\" && echo 'Run /init as init process'"
+check "meowOS banner" "Welcome to meowOS" bash -c "grep -a -q 'Welcome to meowOS' \"$boot_log\" && echo 'Welcome to meowOS'"
+check "BOOT_MARKER from init" "BOOT_MARKER: userspace ready" bash -c "grep -a -q 'BOOT_MARKER: userspace ready' \"$boot_log\" && echo 'BOOT_MARKER: userspace ready'"
 # Gate B: OpenRC should start via rcS (even if openrc binary segfaults, fallback prints marker)
-check "BOOT_MARKER openrc" "BOOT_MARKER: openrc ready" cat "$boot_log"
-check "OpenRC rcS" "rcS: meowOS Gate B" cat "$boot_log"
-check "getty login prompt" "meowOS login:" cat "$boot_log"
+check "BOOT_MARKER openrc" "BOOT_MARKER: openrc ready" bash -c "grep -a -q 'BOOT_MARKER: openrc ready' \"$boot_log\" && echo 'BOOT_MARKER: openrc ready'"
+check "OpenRC rcS" "rcS: meowOS Gate B" bash -c "grep -a -q 'rcS: meowOS Gate B' \"$boot_log\" && echo 'rcS: meowOS Gate B'"
+check "getty login prompt" "meowOS login:" bash -c "grep -a -q 'meowOS login:' \"$boot_log\" && echo 'meowOS login:'"
 
   # Verify that meow and openrc binaries are present in initramfs
 echo "  Checking meow and openrc in initramfs..."
