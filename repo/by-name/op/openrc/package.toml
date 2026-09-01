@@ -1,0 +1,7 @@
+format_version = 1
+[metadata]
+name = "openrc"
+version = "0.55"
+architecture = "AMD64"
+description = "Dependency based init system"
+depends = ["filesystem", "busybox", "glibc"]

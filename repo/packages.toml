@@ -1,5 +1,5 @@
 format_version = 1
-generated = "2026-08-31T14:29:31Z"
+generated = "2026-09-01T08:53:21Z"
 
 [[package]]
 name = "grep"
@@ -102,9 +102,9 @@ size = 13374857
 [[package]]
 name = "glibc"
 version = "2.42"
-manifest_hash = "sha256:e0b6ce47921c4baed66844aeb40716b689aa880636fa3363d48701ffaaeb974b"
-artifact_hash = "sha256:d63871f39dc9928c6a6619846f5fd9ddce9c44fa5cdc10e672f0a9d9d998b5be"
-size = 0
+manifest_hash = "sha256:fefbb24fa7a8d1656280b21204d2e584132bc3e9a60ea12418b3eb25ef72a3c5"
+artifact_hash = "sha256:59fb167a4eab529a4fd85480e4582f751ee8cfa142e200cd67aa277deb243060"
+size = 1449215
 
 [[package]]
 name = "htop"
@@ -112,6 +112,13 @@ version = "3.4.0"
 manifest_hash = "sha256:e5fa97461ad8f41b02b6967cf616f57266be5468e2e7920952fc1aa47b91226e"
 artifact_hash = "sha256:6ec7d43d1d7c8142454bce4253407d74b9c1eb87140fd3e84c701acabab59818"
 size = 561994
+
+[[package]]
+name = "openrc"
+version = "0.55"
+manifest_hash = "sha256:4ffca53b7036f2f0ea69508d9e506220f1c8e4fe825e52239ba3b636852b67c1"
+artifact_hash = "sha256:40bd04873a43c1f6c383dbea0b639ff8810c68ce8dbd2fa46ca9d40eed97acc7"
+size = 245798
 
 [[package]]
 name = "gzip"
@@ -137,9 +144,9 @@ size = 313323
 [[package]]
 name = "filesystem"
 version = "1.0.0"
-manifest_hash = "sha256:69da3818939fa2e85e4fd0893566ff29975d2903272d3ecf20523f04cad98446"
-artifact_hash = "sha256:51e8d28e9179e19665f205fd31a89771bd26e1d92cc926cef42124e7ce93ef76"
-size = 1648
+manifest_hash = "sha256:18e7fe36d3b9789d4dd2c75d9ee93fc99aff74bf276e3b8fcf0ee9e942dba776"
+artifact_hash = "sha256:395a4aa2fa407f7aab192479d28cc200ca2d928a780994bc6edb427e59e4dfcb"
+size = 2092
 
 [[package]]
 name = "patch"
