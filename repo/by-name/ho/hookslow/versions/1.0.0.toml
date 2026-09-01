@@ -1,0 +1,4 @@
+[artifact]
+filename = "hookslow-1.0.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/hookslow-1.0.0.pkg.tar.zst"
+sha256 = "0064b72215173ca80edb7a9d78597ac97e1f40ce9ff25fa78d1cf4e2b421cf43"

@@ -1,0 +1,6 @@
+format_version = 1
+[metadata]
+name = "hookok"
+version = "1.0.0"
+architecture = "AMD64"
+description = "hook fixture"

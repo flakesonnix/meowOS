@@ -1,0 +1,4 @@
+[artifact]
+filename = "libbar-2.0.0.pkg.tar.zst"
+url = "file:///tmp/meow-artifacts/libbar-2.0.0.pkg.tar.zst"
+sha256 = "8d8d315caf65f24f6ad11831d9654b85a1ff1670287464e3c0fc944c11938150"

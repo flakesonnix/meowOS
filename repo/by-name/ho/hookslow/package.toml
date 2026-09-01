@@ -1,0 +1,6 @@
+format_version = 1
+[metadata]
+name = "hookslow"
+version = "1.0.0"
+architecture = "AMD64"
+description = "hook fixture"

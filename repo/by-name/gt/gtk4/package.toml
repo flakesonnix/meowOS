@@ -1,0 +1,6 @@
+format_version = 1
+[metadata]
+name = "gtk4"
+version = "1.0.0"
+architecture = "AMD64"
+description = "optional fixture"
