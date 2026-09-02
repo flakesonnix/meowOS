@@ -9,14 +9,26 @@ set -euo pipefail
 MEOW="${MEOW:-$PWD/build/meow}"
 ROOTFS="/tmp/meow-iso-root"
 ISODIR="/tmp/meow-iso"
-OUTISO="${1:-meowos.iso}"
-SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1721520000}"
-export SOURCE_DATE_EPOCH
-
-echo "==> meowOS ISO builder (Gate B - OpenRC deterministic)"
+# Gate C: if --gate-c is passed, build ext4 RootFS and use init-gatec.sh
+GATE_C=false
+OUTISO="meowos.iso"
+for arg in "$@"; do
+  case "$arg" in
+    --gate-c) GATE_C=true ;;
+    *) OUTISO="$arg" ;;
+  esac
+done
+if [ "$GATE_C" = true ]; then
+  echo "==> meowOS ISO builder (Gate C - switch_root, deterministic)"
+else
+  echo "==> meowOS ISO builder (Gate B - OpenRC deterministic)"
+fi
 echo "  Output: $OUTISO"
+echo "  Gate C: $GATE_C"
 echo "  SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 echo ""
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1721520000}"
+export SOURCE_DATE_EPOCH
 
 # --- Check meow binary ---
 if [ ! -x "$MEOW" ]; then
@@ -67,17 +79,38 @@ if [ -f "$ROOTFS/boot/System.map" ]; then
 fi
 
 # --- Step 2: Build initramfs root from meow packages ---
-echo "==> Step 2: Building initramfs root (filesystem + busybox + openrc)..."
-rm -rf "$ROOTFS"
-# Bootstrap minimal userspace for initramfs.
-# filesystem provides usr-merge + etc/passwd etc
-# busybox provides static binary (no glibc needed in early boot)
-# openrc provides init system (Gate B)
-if ! "$MEOW" bootstrap --verbose "$ROOTFS" filesystem busybox openrc 2>&1; then
-  echo "error: meow bootstrap filesystem busybox openrc failed"
-  exit 1
+if [ "$GATE_C" = true ]; then
+  echo "==> Step 2: Building Gate C RootFS (ext4) and initramfs..."
+  # Gate C: build the real RootFS ext4 image via mkrootfs.sh
+  # It bootstraps filesystem/busybox/openrc/glibc/bash/neofetch into build/gate-c-root
+  # and creates build/rootfs.ext4 (256M, ext4, LABEL=meowOS)
+  if ! ./scripts/mkrootfs.sh 2>&1 | tail -n 20; then
+    echo "error: mkrootfs.sh failed"
+    exit 1
+  fi
+  # For Gate C, the initramfs is minimal: only busybox + init-gatec.sh + switch_root
+  # Reuse the same bootstrap for initramfs but with a minimal set (busybox only)
+  # and then overlay init-gatec.sh as /init
+  echo "==> Step 2b: Building Gate C initramfs (busybox + switch_root)..."
+  rm -rf "$ROOTFS"
+  if ! "$MEOW" bootstrap --verbose "$ROOTFS" busybox 2>&1; then
+    echo "error: meow bootstrap busybox for Gate C initramfs failed"
+    exit 1
+  fi
+  echo "  initramfs bootstrapped: $(du -sh "$ROOTFS" | cut -f1)"
+else
+  echo "==> Step 2: Building initramfs root (filesystem + busybox + openrc)..."
+  rm -rf "$ROOTFS"
+  # Bootstrap minimal userspace for initramfs.
+  # filesystem provides usr-merge + etc/passwd etc
+  # busybox provides static binary (no glibc needed in early boot)
+  # openrc provides init system (Gate B)
+  if ! "$MEOW" bootstrap --verbose "$ROOTFS" filesystem busybox openrc 2>&1; then
+    echo "error: meow bootstrap filesystem busybox openrc failed"
+    exit 1
+  fi
+  echo "  bootstrapped: $(du -sh "$ROOTFS" | cut -f1)"
 fi
-echo "  bootstrapped: $(du -sh "$ROOTFS" | cut -f1)"
 
 # Ensure essential directories (filesystem package now provides many, but
 # be defensive for older artifacts)
@@ -150,7 +183,11 @@ fi
 
 # --- Step 3: Install init script ---
 echo "==> Step 3: Installing /init..."
-cp scripts/init.sh "$ROOTFS/init"
+if [ "$GATE_C" = true ]; then
+  cp scripts/init-gatec.sh "$ROOTFS/init"
+else
+  cp scripts/init.sh "$ROOTFS/init"
+fi
 chmod +x "$ROOTFS/init"
 # Also ensure /etc files from filesystem package are present; if not, create minimal
 if [ ! -f "$ROOTFS/etc/hostname" ]; then
@@ -269,6 +306,17 @@ echo "  initramfs sha256: $(cat "$ISODIR/boot/initramfs.sha256")"
 
 # --- Step 5: GRUB config ---
 echo "==> Step 5: Setting up GRUB..."
+if [ "$GATE_C" = true ]; then
+  # Gate C: also copy the ext4 RootFS image to the ISO for QEMU virtio
+  # The RootFS was built by mkrootfs.sh to build/rootfs.ext4
+  if [ -f "build/rootfs.ext4" ]; then
+    cp "build/rootfs.ext4" "$ISODIR/boot/rootfs.ext4" 2>/dev/null || true
+    echo "  rootfs.ext4: $(du -sh "$ISODIR/boot/rootfs.ext4" | cut -f1) (Gate C)"
+  elif [ -f "/tmp/meow-rootfs.ext4" ]; then
+    cp "/tmp/meow-rootfs.ext4" "$ISODIR/boot/rootfs.ext4" 2>/dev/null || true
+    echo "  rootfs.ext4: $(du -sh "$ISODIR/boot/rootfs.ext4" | cut -f1) (Gate C, from /tmp)"
+  fi
+fi
 cat > "$ISODIR/boot/grub/grub.cfg" <<'GRUB'
 set timeout=3
 set default=0
@@ -286,6 +334,15 @@ menuentry "meowOS (verbose)" {
     initrd /boot/initramfs.cpio.gz
 }
 GRUB
+if [ "$GATE_C" = true ]; then
+  cat >> "$ISODIR/boot/grub/grub.cfg" <<'GRUB_GATEC'
+
+menuentry "meowOS Gate C (switch_root)" {
+    linux /boot/vmlinuz console=ttyS0,115200n8 console=tty0 loglevel=7 panic=10 root=LABEL=meowOS
+    initrd /boot/initramfs.cpio.gz
+}
+GRUB_GATEC
+fi
 
 # --- Step 6: Create ISO ---
 echo "==> Step 6: Creating ISO ($OUTISO)..."
@@ -300,8 +357,16 @@ echo "==> ISO created: $OUTISO"
 echo "  Size: $(du -sh "$OUTISO" | cut -f1)"
 echo "  Kernel: $(du -sh "$ISODIR/boot/vmlinuz" | cut -f1)"
 echo "  Initramfs: $(du -sh "$ISODIR/boot/initramfs.cpio.gz" | cut -f1) sha256:$(cat "$ISODIR/boot/initramfs.sha256")"
+if [ "$GATE_C" = true ] && [ -f "$ISODIR/boot/rootfs.ext4" ]; then
+  echo "  RootFS: $(du -sh "$ISODIR/boot/rootfs.ext4" | cut -f1) (ext4, LABEL=meowOS, for switch_root)"
+fi
 echo "  Deterministic: SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH, sorted cpio, gzip -n"
 echo ""
-echo "  Test (serial): qemu-system-x86_64 -cdrom $OUTISO -m 512 -nographic -serial mon:stdio"
-echo "  Test (VGA):    qemu-system-x86_64 -cdrom $OUTISO -m 512"
+if [ "$GATE_C" = true ]; then
+  echo "  Test Gate C (switch_root): qemu-system-x86_64 -kernel $ISODIR/boot/vmlinuz -initrd $ISODIR/boot/initramfs.cpio.gz -drive file=$ISODIR/boot/rootfs.ext4,format=raw,if=virtio -m 512 -nographic -serial mon:stdio -append 'console=ttyS0 root=LABEL=meowOS init=/init'"
+  echo "  Expected Gate C markers: BOOT_MARKER: switch_root, BOOT_MARKER: openrc ready, meowOS login:"
+else
+  echo "  Test (serial): qemu-system-x86_64 -cdrom $OUTISO -m 512 -nographic -serial mon:stdio"
+  echo "  Test (VGA):    qemu-system-x86_64 -cdrom $OUTISO -m 512"
+fi
 echo "  Expected marker: BOOT_MARKER: userspace ready"
