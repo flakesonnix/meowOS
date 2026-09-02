@@ -117,17 +117,21 @@ if [ -n "$BB" ] && [ -x "$BB" ]; then
     ln -sf /usr/bin/busybox "$ROOTFS/usr/bin/$applet" 2>/dev/null || true
   done
   # Ensure /bin/sh and /sbin/* point to busybox
-  # For Gate B, OpenRC is run as a service via rcS, not as PID 1.
-  # Keep BusyBox init as PID 1 (/sbin/init -> busybox) for now.
-  # OpenRC will be started from rcS via "openrc sysinit/boot/default".
+  # For Gate B, OpenRC is PID1 (via /init -> openrc-init).
+  # Keep BusyBox applets for shell utilities; OpenRC provides init.
   # Note: /bin is a symlink to usr/bin (usr-merge), so don't create
   # /bin/busybox as it would overwrite /usr/bin/busybox via the symlink.
   # /bin/sh -> /usr/bin/busybox is fine (creates usr/bin/sh via the symlink)
   ln -sf /usr/bin/busybox "$ROOTFS/bin/sh" 2>/dev/null || true
-  ln -sf /usr/bin/busybox "$ROOTFS/sbin/init" 2>/dev/null || true
   ln -sf /usr/bin/busybox "$ROOTFS/sbin/halt" 2>/dev/null || true
   ln -sf /usr/bin/busybox "$ROOTFS/sbin/poweroff" 2>/dev/null || true
   ln -sf /usr/bin/busybox "$ROOTFS/sbin/reboot" 2>/dev/null || true
+  # Do not overwrite /sbin/init - it is provided by openrc package (openrc-init)
+  # and /init (scripts/init.sh) will exec it as PID1. Keep busybox init as
+  # fallback only if openrc-init is missing.
+  if [ ! -e "$ROOTFS/sbin/openrc-init" ] && [ ! -e "$ROOTFS/sbin/init" ]; then
+    ln -sf /usr/bin/busybox "$ROOTFS/sbin/init" 2>/dev/null || true
+  fi
   # Also ensure usr/bin/sh exists directly for kernels that don't follow /bin symlink
   ln -sf busybox "$ROOTFS/usr/bin/sh" 2>/dev/null || true
   "$ROOTFS/usr/bin/busybox" --help > /dev/null 2>&1 || echo "warn: busybox self-test failed"
@@ -162,18 +166,26 @@ if [ ! -f "$ROOTFS/etc/inittab" ]; then
 ::shutdown:/bin/umount -a -r
 INITTAB
 fi
-# Always write rcS with OpenRC fallback marker (overrides package version)
+# For Gate B, OpenRC is PID1, so rcS is fallback only.
+# Keep it for BusyBox fallback path, but ensure it does not hide OpenRC success.
 mkdir -p "$ROOTFS/etc/init.d"
 cat > "$ROOTFS/etc/init.d/rcS" <<'RCS'
 #!/bin/sh
-echo "rcS: meowOS Gate B (OpenRC)"
-echo "Welcome to meowOS"
-echo "BOOT_MARKER: userspace ready"
-# OpenRC segfaults in ld-linux; rcS fallback continues to getty
+echo "rcS: meowOS Gate B (fallback, BusyBox init)"
+# If OpenRC is PID1, this rcS will not run. If we are here, OpenRC did not start.
 echo "BOOT_MARKER: openrc unavailable"
-touch "$ROOTFS/run/meowos-openrc-unavailable" 2>/dev/null || true
+touch /run/meowos-openrc-unavailable 2>/dev/null || true
 RCS
 chmod +x "$ROOTFS/etc/init.d/rcS"
+# Fix OpenRC agetty for Gate B: it must be per-port, not generic.
+# The openrc package ships default/agetty (no port) which fails with
+# "agetty cannot be started directly". Replace with per-port links.
+rm -f "$ROOTFS/etc/runlevels/default/agetty" 2>/dev/null || true
+mkdir -p "$ROOTFS/etc/runlevels/default"
+ln -sf ../../init.d/agetty "$ROOTFS/etc/runlevels/default/agetty.tty1" 2>/dev/null || true
+ln -sf ../../init.d/agetty "$ROOTFS/etc/runlevels/default/agetty.ttyS0" 2>/dev/null || true
+# Ensure meowos-mark is enabled in default (it already is from openrc package)
+ln -sf ../../init.d/meowos-mark "$ROOTFS/etc/runlevels/default/meowos-mark" 2>/dev/null || true
 
 # --- Step 4: Build deterministic initramfs ---
 echo "==> Step 4: Creating deterministic initramfs..."
