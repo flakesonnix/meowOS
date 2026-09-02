@@ -1,4 +1,4 @@
 [artifact]
 filename = "busybox-1.37.0.pkg.tar.zst"
 url = "packages/busybox-1.37.0.pkg.tar.zst"
-sha256 = "a8b1281eca73b6bfd8eeadccffed696574e67a5bd95b02388325602168d13d02"
+sha256 = "fbc8ba9af30f83ae38cd0e498dda4027bc6e81f332779b22d680ed96e6561992"
