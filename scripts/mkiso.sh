@@ -215,8 +215,9 @@ if ! grep -q "agetty.*ttyS0" "$ROOTFS/etc/init.d/meowos-mark" 2>/dev/null; then
 # Fallback: ensure login prompt on serial console even if agetty service fails
 start_post() {
   # Start a simple getty on ttyS0 if agetty.ttyS0 is not running
-  if ! pgrep -f "agetty.*ttyS0" >/dev/null 2>&1; then
-    setsid /sbin/agetty -L ttyS0 115200 vt100 &
+  # Use getty (busybox provides getty, not agetty)
+  if ! pgrep -f "getty.*ttyS0" >/dev/null 2>&1; then
+    setsid /sbin/getty -L ttyS0 115200 vt100 &
   fi
   # Also ensure the login marker is visible
   echo "meowOS login: " > /dev/ttyS0 2>/dev/null || true
