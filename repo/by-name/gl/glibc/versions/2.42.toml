@@ -1,4 +1,4 @@
 [artifact]
 filename = "glibc-2.42.pkg.tar.zst"
 url = "packages/glibc-2.42.pkg.tar.zst"
-sha256 = "59fb167a4eab529a4fd85480e4582f751ee8cfa142e200cd67aa277deb243060"
+sha256 = "3ed43389d3e28165b37ff06b5783d4abc66e0bcac1cdb08b2e2f745d531e239d"
