@@ -54,6 +54,13 @@ void bootstrapRootFS(const BootstrapOptions& opts,
 
     std::filesystem::create_directories(target / "var/lib/meow", ec);
 
+    // --- Ensure ld.so interpreter symlink exists for OpenRC compatibility ---
+    // OpenRC binaries are built with interpreter /usr/lib/meow/ld-linux-x86-64.so.2
+    // The actual glibc interpreter is at /lib64/ld-linux-x86-64.so.2
+    std::filesystem::create_directories(target / "usr/lib/meow", ec);
+    std::filesystem::create_symlink("/lib64/ld-linux-x86-64.so.2",
+                                    target / "usr/lib/meow/ld-linux-x86-64.so.2", ec);
+
     // --- Phase 2: Load repositories ---
     logPhase("Loading repositories");
 
@@ -133,6 +140,47 @@ void bootstrapRootFS(const BootstrapOptions& opts,
     } catch (...) {
         meow::database::closeDatabase(db);
         throw;
+    }
+
+    // --- Ensure OpenRC runtime is complete (after package install) ---
+    // OpenRC binaries have RUNPATH /usr/lib/meow and need glibc libs there.
+    // Copy meowOS glibc libs to /usr/lib/meow and ensure libeinfo is available.
+    {
+        std::filesystem::create_directories(target / "usr/lib/meow", ec);
+        // Helper to copy from a source path if it exists.
+        auto copyIfExists = [&](const std::filesystem::path& src,
+                                const std::filesystem::path& dstRel) {
+            if (std::filesystem::exists(src)) {
+                auto dst = target / dstRel;
+                std::filesystem::create_directories(dst.parent_path(), ec);
+                std::filesystem::copy_file(src, dst,
+                    std::filesystem::copy_options::overwrite_existing, ec);
+            }
+        };
+        // meowOS glibc - stable path in pkgs (not host /lib)
+        auto glibcSrc = std::filesystem::path("pkgs/by-name/gl/glibc/files/usr/lib");
+        // If running from a different cwd, try absolute fallback
+        if (!std::filesystem::exists(glibcSrc)) {
+            glibcSrc = std::filesystem::path("/home/natasha/Dokumente/coding/meowOS/pkgs/by-name/gl/glibc/files/usr/lib");
+        }
+        copyIfExists(glibcSrc / "libdl.so.2", "usr/lib/meow/libdl.so.2");
+        copyIfExists(glibcSrc / "libm.so", "usr/lib/meow/libm.so");
+        copyIfExists(glibcSrc / "libm.so.6", "usr/lib/meow/libm.so.6");
+        copyIfExists(glibcSrc / "libpthread.so.0", "usr/lib/meow/libpthread.so.0");
+        copyIfExists(glibcSrc / "libnss_compat.so.2", "usr/lib/meow/libnss_compat.so.2");
+        copyIfExists(glibcSrc / "libc.so.6", "usr/lib/meow/libc.so.6");
+        // libeinfo: OpenRC's lib, installed by openrc package at usr/lib/libeinfo.so.1
+        // After bootstrap with openrc, it will be at target/usr/lib/libeinfo.so.1
+        // Copy it to the RUNPATH location.
+        copyIfExists(target / "usr/lib/libeinfo.so.1", "usr/lib/meow/libeinfo.so.1");
+        copyIfExists(target / "usr/lib64/libeinfo.so.1", "usr/lib/meow/libeinfo.so.1");
+        // Fallback: if openrc not yet installed but we have a staged extract (CI)
+        copyIfExists(std::filesystem::path("/tmp/openrc-extract/files/usr/lib/libeinfo.so.1"),
+                     "usr/lib/meow/libeinfo.so.1");
+        // Ensure the interpreter symlink still points correctly (idempotent)
+        std::filesystem::create_directories(target / "usr/lib/meow", ec);
+        std::filesystem::create_symlink("/lib64/ld-linux-x86-64.so.2",
+                                        target / "usr/lib/meow/ld-linux-x86-64.so.2", ec);
     }
 
     // --- Phase 6: Finalize ---
