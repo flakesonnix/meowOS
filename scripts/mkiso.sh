@@ -197,6 +197,21 @@ ln -sf /usr/bin/busybox "$ROOTFS/usr/sbin/getty" 2>/dev/null || true
 if grep -q 'command_background=true' "$ROOTFS/etc/init.d/meowos-mark" 2>/dev/null; then
   sed -i 's/command_background=true/command_background=false/' "$ROOTFS/etc/init.d/meowos-mark" 2>/dev/null || true
 fi
+# Configure agetty for serial console (qemu -serial). The default agetty
+# service has empty baud/term_type, so it would run "agetty ttyS0 linux"
+# without baud. For the serial console we need 115200 vt100 like the old
+# inittab did (getty -L ttyS0 115200 vt100).
+mkdir -p "$ROOTFS/etc/conf.d"
+cat > "$ROOTFS/etc/conf.d/agetty.ttyS0" <<'AGETTY_TTY'
+baud="115200"
+term_type="vt100"
+agetty_options="-L"
+AGETTY_TTY
+cat > "$ROOTFS/etc/conf.d/agetty.tty1" <<'AGETTY_TTY1'
+baud="115200"
+term_type="linux"
+agetty_options=""
+AGETTY_TTY1
 
 # --- Step 4: Build deterministic initramfs ---
 echo "==> Step 4: Creating deterministic initramfs..."
