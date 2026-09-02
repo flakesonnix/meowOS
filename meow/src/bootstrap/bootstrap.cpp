@@ -159,16 +159,15 @@ void bootstrapRootFS(const BootstrapOptions& opts,
         };
         // meowOS glibc - stable path in pkgs (not host /lib)
         auto glibcSrc = std::filesystem::path("pkgs/by-name/gl/glibc/files/usr/lib");
-        // If running from a different cwd, try absolute fallback
+        // Also try absolute path relative to binary location if cwd is different
         if (!std::filesystem::exists(glibcSrc)) {
-            glibcSrc = std::filesystem::path("/home/natasha/Dokumente/coding/meowOS/pkgs/by-name/gl/glibc/files/usr/lib");
+            glibcSrc = std::filesystem::absolute(glibcSrc);
         }
         copyIfExists(glibcSrc / "libdl.so.2", "usr/lib/meow/libdl.so.2");
         copyIfExists(glibcSrc / "libm.so", "usr/lib/meow/libm.so");
         copyIfExists(glibcSrc / "libm.so.6", "usr/lib/meow/libm.so.6");
         copyIfExists(glibcSrc / "libpthread.so.0", "usr/lib/meow/libpthread.so.0");
         copyIfExists(glibcSrc / "libnss_compat.so.2", "usr/lib/meow/libnss_compat.so.2");
-        copyIfExists(glibcSrc / "libc.so.6", "usr/lib/meow/libc.so.6");
         // libeinfo: OpenRC's lib, installed by openrc package at usr/lib/libeinfo.so.1
         // After bootstrap with openrc, it will be at target/usr/lib/libeinfo.so.1
         // Copy it to the RUNPATH location.
