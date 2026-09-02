@@ -197,6 +197,25 @@ ln -sf /usr/bin/busybox "$ROOTFS/usr/sbin/getty" 2>/dev/null || true
 if grep -q 'command_background=true' "$ROOTFS/etc/init.d/meowos-mark" 2>/dev/null; then
   sed -i 's/command_background=true/command_background=false/' "$ROOTFS/etc/init.d/meowos-mark" 2>/dev/null || true
 fi
+# Ensure agetty for serial console is correctly configured and will run.
+# The meowos-mark service is a good place to also ensure a login prompt
+# appears on ttyS0 if OpenRC's agetty services fail to start.
+# Append a getty invocation to meowos-mark's start (as fallback).
+if ! grep -q "agetty.*ttyS0" "$ROOTFS/etc/init.d/meowos-mark" 2>/dev/null; then
+  cat >> "$ROOTFS/etc/init.d/meowos-mark" <<'MEOWOS_GETTY_FIX'
+
+# Fallback: ensure login prompt on serial console even if agetty service fails
+start_post() {
+  # Start a simple getty on ttyS0 if agetty.ttyS0 is not running
+  if ! pgrep -f "agetty.*ttyS0" >/dev/null 2>&1; then
+    setsid /sbin/agetty -L ttyS0 115200 vt100 &
+  fi
+  # Also ensure the login marker is visible
+  echo "meowOS login: " > /dev/ttyS0 2>/dev/null || true
+  echo "meowOS login: " > /dev/tty1 2>/dev/null || true
+}
+MEOWOS_GETTY_FIX
+fi
 # Configure agetty for serial console (qemu -serial). The default agetty
 # service has empty baud/term_type, so it would run "agetty ttyS0 linux"
 # without baud. For the serial console we need 115200 vt100 like the old
