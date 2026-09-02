@@ -18,19 +18,25 @@ $BUSYBOX mount -t devpts none /dev/pts 2>/dev/null || mount -t devpts none /dev/
 echo "rcS: meowOS Gate B"
 # Wait for the root device to appear (virtio-blk, sda, vda)
 echo "Gate C initramfs: waiting for root device..."
-for i in 1 2 3 4 5; do
-  for dev in /dev/vda /dev/sda /dev/disk/by-label/meowOS; do
+# Debug: list available block devices
+echo "Gate C initramfs: available block devices:"
+$BUSYBOX ls -l /dev/vda* /dev/sda* /dev/disk/by-label/* 2>&1 | head -n 20
+$BUSYBOX dmesg 2>&1 | grep -i "virtio\|vda\|sda" | head -n 10
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  for dev in /dev/vda /dev/sda /dev/disk/by-label/meowOS /dev/vda1 /dev/sda1; do
     if [ -e "$dev" ]; then
       ROOTDEV="$dev"
       break 2
     fi
   done
-  echo "  waiting for $dev... $i"
+  echo "  waiting for root device... $i (checked vda, sda, by-label)"
   $BUSYBOX sleep 1
 done
 
 if [ -z "${ROOTDEV:-}" ]; then
-  echo "Gate C initramfs: no root device found, falling back to /dev/vda"
+  echo "Gate C initramfs: no root device found after 10s, listing /dev"
+  $BUSYBOX ls -l /dev/ 2>&1 | head -n 30
+  echo "Gate C initramfs: falling back to /dev/vda"
   ROOTDEV="/dev/vda"
 fi
 
