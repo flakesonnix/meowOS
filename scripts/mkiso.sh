@@ -186,6 +186,17 @@ ln -sf ../../init.d/agetty "$ROOTFS/etc/runlevels/default/agetty.tty1" 2>/dev/nu
 ln -sf ../../init.d/agetty "$ROOTFS/etc/runlevels/default/agetty.ttyS0" 2>/dev/null || true
 # Ensure meowos-mark is enabled in default (it already is from openrc package)
 ln -sf ../../init.d/meowos-mark "$ROOTFS/etc/runlevels/default/meowos-mark" 2>/dev/null || true
+# Fix broken agetty/getty symlinks: openrc's agetty expects /sbin/agetty
+# but the initramfs has broken self-referential symlinks. Point them to busybox.
+ln -sf /usr/bin/busybox "$ROOTFS/sbin/agetty" 2>/dev/null || true
+ln -sf /usr/bin/busybox "$ROOTFS/usr/sbin/agetty" 2>/dev/null || true
+ln -sf /usr/bin/busybox "$ROOTFS/sbin/getty" 2>/dev/null || true
+ln -sf /usr/bin/busybox "$ROOTFS/usr/sbin/getty" 2>/dev/null || true
+# Make meowos-mark output visible on console (not backgrounded)
+# The default uses command_background=true which hides the BOOT_MARKER.
+if grep -q 'command_background=true' "$ROOTFS/etc/init.d/meowos-mark" 2>/dev/null; then
+  sed -i 's/command_background=true/command_background=false/' "$ROOTFS/etc/init.d/meowos-mark" 2>/dev/null || true
+fi
 
 # --- Step 4: Build deterministic initramfs ---
 echo "==> Step 4: Creating deterministic initramfs..."
