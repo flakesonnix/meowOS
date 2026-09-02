@@ -1,4 +1,4 @@
 [artifact]
 filename = "linux-6.14.11.pkg.tar.zst"
 url = "packages/linux-6.14.11.pkg.tar.zst"
-sha256 = "541ad25cb0219d9e68a629ed6ebfc543adcb6d8f589a6a1efcd7b2f26f75a7c0"
+sha256 = "9f91355038dde820042b5eb473bfa96e01ec3501162d6cf56206e8a4edec7aaf"
