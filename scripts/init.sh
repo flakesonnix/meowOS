@@ -1,16 +1,14 @@
 #!/bin/sh
-# meowOS Gate A init - deterministic, BusyBox initramfs
-# Mounts virtual filesystems, sets hostname, prints boot marker,
-# then hands off to BusyBox init (which reads /etc/inittab).
-# For initramfs-only Gate A, this IS the root filesystem.
+# meowOS Gate B init - OpenRC as PID1
+# Mounts virtual filesystems, sets hostname, starts OpenRC as init.
+# After OpenRC initializes, agetty provides the login prompt.
 
-# Use BusyBox applets via /usr/bin/busybox where needed; symlinks
-# in /bin and /usr/bin cover the rest once /proc/sys are up.
 BUSYBOX="/usr/bin/busybox"
 if [ ! -x "$BUSYBOX" ]; then
   BUSYBOX="/bin/busybox"
 fi
 
+# Mount virtual filesystems
 $BUSYBOX mount -t proc     none  /proc 2>/dev/null || mount -t proc none /proc
 $BUSYBOX mount -t sysfs    none  /sys 2>/dev/null || mount -t sysfs none /sys
 $BUSYBOX mount -t devtmpfs none  /dev 2>/dev/null || mount -t devtmpfs none /dev
@@ -27,7 +25,7 @@ else
   $BUSYBOX hostname meowOS
 fi
 
-# Deterministic banner for QEMU tests
+# Deterministic banner
 echo ""
 echo "  __  __                      ____   _____ "
 echo " |  \/  |                    / __ \ / ____|"
@@ -39,14 +37,13 @@ echo ""
 echo "  Welcome to meowOS!"
 echo ""
 echo "BOOT_MARKER: userspace ready"
-echo "init: handing off to /sbin/init"
+echo "init: starting OpenRC as PID1"
 
-# If we are initramfs-only, /sbin/init is BusyBox init which will parse
-# /etc/inittab and spawn getty on ttyS0 / tty1.
-# Fall back to shell if init not present (debug).
-if [ -x /sbin/init ]; then
-  exec /sbin/init
+# Start OpenRC as PID1
+# Try openrc-init first, fall back to busybox init
+if [ -x /sbin/openrc-init ]; then
+  exec /sbin/openrc-init --legacy 2>&1
 else
-  echo "WARN: /sbin/init not found, falling back to /bin/sh"
-  exec /bin/sh
+  # Fall back to busybox init
+  exec /sbin/init 2>&1
 fi

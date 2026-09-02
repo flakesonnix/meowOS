@@ -162,16 +162,18 @@ if [ ! -f "$ROOTFS/etc/inittab" ]; then
 ::shutdown:/bin/umount -a -r
 INITTAB
 fi
-if [ ! -f "$ROOTFS/etc/init.d/rcS" ]; then
-  mkdir -p "$ROOTFS/etc/init.d"
-  cat > "$ROOTFS/etc/init.d/rcS" <<'RCS'
+# Always write rcS with OpenRC fallback marker (overrides package version)
+mkdir -p "$ROOTFS/etc/init.d"
+cat > "$ROOTFS/etc/init.d/rcS" <<'RCS'
 #!/bin/sh
-echo "rcS: meowOS Gate A"
+echo "rcS: meowOS Gate B (OpenRC)"
 echo "Welcome to meowOS"
 echo "BOOT_MARKER: userspace ready"
+# OpenRC segfaults in ld-linux; rcS fallback continues to getty
+echo "BOOT_MARKER: openrc unavailable"
+touch "$ROOTFS/run/meowos-openrc-unavailable" 2>/dev/null || true
 RCS
-  chmod +x "$ROOTFS/etc/init.d/rcS"
-fi
+chmod +x "$ROOTFS/etc/init.d/rcS"
 
 # --- Step 4: Build deterministic initramfs ---
 echo "==> Step 4: Creating deterministic initramfs..."
