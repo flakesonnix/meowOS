@@ -678,6 +678,7 @@ int main(int argc, char** argv) {
             //   --with-optional      install every declared optional dependency
             //   --optional <name>    install a named optional (repeatable)
             //   --locked             install from the lockfile
+            //   --yes / -y / --noconfirm  APT-like UX: non-interactive (already default)
             bool withOptional = false;
             bool locked = false;
             std::set<meow::types::PackageName> selectedOptional;
@@ -694,6 +695,9 @@ int main(int argc, char** argv) {
                     selectedOptional.insert(meow::types::PackageName{std::string(cmdArgv[++i])});
                 } else if (a == "--locked") {
                     locked = true;
+                } else if (a == "--yes" || a == "-y" || a == "--noconfirm") {
+                    // Accept APT-like non-interactive flag (already default)
+                    continue;
                 } else {
                     pkgName = std::string(a);
                 }
