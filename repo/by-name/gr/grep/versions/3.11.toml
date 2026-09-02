@@ -1,4 +1,4 @@
 [artifact]
 filename = "grep-3.11.pkg.tar.zst"
 url = "packages/grep-3.11.pkg.tar.zst"
-sha256 = "dc49ecbe723bedf6859e4ff299c8dcebe91ddaddc1fe229752019213241295b7"
+sha256 = "2982b1d06478e906621d48aba1cd342f8763b8cdd405dea7efe1cb690f6cfbee"

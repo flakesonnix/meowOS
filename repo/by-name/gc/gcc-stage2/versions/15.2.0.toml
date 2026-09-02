@@ -1,4 +1,4 @@
 [artifact]
 filename = "gcc-stage2-15.2.0.pkg.tar.zst"
 url = "packages/gcc-stage2-15.2.0.pkg.tar.zst"
-sha256 = "10f98177751651013c6cc645754882004e956275f660a31cbcedeb67297a0b9a"
+sha256 = "15fceb8c0399525b8f6b518ea7fba0fd145297469f6c3afd746d841b6f7132da"

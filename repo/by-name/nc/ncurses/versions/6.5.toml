@@ -1,4 +1,4 @@
 [artifact]
 filename = "ncurses-6.5.pkg.tar.zst"
 url = "packages/ncurses-6.5.pkg.tar.zst"
-sha256 = "0b1c71e6bb3738b9ca5602c65eaeddca9863f065de89000ac631350ce101c84f"
+sha256 = "a907d449c112b2b8417b885703225979d25c19d6452bea51c276007a86d010fd"

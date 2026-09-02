@@ -1,4 +1,4 @@
 [artifact]
 filename = "zstd-1.5.7.pkg.tar.zst"
 url = "packages/zstd-1.5.7.pkg.tar.zst"
-sha256 = "d42eea432036270bb049c8ebc0629c1a809037298892199365df0110d735685a"
+sha256 = "ea3a21723defba94f535399694608a30ad630b48fb91d84dedfa1f7422d0cf4a"

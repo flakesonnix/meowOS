@@ -1,4 +1,4 @@
 [artifact]
 filename = "gzip-1.14.pkg.tar.zst"
 url = "packages/gzip-1.14.pkg.tar.zst"
-sha256 = "b2ab610d8183828c1b37de9915cfec323820ebcd76baf1bf3021db288ab8a82a"
+sha256 = "d3e12bcc9235f2a10f039ff5a900c9c37d5e389f661912570d80b223b320c578"
