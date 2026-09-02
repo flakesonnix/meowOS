@@ -1,4 +1,4 @@
 [artifact]
 filename = "qt6-1.0.0.pkg.tar.zst"
 url = "file:///tmp/meow-artifacts/qt6-1.0.0.pkg.tar.zst"
-sha256 = "b9a77281461b7a3890b170fa2e91175a1e56ed983ac49f249627eaf7c473b573"
+sha256 = "75ded22148def63f3c2ddb73320daab84241e8992eb9c76b5a5146950077d196"
