@@ -25,6 +25,7 @@ else
   $BUSYBOX hostname meowOS
 fi
 
+echo "rcS: meowOS Gate B"
 # Deterministic banner
 echo ""
 echo "  __  __                      ____   _____ "

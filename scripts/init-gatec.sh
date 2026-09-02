@@ -15,6 +15,7 @@ $BUSYBOX mount -t devtmpfs none /dev 2>/dev/null || mount -t devtmpfs none /dev
 $BUSYBOX mkdir -p /dev/pts
 $BUSYBOX mount -t devpts none /dev/pts 2>/dev/null || mount -t devpts none /dev/pts
 
+echo "rcS: meowOS Gate B"
 # Wait for the root device to appear (virtio-blk, sda, vda)
 echo "Gate C initramfs: waiting for root device..."
 for i in 1 2 3 4 5; do
