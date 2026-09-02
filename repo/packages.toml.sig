@@ -1,3 +1,3 @@
 algorithm = "ed25519"
 keyId = "meow-release"
-signature = "pE6A/h6Gcw3nw6heSbtMJaLWcUiersF/iZwutp5taYpbXDAfCFjsXFmwL79KYOtMDqwUwxpowNGfjAizZfwTBg=="
+signature = "neRFvKnAUcFcv0gb6+q6hw0P6sBIIF0LEexDbK+BeAdUNhqjOBGhNysN8jS9n16KFyLelgNMlolMzdk/8cAoDg=="
