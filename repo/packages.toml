@@ -295,3 +295,10 @@ manifest_hash = "sha256:8c50dca7b67c74f7ad76865bf5855d6987c4cb83a7557719097ae226
 artifact_hash = "sha256:6d23ffcfc65938575effbcd18e810b0b4a94fd71537aca638283511b042b324e"
 size = 113723
 
+
+[[package]]
+name = "base"
+version = "1.0.0"
+manifest_hash = "sha256:db76423ebf103e734d6066f04014d0f48cd50aa4a155e31d6a72ea06dbe781b5"
+artifact_hash = "sha256:e1e2b2173292db639f237791e3c2a87e47d5d0f6b210c0f111399569ba81fa19"
+size = 207
