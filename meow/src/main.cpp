@@ -867,7 +867,18 @@ int main(int argc, char** argv) {
                 std::cerr << "usage: meow remove <package>\n";
                 return 1;
             }
-            meow::remove::removePackage(meow::types::PackageName{cmdArgv[1]}, db);
+            // Accept --yes/-y/--noconfirm for symmetry with install (APT-like)
+            std::string rmPkg;
+            for (int i = 1; i < cmdArgc; ++i) {
+                std::string_view a = cmdArgv[i];
+                if (a == "--yes" || a == "-y" || a == "--noconfirm") continue;
+                rmPkg = std::string(a);
+            }
+            if (rmPkg.empty()) {
+                std::cerr << "usage: meow remove <package>\n";
+                return 1;
+            }
+            meow::remove::removePackage(meow::types::PackageName{rmPkg}, db);
         } else if (cmd == "verify") {
             cmdVerify(db);
         } else if (cmd == "repair") {

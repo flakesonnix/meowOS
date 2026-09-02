@@ -48,6 +48,7 @@ run_section_from "05_doctor.sh"
 run_section_from "06_reproducible.sh"
 run_section_from "07_hooks.sh"
 run_section_from "22_groups.sh"
+run_section_from "25_cli_noninteractive.sh"
 run_section_from "20_history.sh"
 run_section_from "21_optionals.sh"
 
