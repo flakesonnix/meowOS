@@ -192,6 +192,14 @@ ln -sf /usr/bin/busybox "$ROOTFS/sbin/agetty" 2>/dev/null || true
 ln -sf /usr/bin/busybox "$ROOTFS/usr/sbin/agetty" 2>/dev/null || true
 ln -sf /usr/bin/busybox "$ROOTFS/sbin/getty" 2>/dev/null || true
 ln -sf /usr/bin/busybox "$ROOTFS/usr/sbin/getty" 2>/dev/null || true
+# BusyBox provides getty, not agetty, as applet name. The OpenRC agetty
+# service does 'command=/sbin/agetty' which busybox will not find as
+# 'agetty: applet not found' (only 'getty' exists). Fix the service to
+# use getty, or make agetty resolve to getty.
+if [ -f "$ROOTFS/etc/init.d/agetty" ]; then
+  sed -i 's|command=/sbin/agetty|command=/sbin/getty|' "$ROOTFS/etc/init.d/agetty" 2>/dev/null || true
+  # Also ensure the service's command_args still works (port, baud, etc. are same)
+fi
 # Make meowos-mark output visible on console (not backgrounded)
 # The default uses command_background=true which hides the BOOT_MARKER.
 if grep -q 'command_background=true' "$ROOTFS/etc/init.d/meowos-mark" 2>/dev/null; then
