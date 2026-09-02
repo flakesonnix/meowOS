@@ -67,7 +67,7 @@ commit → register in SQLite database  ("✓ Transaction committed")
 | Repository      | `repository`              | by-name scan, open/verify, index verify     |
 | Resolver (SAT)  | `dependency/sat`          | DPLL over CNF, version constraints, UNSAT   |
 | Resolver (Legacy)| `dependency/legacy`      | DFS-based, cycle detection, compatibility   |
-| Resolver factory| `dependency`              | `Auto → Sat` (legacy via `MEOW_RESOLVER=legacy`); `ResolveRequest::db` for idempotent skip |
+| Resolver factory| `dependency`              | `Auto → Sat` (SAT resolver only); `ResolveRequest::db` for idempotent skip |
 | Download        | `download`                | libcurl transport, atomic writes, retries   |
 | Download queue  | `download/queue`          | bounded parallel fetch of artifacts         |
 | Builder         | `builder`                 | reproducible `.pkg.tar.zst` generation       |

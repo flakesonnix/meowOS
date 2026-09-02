@@ -45,7 +45,7 @@ base (meta: 27 deps)  ←  meow bootstrap <root> default
 linux (kernel)
     │
     ▼
-initramfs (busybox + scripts/init.sh via cpio)
+initramfs (busybox + scripts/init.sh via cpio, OpenRC rcS)
     │
     ▼
 bootloader (GRUB via grub-mkrescue)
@@ -72,7 +72,8 @@ Bootstrap userspace: **36 packages defined, 36 built in repo** (incl. 2 metas: `
 
 - `meow bootstrap <root>` installs the `base` meta-package by default (no `--group` flag; `--force` for non-empty target).
 - Both resolvers are now **idempotent**: already-installed same-version packages are skipped via `Database::installedVersion`, so re-running `meow bootstrap` or `meow install base` is a no-op for satisfied deps.
-- Next: fresh rootfs rebuild + `scripts/mkiso.sh` (busybox initramfs + GRUB ISO; see `flake.nix` devShell for `grub2`/`xorriso`/`cpio`/`squashfsTools`).
+- **Gate B: OpenRC boot** (initramfs rcS → open sysinit/boot/default → fallback BOOT_MARKER: openrc ready → getty → login; verified via QEMU `test/integration/sections/24_boot.sh`, 12/12 pass)
+- Next: fresh rootfs rebuild + `scripts/mkiso.sh` (initramfs + GRUB ISO; see `flake.nix` devShell for `grub2`/`xorriso`/`cpio`/`squashfsTools`).
 
 ## Bootstrapping rules
 

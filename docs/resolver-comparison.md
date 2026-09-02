@@ -1,16 +1,12 @@
 # Resolver backends: Legacy vs SAT
 
-meow ships two resolution backends behind `ResolverEngine` (config) and the
+meow ships a SAT-based `SatResolver` (recommended) behind `ResolverEngine` and the
 `MEOW_RESOLVER` environment override.
 
 - **sat** — the SAT-based `SatResolver` (recommended). DPLL over a CNF
   translation. Full support for version constraints, virtual providers, and
   conflict detection. Select via `MEOW_RESOLVER=sat` or `ResolverEngine::Sat`.
   Planned as default after v0.7.0 stabilization.
-- **legacy** — the DFS-based `LegacyResolver` (current default, via
-  `ResolverEngine::Auto → Legacy`). Provided for debugging and rollback
-  during the transition period.
-  Select via `MEOW_RESOLVER=legacy` or `ResolverEngine::Legacy`.
 
 ## Correctness parity
 
@@ -69,21 +65,12 @@ diagnostics without running the solver again:
 | `VersionConflict` | Dependency constraint with no satisfying version |
 | `Cycle` | Dependency cycle (from expandInstallRequest) |
 
-## Running both backends
+## What to compare
 
-```sh
-MEOW_RESOLVER=legacy ./build/meow install app
-MEOW_RESOLVER=sat    ./build/meow install app
-```
-
-## Idempotency
-
-Both backends are **idempotent** as of `5802214`: `ResolveRequest` carries
-`db*` and each resolver checks `installedVersion(db, name) == version` to skip
-already-installed same-version packages. `meow install base`, `meow install
-<already-installed>`, and `meow bootstrap` (which installs `base`) are no-ops
-for satisfied deps. No resolver re-downloads or re-extracts; `downloadAll` and
-`installPackages` are simply not invoked for skipped members.
+1. **Correctness parity** — `meow-unit-sat-parity` on synthetic graphs.
+2. **Translation cost** — `meow-bench` reports SAT pipeline phases.
+3. **Scalability** — use the `deep`, `wide`, `many-providers`, `many-versions`,
+   `dense-conflicts`, `many-virtuals`, and `random-dag` fixtures.
 
 ## What to compare
 

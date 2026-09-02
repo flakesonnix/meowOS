@@ -122,7 +122,7 @@
   `test/integration/sections/23_signed_index.sh`. See `docs/security.md`.
 
 - SAT resolver status: feature-complete and at parity with the legacy resolver
-  (integration suite passes identically under `MEOW_RESOLVER=legacy` and
+  (integration suite passes identically under SAT resolver)
   `MEOW_RESOLVER=sat`); the default engine remains `Legacy`
   (`ResolverEngine::Auto`). See `docs/release-readiness-v0.7.md` for the
   full review and the criteria assessment in `docs/sat-default-criteria.md`.

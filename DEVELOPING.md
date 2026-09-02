@@ -49,7 +49,7 @@ scripts/mkiso.sh myos.iso                       # kernel + busybox initramfs + G
 ```bash
 # full suite (both resolvers)
 MEOW_RESOLVER=sat    ctest --output-on-failure
-MEOW_RESOLVER=legacy ctest --output-on-failure
+# Legacy resolver removed - SAT only
 
 # unit tests only
 ctest -L unit
@@ -59,7 +59,7 @@ ctest -L integration
 
 # RC validation (deterministic large-repo parity check)
 python3 test/rc/generate_realistic_repo.py
-MEOW_RESOLVER=legacy python3 test/rc/compare_resolvers.py
+# Legacy resolver removed - SAT only
 MEOW_RESOLVER=sat    python3 test/rc/compare_resolvers.py
 ```
 
@@ -152,8 +152,8 @@ support for caching. `downloadAll` shows a colored progress bar
 
 ## Resolver selection & idempotency
 
-Set `MEOW_RESOLVER=sat` or `MEOW_RESOLVER=legacy` to switch. The default
-(`Auto`) maps to `SatResolver`. Legacy is available via `MEOW_RESOLVER=legacy`
+# MEOW_RESOLVER defaults to sat (default resolver engine)
+# Legacy resolver has been removed; Auto maps to Sat natively
 or `ResolverEngine::Legacy`.
 
 Both resolvers are **idempotent**: `ResolveRequest` carries `db*` and skips

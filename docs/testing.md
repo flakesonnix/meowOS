@@ -76,8 +76,8 @@ A non-zero failure count still exits non-zero; skips do not.
 
 ### Legacy sequential runner
 ```bash
+# MEOW_RESOLVER defaults to sat (SAT resolver only, legacy removed)
 MEOW_RESOLVER=sat ./test/integration.sh
-MEOW_RESOLVER=legacy ./test/integration.sh
 ```
 
 ### Single section standalone
@@ -128,8 +128,8 @@ Usage:
 python3 test/rc/generate_realistic_repo.py
 
 # 2. Run comparison under each resolver
-MEOW_RESOLVER=legacy python3 test/rc/compare_resolvers.py
-MEOW_RESOLVER=sat    python3 test/rc/compare_resolvers.py
+# MEOW_RESOLVER defaults to sat (SAT resolver only, legacy removed)
+MEOW_RESOLVER=sat python3 test/rc/compare_resolvers.py
 
 # 3. Check the report for regressions
 cat rc-comparison-report.md

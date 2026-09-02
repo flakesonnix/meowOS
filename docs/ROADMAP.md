@@ -6,7 +6,7 @@ See `docs/bootstrap.md` for the bootstrap chain diagram and
 `docs/packaging.md` for packaging conventions.
 
 Gate 2 active. Package manager (v0.7) stable; bootstrap userspace complete
-across three segments:
+across three segments; Gate B (OpenRC boot) finalised.
 
 ### Gate 2 progress
 
@@ -21,7 +21,10 @@ Gate 2
 │
 ├── ✅ base meta-package     (meow bootstrap <root> installs base + 27 deps, idempotent)
 ├── ✅ Fresh RootFS          (meow bootstrap → base; re-run is no-op for satisfied deps)
-├── ✅ ISO prototype         (scripts/mkiso.sh: kernel + busybox initramfs + GRUB)
+├── ✅ ISO prototype         (scripts/mkiso.sh: kernel + initramfs + GRUB;
+│ Gate B: rcS openrc fallback, boot to login)
+├── ✅ Gate B: OpenRC        (initramfs rcS → open sysinit/boot/default → fallback
+│                             BOOT_MARKER: openrc ready → getty → login)
 ├── ⏳ Regression Suite      (verify all tools; meow owns; toolchain smoke test)
 └── ⏳ Exit Checklist        (docs finalised, all gates green)
 ```
@@ -271,7 +274,7 @@ v0.7 closed the per-package trust boundary and added a full SAT-based resolver.
   (`test/rc/generate_realistic_repo.py` + `compare_resolvers.py`).
 - **0 unexpected regressions** in RC comparison.
 - `Auto` maps to `Sat` as of v0.7.0; `Legacy` remains selectable via
-  `MEOW_RESOLVER=legacy`.
+  `MEOW_RESOLVER=sat`.
 
 ### Security hardening
 
