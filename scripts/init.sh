@@ -42,7 +42,7 @@ echo "init: starting OpenRC as PID1"
 # Start OpenRC as PID1
 # Try openrc-init first, fall back to busybox init
 if [ -x /sbin/openrc-init ]; then
-  exec /sbin/openrc-init --legacy 2>&1
+  exec /sbin/openrc-init 2>&1
 else
   # Fall back to busybox init
   exec /sbin/init 2>&1
